@@ -1,32 +1,33 @@
+import 'dotenv/config'
 import { Bot } from 'grammy'
 import { config } from './src/config.js'
-import { getMainMenu, mainMenuCaption, EXAMPLE_DAYS } from './src/keyboards.js'
-import { InputFile } from 'grammy'
+
+import startHandler from './src/handlers/start.js'
+import callbackHandler from './src/handlers/callback.js'
+
+import messagesHandler from './src/handlers/messages.js'
+
+// ... после других bot.use
+
+bot.use(messagesHandler)
 
 console.log('Запуск бота...')
 
 const bot = new Bot(config.botToken)
 
-bot.command('start', async (ctx) => {
-  const caption = mainMenuCaption(EXAMPLE_DAYS)
-  const keyboard = getMainMenu(EXAMPLE_DAYS)
+// Подключаем handlers
+bot.use(startHandler)
+bot.use(callbackHandler)
 
-  await ctx.replyWithPhoto(
-    new InputFile('./public/calcilatorplus.png'), // ← InputFile + правильный путь
-    {
-      caption: caption,
-      parse_mode: 'Markdown',
-      reply_markup: keyboard,
-    }
-  )
+// Глобальный catch ошибок (чтобы бот не падал)
+bot.catch((err) => {
+  console.error('Глобальная ошибка:', err)
 })
-
-bot.on('message', (ctx) => ctx.reply('Got another message!'))
 
 bot
   .start()
   .then(() => console.log('Bot started successfully'))
   .catch((err) => {
-    console.error('Ошибка при запуске бота:', err)
+    console.error('Ошибка запуска:', err)
     process.exit(1)
   })
