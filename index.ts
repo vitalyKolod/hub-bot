@@ -9,14 +9,13 @@ import messagesHandler from './src/handlers/messages.js'
 
 // ... после других bot.use
 
-bot.use(messagesHandler)
-
 console.log('Запуск бота...')
 
 const bot = new Bot(config.botToken)
 
 // Подключаем handlers
 bot.use(startHandler)
+bot.use(messagesHandler)
 bot.use(callbackHandler)
 
 // Глобальный catch ошибок (чтобы бот не падал)

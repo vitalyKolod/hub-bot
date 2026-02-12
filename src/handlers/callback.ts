@@ -2,6 +2,7 @@
 import { Composer, InlineKeyboard, InputFile } from 'grammy'
 import { getScreenData } from '../keyboards.js'
 import { clearSession, setSession } from '../state/session.js'
+import { extendSubscription } from '../state/users.js'
 
 const composer = new Composer()
 
@@ -24,7 +25,7 @@ composer.on('callback_query:data', async (ctx) => {
     | 'support'
     | 'faq' = 'main'
 
-  let handled = false // флаг, что мы уже обработали специальный случай
+  let handled = false
 
   switch (data) {
     case 'payment_method':
@@ -63,19 +64,18 @@ composer.on('callback_query:data', async (ctx) => {
 
 Я сразу перешлю админу на проверку.
 Чтобы отменить — напиши /cancel
-      `
+      `.trim()
 
       const waitKeyboard = new InlineKeyboard().text('Отмена', 'cancel_check')
 
       try {
         await ctx.api.editMessageCaption(chatId, messageId, {
-          caption: waitCaption.trim(),
+          caption: waitCaption,
           parse_mode: 'Markdown',
           reply_markup: waitKeyboard,
         })
-
         await ctx.answerCallbackQuery({ text: 'Ожидаю чек!' })
-        handled = true // обработали, дальше не редактируем
+        handled = true
       } catch (err) {
         console.error('Ошибка при переходе в режим чека:', err)
         await ctx.answerCallbackQuery({
@@ -90,16 +90,57 @@ composer.on('callback_query:data', async (ctx) => {
       screen = 'main'
       break
 
+    // === КНОПКИ РЕГИСТРАЦИИ ===
+    case 'has_subscription':
+      // Ставим режим ожидания ФИО
+      setSession(chatId, 'waiting_fio', { registrationMode: 'has_subscription' })
+
+      // Меняем сообщение на запрос ФИО
+      const fioCaption = 'Отлично! Введи своё ФИО полностью.'
+      const fioKeyboard = new InlineKeyboard().text('Отмена', 'cancel_check')
+
+      try {
+        await ctx.api.editMessageCaption(chatId, messageId, {
+          caption: fioCaption,
+          reply_markup: fioKeyboard,
+        })
+        await ctx.answerCallbackQuery({ text: 'Жду ФИО' })
+        handled = true
+      } catch (err) {
+        console.error('Ошибка перехода к ФИО:', err)
+        await ctx.answerCallbackQuery({ text: 'Ошибка, попробуй /start', show_alert: true })
+      }
+      break
+
+    case 'want_buy':
+      // То же самое, но registrationMode = 'want_buy'
+      setSession(chatId, 'waiting_fio', { registrationMode: 'want_buy' })
+
+      const fioCaptionWant = 'Круто! Введи своё ФИО полностью.'
+      const fioKeyboardWant = new InlineKeyboard().text('Отмена', 'cancel_check')
+
+      try {
+        await ctx.api.editMessageCaption(chatId, messageId, {
+          caption: fioCaptionWant,
+          reply_markup: fioKeyboardWant,
+        })
+        await ctx.answerCallbackQuery({ text: 'Жду ФИО' })
+        handled = true
+      } catch (err) {
+        console.error('Ошибка перехода к ФИО (want_buy):', err)
+        await ctx.answerCallbackQuery({ text: 'Ошибка, попробуй /start', show_alert: true })
+      }
+      break
+
     default:
       screen = 'main'
       await ctx.answerCallbackQuery({ text: 'Неизвестная кнопка', show_alert: true })
       return
   }
 
-  // Если это был специальный случай (uploaded_check) — выходим, не редактируем второй раз
   if (handled) return
 
-  // Обычные экраны — редактируем фото + caption + клавиатуру
+  // Обычное переключение экрана (для остальных кнопок)
   const { photoPath, caption, keyboard } = getScreenData(screen)
 
   try {
