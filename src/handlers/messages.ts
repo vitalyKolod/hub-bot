@@ -15,48 +15,52 @@ composer.on('message', async (ctx) => {
   const session = getSession(userId)
   const text = ctx.message.text?.trim()
 
-  // Режим чека — форвард с инфой юзера
+  // Режим чека — только документы
   if (session?.mode === 'waiting_check') {
+    if (!ctx.message.document) {
+      return ctx.reply('Пришли именно документ (PDF, ZIP и т.д.). Фото или текст не принимаются.')
+    }
+
     try {
       const user = registerUser(userId)
-      await ctx.replyTo(
+
+      // Инфа админу
+      await ctx.api.sendMessage(
         config.adminId,
-        `Чек от юзера:
+        `Новый чек от юзера:
 ФИО: ${user.name || 'не указано'}
 Город: ${user.city || 'не указан'}
-ID: ${userId}
-Подписка до: ${user.subscriptionEnd ? user.subscriptionEnd.toISOString() : 'нет'}
-`
+Telegram ID: ${userId}
+Подписка до: ${user.subscriptionEnd ? user.subscriptionEnd.toISOString() : 'нет'}`
       )
 
-      const forwarded = await ctx.forwardMessage(config.adminId)
+      await ctx.forwardMessage(config.adminId)
 
-      const confirmKeyboard = new InlineKeyboard()
-        .text('✅ Подтвердить', `confirm_${userId}`)
-        .text('❌ Отклонить', `reject_${userId}`)
-        .text('📝 Уточнить', `clarify_${userId}`)
-
-      await ctx.api.editMessageReplyMarkup(config.adminId, forwarded.message_id, {
-        reply_markup: confirmKeyboard,
+      await ctx.api.sendMessage(config.adminId, 'Выбери действие:', {
+        reply_markup: new InlineKeyboard()
+          .text('✅ Подтвердить', `confirm_${userId}`)
+          .text('❌ Отклонить', `reject_${userId}`)
+          .row()
+          .text('📝 Уточнить', `clarify_${userId}`),
       })
 
-      await ctx.reply('Чек отправлен админу на проверку. Жди подтверждения.')
+      await ctx.reply('Чек успешно отправлен админу! Жди подтверждения.')
       clearSession(userId)
     } catch (err) {
-      console.error('Ошибка форварда чека:', err)
-      await ctx.reply('Не удалось отправить чек. Попробуй ещё раз.')
+      console.error('Ошибка отправки чека:', err)
+      await ctx.reply('Не удалось отправить документ админу. Попробуй заново.')
     }
     return
   }
 
-  // Шаги регистрации (ФИО + город для обоих)
+  // Регистрация по шагам
   if (session?.mode === 'waiting_fio') {
-    if (!text) return ctx.reply('ФИО не может быть пустым. Попробуй заново.')
+    if (!text) return ctx.reply('ФИО не может быть пустым.')
 
     registerUser(userId, { name: text })
-    setSession(userId, 'waiting_city', session.data) // сохраняем data с выбором
+    setSession(userId, 'waiting_city', session.data)
 
-    return ctx.reply('Отлично! В каком городе ты живёшь?')
+    return ctx.reply('В каком городе ты живёшь?')
   }
 
   if (session?.mode === 'waiting_city') {
@@ -68,7 +72,6 @@ ID: ${userId}
       setSession(userId, 'waiting_subscription_date')
       return ctx.reply('До какого числа подписка? (формат: 2026-12-31)')
     } else {
-      // want_buy — в оплату
       clearSession(userId)
       const { photoPath, caption, keyboard } = getScreenData('payment_method')
       await ctx.replyWithPhoto(new InputFile(photoPath), {
@@ -95,7 +98,32 @@ ID: ${userId}
       parse_mode: 'Markdown',
       reply_markup: keyboard,
     })
-    return ctx.reply('Регистрация завершена! Добро пожаловать.')
+    await ctx.reply('Регистрация завершена! Добро пожаловать.')
+    return
+  }
+
+  // Если юзер уже зарегистрирован — показываем меню
+  const user = registerUser(userId)
+  if (user.name && user.city) {
+    if (user.subscriptionEnd && getRemainingDays(user) > 0) {
+      const days = getRemainingDays(user)
+      const { photoPath, caption, keyboard } = getScreenData('main', days)
+      await ctx.replyWithPhoto(new InputFile(photoPath), {
+        caption: caption.trim(),
+        parse_mode: 'Markdown',
+        reply_markup: keyboard,
+      })
+      return
+    } else {
+      // Подписки нет — в оплату
+      const { photoPath, caption, keyboard } = getScreenData('payment_method')
+      await ctx.replyWithPhoto(new InputFile(photoPath), {
+        caption: caption.trim(),
+        parse_mode: 'Markdown',
+        reply_markup: keyboard,
+      })
+      return
+    }
   }
 
   // Если ничего — /start

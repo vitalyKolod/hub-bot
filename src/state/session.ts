@@ -4,7 +4,8 @@ export type SessionMode =
   | 'waiting_check'
   | 'waiting_name'
   | 'waiting_fio'
-  | 'waiting_city' // ждём имя
+  | 'waiting_city'
+  | 'waiting_check'
   | 'waiting_description' // ждём описание/роль
   | 'waiting_subscription_date' // ждём дату окончания подписки
   | 'waiting_admin_message' // если оставишь позже

@@ -1,8 +1,10 @@
+// src/state/users.ts
+
 export interface User {
   telegramId: number
   name?: string
   city?: string
-  description?: string // кто они, роль, комментарий
+  description?: string
   joinDate: Date
   subscriptionEnd?: Date
   role?: 'user' | 'admin' | 'broadcaster'
@@ -24,7 +26,6 @@ export function registerUser(telegramId: number, updates: Partial<User> = {}): U
     }
   }
 
-  // Обновляем только переданные поля
   Object.assign(user, updates)
   user.lastActivity = new Date()
 
@@ -49,12 +50,12 @@ export function extendSubscription(telegramId: number, days: number = 365) {
   const user = users.get(telegramId)
   if (!user) return
 
-  const now = new Date()
-  const end = new Date(now)
-  end.setDate(now.getDate() + days)
+  const startDate = new Date() // со дня оплаты/подтверждения
+  const end = new Date(startDate)
+  end.setDate(startDate.getDate() + days)
 
   user.subscriptionEnd = end
-  user.lastActivity = now
+  user.lastActivity = startDate
   users.set(telegramId, user)
   console.log(`Подписка продлена для ${telegramId} до ${end.toISOString()}`)
 }
@@ -63,7 +64,7 @@ export function debugUsers() {
   console.log('Текущие пользователи:')
   for (const [id, user] of users) {
     console.log(
-      `ID: ${id}, Имя: ${user.name || 'нет'}, Подписка до: ${user.subscriptionEnd?.toISOString() || 'нет'}`
+      `ID: ${id}, Имя: ${user.name || 'нет'}, Город: ${user.city || 'нет'}, Подписка до: ${user.subscriptionEnd?.toISOString() || 'нет'}`
     )
   }
 }
