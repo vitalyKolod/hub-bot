@@ -28,14 +28,14 @@ export function getScreenData(screen: Screen, days: number = EXAMPLE_DAYS) {
 Ваша подписка: ProPresenter (годовая)
 ${statusText}
       `
+
       keyboard = new InlineKeyboard()
-        .text('Продлить подписку', 'payment_method')
-        .row()
-        .text('Связаться с админом', 'contact_admin')
-        .row()
-        .text('Техподдержка', 'support')
-        .row()
-        .text('Правила и FAQ', 'faq')
+      if (days <= 0) {
+        keyboard.text('Продлить подписку', 'payment_method').row()
+      }
+      keyboard.text('Связаться с админом', 'contact_admin').row()
+      keyboard.text('Техподдержка', 'support').row()
+      keyboard.text('Правила и FAQ', 'faq')
       break
 
     case 'payment_method':

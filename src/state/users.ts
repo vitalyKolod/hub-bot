@@ -1,5 +1,3 @@
-// src/state/users.ts
-
 export interface User {
   telegramId: number
   name?: string

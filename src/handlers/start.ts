@@ -1,7 +1,6 @@
 // src/handlers/start.ts
 import { Composer, InlineKeyboard } from 'grammy'
 import { registerUser, getRemainingDays } from '../state/users.js'
-import { setSession } from '../state/session.js'
 import { getScreenData } from '../keyboards.js'
 import { InputFile } from 'grammy'
 
@@ -10,13 +9,13 @@ const composer = new Composer()
 composer.command('start', async (ctx) => {
   const userId = ctx.from?.id
   if (!userId) {
-    return ctx.reply('Не удалось определить твой ID. Попробуй позже.')
+    return ctx.reply('Не удалось определить ID.')
   }
 
   const user = registerUser(userId)
 
-  // Если юзер уже зарегистрирован (имя есть) и подписка активна
-  if (user.name && user.subscriptionEnd && getRemainingDays(user) > 0) {
+  // Если уже зарегистрирован и подписка активна — главное меню
+  if (user.name && user.city && user.subscriptionEnd && getRemainingDays(user) > 0) {
     const days = getRemainingDays(user)
     const { photoPath, caption, keyboard } = getScreenData('main', days)
 
@@ -27,23 +26,21 @@ composer.command('start', async (ctx) => {
         reply_markup: keyboard,
       })
     } catch (err) {
-      console.error('Ошибка отправки главного меню:', err)
-      await ctx.reply('Что-то пошло не так. Попробуй /start позже.')
+      console.error('Ошибка главного меню:', err)
+      await ctx.reply('Что-то пошло не так. Напиши /start позже.')
     }
     return
   }
 
-  // Первый запуск — сразу показываем выбор по кнопкам
+  // Первый запуск — разветвление по кнопкам
   const caption = `
 Привет! Добро пожаловать в ProPresenter Hub.
-
-Это твой первый запуск бота.
 
 У тебя уже есть активная подписка на ProPresenter?
   `.trim()
 
   const keyboard = new InlineKeyboard()
-    .text('Да, подписка уже есть', 'has_subscription')
+    .text('Да, есть подписка', 'has_subscription')
     .row()
     .text('Нет, хочу купить новую', 'want_buy')
 
