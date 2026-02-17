@@ -1,32 +1,22 @@
 import 'dotenv/config'
 import { Bot } from 'grammy'
 import { config } from './src/config.js'
+import { registerHandlers } from './src/bot.js'
 
-import startHandler from './src/handlers/start.js'
-import callbackHandler from './src/handlers/callback.js'
+console.log('Starting HUB bot...')
 
-import messagesHandler from './src/handlers/messages.js'
+const bot = new Bot(config.BOT_TOKEN)
 
-// ... после других bot.use
+registerHandlers(bot)
 
-console.log('Запуск бота...')
-
-const bot = new Bot(config.botToken)
-
-// Подключаем handlers
-bot.use(startHandler)
-bot.use(messagesHandler)
-bot.use(callbackHandler)
-
-// Глобальный catch ошибок (чтобы бот не падал)
 bot.catch((err) => {
-  console.error('Глобальная ошибка:', err)
+  console.error('BOT ERROR:', err)
 })
 
 bot
   .start()
-  .then(() => console.log('Bot started successfully'))
+  .then(() => console.log('Bot started'))
   .catch((err) => {
-    console.error('Ошибка запуска:', err)
+    console.error('Start failed:', err)
     process.exit(1)
   })

@@ -1,17 +1,16 @@
-// src/config.ts
 import 'dotenv/config'
 
-if (!process.env.BOT_TOKEN) {
-  console.error('Ошибка: BOT_TOKEN не найден в .env')
-  process.exit(1)
-}
-
-if (!process.env.ADMIN_ID) {
-  console.error('Ошибка: ADMIN_ID не найден в .env')
-  process.exit(1)
+function req(name: string): string {
+  const v = process.env[name]
+  if (!v) {
+    console.error(`Missing env: ${name}`)
+    process.exit(1)
+  }
+  return v
 }
 
 export const config = {
-  botToken: process.env.BOT_TOKEN,
-  adminId: Number(process.env.ADMIN_ID), // преобразуем в число
+  BOT_TOKEN: req('BOT_TOKEN'),
+  ADMIN_ID: Number(req('ADMIN_ID')),
+  MONGO_URL: process.env.MONGO_URL || '', // подключим позже
 } as const
