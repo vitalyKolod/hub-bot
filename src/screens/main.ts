@@ -5,7 +5,7 @@ import type { ScreenView } from '../core/render.js'
 
 export function mainScreen(userId: number): ScreenView {
   const keyboard = new InlineKeyboard()
-    .text('МОИ ПОДПИСКИ', packCb({ a: 'open', s: 'my_subscriptions' }))
+    .text('МОИ ПОДПИСКИ', packCb({ a: 'open', s: 'profile' }))
     .row()
     .text('ДОБАВИТЬ ПОДПИСКУ', packCb({ a: 'open', s: 'add_subscription' }))
     .row()

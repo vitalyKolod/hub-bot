@@ -1,4 +1,4 @@
-import { Bot, InlineKeyboard, InputFile } from 'grammy'
+import { Bot, InlineKeyboard } from 'grammy'
 import {
   ONBOARDING_ASSET,
   getOnboardingCaption,
@@ -11,12 +11,15 @@ import { initScreens } from './screens/index.js'
 import { renderScreen } from './core/render.js'
 import { parseCb } from './core/callback.js'
 import { goTo, goBack, goHome } from './state/ui.js'
+import { getProfile } from './state/profile.js'
+import { startRegistration, handleRegistrationText } from './flows/registration.js'
 
 export function registerHandlers(bot: Bot) {
   initScreens()
 
   bot.command('start', async (ctx) => {
     const kb = new InlineKeyboard().text('СТАРТ', 'ui:onb:start')
+
     await ctx.replyWithPhoto(ONBOARDING_ASSET, {
       caption: 'Привет! Добро пожаловать в ХАБ.\n\nНажми “СТАРТ”, чтобы продолжить 🙂',
       reply_markup: kb,
@@ -34,7 +37,7 @@ export function registerHandlers(bot: Bot) {
       } catch {}
     }
 
-    // Онбординг остаётся отдельно
+    // 🔹 Онбординг
     if (isOnboardingCallback(data)) {
       const parsed = parseOnboardingCallback(data)
       if (!parsed) return
@@ -46,9 +49,7 @@ export function registerHandlers(bot: Bot) {
           caption: getOnboardingCaption(0),
           parse_mode: 'Markdown',
         })
-        await ctx.editMessageReplyMarkup({
-          reply_markup: getOnboardingKeyboard(0),
-        })
+        await ctx.editMessageReplyMarkup({ reply_markup: getOnboardingKeyboard(0) })
         await ack()
         return
       }
@@ -60,22 +61,27 @@ export function registerHandlers(bot: Bot) {
           caption: getOnboardingCaption(parsed.step),
           parse_mode: 'Markdown',
         })
-        await ctx.editMessageReplyMarkup({
-          reply_markup: getOnboardingKeyboard(parsed.step),
-        })
+        await ctx.editMessageReplyMarkup({ reply_markup: getOnboardingKeyboard(parsed.step) })
         await ack()
         return
       }
 
       if (parsed.type === 'confirm') {
-        goHome(userId)
-        await renderScreen(ctx, userId, 'main')
+        const profile = getProfile(userId)
+
+        if (profile.reg !== 'done') {
+          await startRegistration(ctx, userId) // старт регистрации (чатом)
+        } else {
+          goHome(userId)
+          await renderScreen(ctx, userId, 'main')
+        }
+
         await ack()
         return
       }
     }
 
-    // Новый универсальный callback router
+    // 🔹 Универсальный router экранов
     const parsed = parseCb(data)
     if (!parsed) {
       await ack()
@@ -104,5 +110,16 @@ export function registerHandlers(bot: Bot) {
     }
 
     await ack()
+  })
+
+  // 🔹 Регистрация: ответы текстом
+  bot.on('message:text', async (ctx) => {
+    const userId = ctx.from?.id
+    if (!userId) return
+
+    const profile = getProfile(userId)
+    if (profile.reg === 'in_progress') {
+      await handleRegistrationText(ctx, userId, ctx.message.text)
+    }
   })
 }
