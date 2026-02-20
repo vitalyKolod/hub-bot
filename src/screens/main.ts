@@ -5,15 +5,13 @@ import type { ScreenView } from '../core/render.js'
 
 export function mainScreen(userId: number): ScreenView {
   const keyboard = new InlineKeyboard()
-    .text('МОИ ПОДПИСКИ', packCb({ a: 'open', s: 'profile' }))
+    .text('📋 Мои подписки', packCb({ a: 'open', s: 'profile' }))
     .row()
-    .text('ДОБАВИТЬ ПОДПИСКУ', packCb({ a: 'open', s: 'add_subscription' }))
+    .text('➕ Добавить подписку', packCb({ a: 'open', s: 'add_subscription' }))
     .row()
-    .text('КАТАЛОГ ПОДПИСОК', packCb({ a: 'open', s: 'catalog' }))
+    .text('💬 Чат Хаб комьюнити', packCb({ a: 'open', s: 'chat' }))
     .row()
-    .text('ПОМОЩЬ', packCb({ a: 'open', s: 'help' }))
-    .row()
-    .text('ДРУГОЕ', packCb({ a: 'open', s: 'other' }))
+    .text('❓ Помощь', packCb({ a: 'open', s: 'help' }))
 
   return {
     photo: './public/main.png',

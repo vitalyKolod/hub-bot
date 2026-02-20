@@ -33,7 +33,7 @@ export function profileScreen(userId: number): ScreenView {
   if (!p.hasProPresenter && !p.hasScreens) {
     lines.push('У вас пока нет активных подписок.', '', 'Вы можете приобрести новую подписку.')
 
-    kb.text('➕ Приобрести подписку', packCb({ a: 'open', s: 'catalog' })).row()
+    kb.text('➕ Приобрести подписку', packCb({ a: 'open', s: 'add_subscription' })).row()
   }
 
   // Общие кнопки
@@ -41,7 +41,7 @@ export function profileScreen(userId: number): ScreenView {
   kb.text('🏠 На главную', packCb({ a: 'home' }))
 
   return {
-    photo: './public/main.png',
+    photo: './public/user-profile.png',
     caption: lines.join('\n'),
     keyboard: kb,
   }

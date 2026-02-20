@@ -3,7 +3,7 @@ export type ScreenId =
   | 'profile'
   | 'my_subscriptions'
   | 'add_subscription'
-  | 'catalog'
+  | 'chat'
   | 'help'
   | 'faq_hub'
   | 'payment'

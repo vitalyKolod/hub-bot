@@ -58,22 +58,10 @@ function buildQuestionText(userId: number): string {
 }
 
 async function sendOrEditPrompt(ctx: any, userId: number, text: string) {
-  const p = getProfile(userId)
-
-  // Если сообщение-вопрос уже есть — редактируем его
-  if (p.regPromptMessageId) {
-    try {
-      await ctx.api.sendMessage(userId, p.regPromptMessageId, text, {
-        parse_mode: 'Markdown',
-      })
-      return
-    } catch (e) {
-      // Если не смогли отредактировать (удалили/не найдено) — создадим заново
-    }
-  }
-
-  const msg = await ctx.api.sendMessage(userId, text, { parse_mode: 'Markdown' })
-  updateProfile(userId, { regPromptMessageId: msg.message_id })
+  // Всегда отправляем НОВОЕ сообщение с вопросом
+  await ctx.api.sendMessage(userId, text, {
+    parse_mode: 'Markdown',
+  })
 }
 
 function normalizeYesNo(input: string): 'yes' | 'no' | null {

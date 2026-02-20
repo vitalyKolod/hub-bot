@@ -9,11 +9,11 @@ export function initScreens() {
     main: mainScreen,
 
     // временные заглушки
-    profile: mainScreen,
+    profile: profileScreen,
 
     my_subscriptions: mainScreen,
     add_subscription: mainScreen,
-    catalog: mainScreen,
+    chat: mainScreen,
     help: mainScreen,
     faq_hub: mainScreen,
     payment: mainScreen,
