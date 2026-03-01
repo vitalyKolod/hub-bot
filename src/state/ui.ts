@@ -4,9 +4,12 @@ export type ScreenId =
   | 'my_subscriptions'
   | 'add_subscription'
   | 'chat'
+  | 'product'
   | 'help'
   | 'faq_hub'
+  | 'legal'
   | 'payment'
+  | 'payment_info'
   | 'other'
 
 export type UiState = {

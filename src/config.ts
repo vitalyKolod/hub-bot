@@ -12,5 +12,6 @@ function req(name: string): string {
 export const config = {
   BOT_TOKEN: req('BOT_TOKEN'),
   ADMIN_ID: Number(req('ADMIN_ID')),
-  MONGO_URL: process.env.MONGO_URL || '', // подключим позже
+  MONGO_URL: process.env.MONGO_URL || '',
+  MEDIA_MODE: (process.env.MEDIA_MODE ?? 'photo') as 'photo' | 'text',
 } as const
