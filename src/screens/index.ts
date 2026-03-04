@@ -4,6 +4,8 @@ import type { ScreenId } from '../state/ui.js'
 import type { ScreenView } from '../core/render.js'
 import { profileScreen } from './profile.js'
 import { addSubscriptionScreen } from './add-subscription.js'
+import { propresenterScreen } from './propresenter.js'
+import { contentScreensScreen } from './content-screens.js'
 
 export function initScreens() {
   const registry: Record<ScreenId, (userId: number) => ScreenView> = {
@@ -14,8 +16,11 @@ export function initScreens() {
 
     my_subscriptions: mainScreen,
     add_subscription: addSubscriptionScreen,
+    propresenter: propresenterScreen,
+    contentScreens: contentScreensScreen,
     chat: mainScreen,
-    product: mainScreen,
+    faq_propresenter: mainScreen,
+    faq_content_screens: mainScreen,
     help: mainScreen,
     legal: mainScreen,
     faq_hub: mainScreen,
