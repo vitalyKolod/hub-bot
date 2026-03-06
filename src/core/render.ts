@@ -25,7 +25,7 @@ export function registerScreens(registry: ScreenRegistry) {
  * 1) Пытаемся отредактировать существующий UI message
  * 2) Если не получилось — создаём новый и сохраняем его id
  */
-export async function renderScreen(ctx: any, userId: number, screenId: ScreenId) {
+export async function renderScreen(ctx: any, userId: number, screenId: ScreenId, params?: any) {
   const ui = getUi(userId)
 
   const screenFactory = screens[screenId]
@@ -33,7 +33,7 @@ export async function renderScreen(ctx: any, userId: number, screenId: ScreenId)
     throw new Error(`Screen "${screenId}" not registered`)
   }
 
-  const view = screenFactory(userId)
+  const view = screenFactory(userId, params)
 
   // 1️⃣ Пытаемся редактировать существующее сообщение
   if (ui.uiMessageId) {

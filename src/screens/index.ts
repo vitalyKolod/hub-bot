@@ -10,9 +10,10 @@ import { otherScreen } from './others.js'
 import { faqHubScreen } from './faq-hub.js'
 import { legalScreen } from './legal.js'
 import { paymentScreen } from './payment.js'
+import { paymentDetailsScreen } from './payment-detail.js'
 
 export function initScreens() {
-  const registry: Record<ScreenId, (userId: number) => ScreenView> = {
+  const registry: Record<ScreenId, (userId: number, params?: any) => ScreenView> = {
     main: mainScreen,
 
     // временные заглушки
@@ -32,7 +33,7 @@ export function initScreens() {
     faq_content_screens: mainScreen,
     help: mainScreen,
     payment: paymentScreen,
-    payment_info: mainScreen,
+    payment_info: paymentDetailsScreen,
   }
 
   registerScreens(registry)
