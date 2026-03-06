@@ -8,6 +8,8 @@ import { propresenterScreen } from './propresenter.js'
 import { contentScreensScreen } from './content-screens.js'
 import { otherScreen } from './others.js'
 import { faqHubScreen } from './faq-hub.js'
+import { legalScreen } from './legal.js'
+import { paymentScreen } from './payment.js'
 
 export function initScreens() {
   const registry: Record<ScreenId, (userId: number) => ScreenView> = {
@@ -23,12 +25,13 @@ export function initScreens() {
     faq_hub: faqHubScreen,
     other: otherScreen,
     admin_chat: mainScreen,
+    legal: legalScreen,
+    pay_method: mainScreen,
     chat: mainScreen,
     faq_propresenter: mainScreen,
     faq_content_screens: mainScreen,
     help: mainScreen,
-    legal: mainScreen,
-    payment: mainScreen,
+    payment: paymentScreen,
     payment_info: mainScreen,
   }
 

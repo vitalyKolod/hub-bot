@@ -15,6 +15,7 @@ export type ScreenId =
   | 'faq_content_screens'
   | 'legal'
   | 'payment'
+  | 'pay_method'
   | 'payment_info'
   | 'other'
 

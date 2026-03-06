@@ -15,7 +15,7 @@ export function addSubscriptionScreen(userId: number): ScreenView {
   kb.row()
   kb.text('❓ ЧАВО ПО ХАБУ (FAQ)', packCb({ a: 'open', s: 'faq_hub' })).row()
   kb.text('⚖️ Юридические аспекты и нюансы', packCb({ a: 'open', s: 'legal' })).row()
-  kb.text('💳 ОБ ОПЛАТЕ', packCb({ a: 'open', s: 'payment_info' })).row()
+  kb.text('💳 ОБ ОПЛАТЕ', packCb({ a: 'open', s: 'payment' })).row()
   kb.row()
   kb.text('🏠 На Главную', packCb({ a: 'home' }))
 
