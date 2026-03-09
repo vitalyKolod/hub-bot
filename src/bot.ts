@@ -93,7 +93,7 @@ export function registerHandlers(bot: Bot) {
 
     if (parsed.a === 'open' && parsed.s) {
       goTo(userId, parsed.s)
-      await renderScreen(ctx, userId, parsed.s)
+      await renderScreen(ctx, userId, parsed.s, parsed.p)
       await ack()
       return
     }

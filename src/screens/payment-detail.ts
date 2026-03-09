@@ -5,52 +5,54 @@ import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
 
 const PAGES = [
-  // 1/5
   `1/5\n\n` +
     `Администрация ХАБа вам очень признательна, если вы сможете оплатить именно криптовалютой, так как эти переводы привлекают меньше внимания банковских работников к нашим системам / помогают избежать проверок и блокировок по 115-ФЗ, а также налоговых издержек.`,
 
-  // 2/5
   `2/5\n\n` +
     `В связи с вышеизложенным уведомляем вас о том, что при переводе в USDT вы сможете значительно сэкономить на покупке подписки.`,
 
-  // 3/5
   `3/5\n\n` +
     `Если вы совершаете самостоятельную покупку USDT на любой бирже через P2P (даже с учётом комиссий за перевод), такая покупка выйдет выгоднее.\n\n` +
     `Пример:\n` +
     `подписка через ХАБ стоит 40$ + 18% комиссии системы за перевод × 80₽ (или иной курс) = примерно 3280₽`,
 
-  // 4/5
   `4/5\n\n` +
     `Если вы совершаете покупку через администратора ХАБа (рублёвый перевод), в этом случае сумма, которая изначально переводится в долларах, будет умножаться на 100₽ за каждый доллар, вне зависимости от актуальной стоимости доллара.\n\n` +
     `Пример:\n` +
     `подписка через ХАБ стоит 40$ × 100₽ = 4000₽`,
 
-  // 5/5
   `5/5\n\n` +
     `Выбирайте удобный способ и пишите админу в случае вопросов.\n` +
     `Мы всегда на связи и поможем с оплатой максимально выгодно и безопасно.`,
 ]
 
+const TOTAL_PAGES = PAGES.length
+
 export function paymentDetailsScreen(userId: number, params?: { page: number }): ScreenView {
-  const page = params?.page ?? 1
-  const total = PAGES.length
+  const page = Math.max(1, Math.min(TOTAL_PAGES, params?.page ?? 1))
 
   const kb = new InlineKeyboard()
 
+  // Умные стрелки: показываем только доступные
   if (page > 1) {
     kb.text('◀️ Предыдущая', packCb({ a: 'open', s: 'payment_details', p: { page: page - 1 } }))
   }
-  if (page < total) {
+  if (page < TOTAL_PAGES) {
     kb.text('Следующая ▶️', packCb({ a: 'open', s: 'payment_details', p: { page: page + 1 } }))
   }
+
   kb.row()
-  kb.text('Назад к оплате', packCb({ a: 'open', s: 'payment' })).row()
+
+  // Кнопка "Назад к оплате" появляется ТОЛЬКО на последней странице
+  if (page === TOTAL_PAGES) {
+    kb.text('Назад к оплате', packCb({ a: 'open', s: 'payment' })).row()
+  }
+
   kb.text('На главную', packCb({ a: 'home' }))
 
   return {
-    photo: './public/payment-details.png', // или тот же payment.png
-    caption: `*ПОДРОБНОСТИ ОБ ОПЛАТЕ*\n\n${PAGES[page - 1]}\n\n(${page}/${total})`,
-
+    photo: './public/payment-details.png', // или './public/payment.png'
+    caption: `*ПОДРОБНОСТИ ОБ ОПЛАТЕ*\n\n${PAGES[page - 1]}\n\n`,
     keyboard: kb,
   }
 }

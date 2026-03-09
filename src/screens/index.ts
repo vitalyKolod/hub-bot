@@ -33,7 +33,7 @@ export function initScreens() {
     faq_content_screens: mainScreen,
     help: mainScreen,
     payment: paymentScreen,
-    payment_info: paymentDetailsScreen,
+    payment_details: paymentDetailsScreen,
   }
 
   registerScreens(registry)

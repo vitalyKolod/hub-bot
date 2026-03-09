@@ -17,7 +17,7 @@ export function paymentScreen(userId: number): ScreenView {
 
   kb.row()
 
-  kb.text('ПОДРОБНОСТИ ОБ ОПЛАТЕ', packCb({ a: 'open', s: 'payment_info', p: { page: 1 } }))
+  kb.text('ПОДРОБНОСТИ ОБ ОПЛАТЕ', packCb({ a: 'open', s: 'payment_details', p: { page: 1 } }))
 
     .row()
 
