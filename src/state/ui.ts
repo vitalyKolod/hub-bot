@@ -8,6 +8,7 @@ export type ScreenId =
   | 'contentScreens'
   | 'admin_chat'
   | 'faq_learning'
+  | 'about_payment'
   | 'faq_other'
   | 'chat'
   | 'help'

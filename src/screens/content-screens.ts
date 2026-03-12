@@ -1,4 +1,3 @@
-// src/screens/content_screens.ts
 import { InlineKeyboard } from 'grammy'
 import { packCb } from '../core/callback.js'
 

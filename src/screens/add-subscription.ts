@@ -11,11 +11,11 @@ export function addSubscriptionScreen(userId: number): ScreenView {
 
   kb.text('🟧 Pro Presenter', packCb({ a: 'open', s: 'propresenter' })).row()
   kb.text('🟪 Контент для экранов', packCb({ a: 'open', s: 'contentScreens' })).row()
-  kb.text('🟨 ДРУГОЕ', packCb({ a: 'open', s: 'other' })).row()
+  kb.text('🟨 Другое', packCb({ a: 'open', s: 'other' })).row()
   kb.row()
-  kb.text('❓ ЧАВО ПО ХАБУ (FAQ)', packCb({ a: 'open', s: 'faq_hub' })).row()
+  kb.text('❓ Чаво по ХАБу (FAQ)', packCb({ a: 'open', s: 'faq_hub' })).row()
   kb.text('⚖️ Юридические аспекты и нюансы', packCb({ a: 'open', s: 'legal' })).row()
-  kb.text('💳 ОБ ОПЛАТЕ', packCb({ a: 'open', s: 'payment' })).row()
+  kb.text('💳 Об оплате', packCb({ a: 'open', s: 'about_payment' })).row()
   kb.row()
   kb.text('🏠 На Главную', packCb({ a: 'home' }))
 

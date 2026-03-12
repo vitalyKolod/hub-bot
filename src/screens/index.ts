@@ -11,6 +11,7 @@ import { faqHubScreen } from './faq-hub.js'
 import { legalScreen } from './legal.js'
 import { paymentScreen } from './payment.js'
 import { paymentDetailsScreen } from './payment-detail.js'
+import { aboutPaymentScreen } from './about-payment.js'
 
 export function initScreens() {
   const registry: Record<ScreenId, (userId: number, params?: any) => ScreenView> = {
@@ -25,6 +26,7 @@ export function initScreens() {
     contentScreens: contentScreensScreen,
     faq_hub: faqHubScreen,
     other: otherScreen,
+    about_payment: aboutPaymentScreen,
     admin_chat: mainScreen,
     legal: legalScreen,
     pay_method: mainScreen,

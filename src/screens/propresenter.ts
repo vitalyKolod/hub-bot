@@ -7,8 +7,8 @@ import type { ScreenView } from '../core/render.js'
 export function propresenterScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
-  kb.text('❓ ЧАВО ПО ПРОДУКТУ', packCb({ a: 'open', s: 'faq_propresenter' })).row()
-  kb.text('💚 ОПЛАТИТЬ', packCb({ a: 'open', s: 'payment', p: 'propresenter' })).row()
+  kb.text('❓ Чаво по продукту', packCb({ a: 'open', s: 'faq_propresenter' })).row()
+  kb.text('💚 Оплатить', packCb({ a: 'open', s: 'payment', p: 'propresenter' })).row()
   kb.row()
   kb.text('◀️ Назад', packCb({ a: 'back' }))
 

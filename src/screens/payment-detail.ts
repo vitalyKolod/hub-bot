@@ -45,13 +45,13 @@ export function paymentDetailsScreen(userId: number, params?: { page: number }):
 
   // Кнопка "Назад к оплате" появляется ТОЛЬКО на последней странице
   if (page === TOTAL_PAGES) {
-    kb.text('Назад к оплате', packCb({ a: 'open', s: 'payment' })).row()
+    kb.text('Назад к оплате', packCb({ a: 'open', s: 'about_payment' })).row()
   }
 
   kb.text('На главную', packCb({ a: 'home' }))
 
   return {
-    photo: './public/payment-details.png', // или './public/payment.png'
+    photo: './public/payment-details.png',
     caption: `*ПОДРОБНОСТИ ОБ ОПЛАТЕ*\n\n${PAGES[page - 1]}\n\n`,
     keyboard: kb,
   }

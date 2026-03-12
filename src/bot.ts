@@ -1,4 +1,4 @@
-import { Bot, InlineKeyboard } from 'grammy'
+import { Bot, InlineKeyboard, session, type Context, type SessionFlavor } from 'grammy'
 import {
   ONBOARDING_ASSET,
   getOnboardingCaption,
@@ -14,8 +14,25 @@ import { goTo, goBack, goHome } from './state/ui.js'
 import { getProfile } from './state/profile.js'
 import { startRegistration, handleRegistrationText } from './flows/registration.js'
 
-export function registerHandlers(bot: Bot) {
+type PaymentSession = {
+  payment: null | {
+    product: string
+    method: string | null
+  }
+}
+
+type MyContext = Context & SessionFlavor<PaymentSession>
+
+export function registerHandlers(bot: Bot<MyContext>) {
   initScreens()
+
+  bot.use(
+    session<PaymentSession, MyContext>({
+      initial: () => ({
+        payment: null,
+      }),
+    })
+  )
 
   bot.command('start', async (ctx) => {
     const kb = new InlineKeyboard().text('СТАРТ', 'ui:onb:start')
