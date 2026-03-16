@@ -8,7 +8,7 @@ export function propresenterScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
   kb.text('❓ Чаво по продукту', packCb({ a: 'open', s: 'faq_propresenter' })).row()
-  kb.text('💚 Оплатить', packCb({ a: 'open', s: 'payment', p: 'propresenter' })).row()
+  kb.text('💚 Оплатить', packCb({ a: 'pay_product', p: 'propresenter' })).row()
   kb.row()
   kb.text('◀️ Назад', packCb({ a: 'back' }))
 

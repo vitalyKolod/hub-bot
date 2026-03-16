@@ -6,6 +6,7 @@ export type ActionId =
   | 'home' // на главную
   | 'pay_method'
   | 'noop' // ничего (заглушка)
+  | 'pay_product'
 
 export type CbData = {
   a: ActionId

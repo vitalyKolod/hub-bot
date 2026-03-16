@@ -7,9 +7,9 @@ import type { ScreenView } from '../core/render.js'
 export function paymentScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
-  kb.text('₽ РУБЛИ', packCb({ a: 'pay_method', m: 'rub' })).row()
+  kb.text('🇷🇺 РУБЛИ', packCb({ a: 'pay_method', m: 'rub' })).row()
 
-  kb.text('₿ КРИПТА (USDT)', packCb({ a: 'pay_method', m: 'crypto' })).row()
+  kb.text('🪙 КРИПТА (USDT)', packCb({ a: 'pay_method', m: 'crypto' })).row()
 
   kb.row() // можно убрать, если пустая строка не нужна
 

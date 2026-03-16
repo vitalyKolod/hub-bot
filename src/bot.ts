@@ -129,6 +129,20 @@ export function registerHandlers(bot: Bot<MyContext>) {
       return
     }
 
+    if (parsed.a === 'pay_product' && parsed.p) {
+      // Запоминаем продукт в сессии
+      ctx.session.payment = {
+        product: parsed.p,
+        method: null,
+      }
+
+      // Переходим на экран оплаты
+      goTo(userId, 'payment')
+      await renderScreen(ctx, userId, 'payment')
+      await ack()
+      return
+    }
+
     await ack()
   })
 
