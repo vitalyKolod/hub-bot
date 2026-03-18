@@ -7,11 +7,14 @@ export type ActionId =
   | 'pay_method'
   | 'noop' // ничего (заглушка)
   | 'pay_product'
+  | 'rub_method'
+  | 'rub_payment'
 
 export type CbData = {
   a: ActionId
   s?: ScreenId
   p?: string | Record<string, any>
+  m?: string
 }
 
 // Формат: a=open&s=help&p=faq
@@ -28,6 +31,7 @@ export function packCb(d: CbData): string {
       parts.push(`p=${Buffer.from(json).toString('base64')}`)
     }
   }
+  if (d.m) parts.push(`m=${d.m}`)
   return parts.join('&')
 }
 
@@ -46,7 +50,7 @@ export function parseCb(raw: string): CbData | null {
     const s = obj.s ? (obj.s as ScreenId) : undefined
     let p: string | Record<string, any> | undefined = obj.p ? decodeURIComponent(obj.p) : undefined
 
-    // Если p выглядит как base64 — декодируем в объект
+    // Декодируем p, если base64
     if (p && /^[A-Za-z0-9+/=]+$/.test(p)) {
       try {
         const decoded = Buffer.from(p, 'base64').toString()
@@ -54,7 +58,10 @@ export function parseCb(raw: string): CbData | null {
       } catch {}
     }
 
-    return { a, s, p }
+    // Добавляем m (method)
+    const m = obj.m || undefined
+
+    return { a, s, p, m }
   } catch {
     return null
   }

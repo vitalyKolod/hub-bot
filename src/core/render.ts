@@ -8,7 +8,7 @@ export type ScreenView = {
   keyboard: InlineKeyboard
 }
 
-type ScreenRegistry = Record<ScreenId, (userId: number) => ScreenView>
+type ScreenRegistry = Record<ScreenId, (userId: number, params?: any, ctx?: any) => ScreenView>
 
 /**
  * Здесь будет регистрироваться набор экранов.
@@ -33,7 +33,7 @@ export async function renderScreen(ctx: any, userId: number, screenId: ScreenId,
     throw new Error(`Screen "${screenId}" not registered`)
   }
 
-  const view = screenFactory(userId, params)
+  const view = screenFactory(userId, params, ctx)
 
   // 1️⃣ Пытаемся редактировать существующее сообщение
   if (ui.uiMessageId) {
