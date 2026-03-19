@@ -9,6 +9,7 @@ export type ActionId =
   | 'pay_product'
   | 'rub_method'
   | 'rub_payment'
+  | 'paid'
 
 export type CbData = {
   a: ActionId

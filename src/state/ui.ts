@@ -12,6 +12,7 @@ export type ScreenId =
   | 'faq_other'
   | 'rub_payment'
   | 'chat'
+  | 'paid'
   | 'help'
   | 'faq_hub'
   | 'faq_content_screens'

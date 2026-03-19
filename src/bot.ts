@@ -14,12 +14,24 @@ import { goTo, goBack, goHome } from './state/ui.js'
 import { getProfile } from './state/profile.js'
 import { startRegistration, handleRegistrationText } from './flows/registration.js'
 
+import dotenv from 'dotenv'
+dotenv.config()
+
+const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
+
+if (!ADMIN_GROUP_ID) {
+  console.error('ADMIN_GROUP_ID не задан в .env')
+  process.exit(1)
+}
+
 type PaymentSession = {
   payment: null | {
     product: string
-    method: string | null // 'rub' или 'crypto'
-    rubMethod?: string | null // 'card' или 'sbp' — если рубли
+    method: string | null
+    rubMethod?: string | null
   }
+  waitingForReceipt?: boolean
+  lastPaymentMessageId?: number
 }
 
 type MyContext = Context & SessionFlavor<PaymentSession>
@@ -202,7 +214,86 @@ export function registerHandlers(bot: Bot<MyContext>) {
       return
     }
 
+    // 7. Пользователь нажал "Я ОПЛАТИЛ(А)"
+    if (parsed.a === 'paid') {
+      await ctx.answerCallbackQuery({ text: 'Пришли фото чека или документ' })
+
+      await ctx.editMessageCaption({
+        caption:
+          '📸 Отлично! Теперь пришли фото чека (или документ) в этот чат.\n' +
+          'Я сразу передам админу.',
+        reply_markup: new InlineKeyboard().text('Отмена', packCb({ a: 'back' })),
+        parse_mode: 'Markdown',
+      })
+
+      ctx.session.waitingForReceipt = true
+      ctx.session.lastPaymentMessageId = ctx.callbackQuery.message.message_id
+
+      await ack()
+      return
+    }
+
     await ack()
+  })
+
+  // ────────────────────────────────────────────────
+  // Обработка чека (фото или документ) — отправка админу
+  // ────────────────────────────────────────────────
+  bot.on(['message:photo', 'message:document'], async (ctx) => {
+    if (!ctx.session.waitingForReceipt) return
+
+    ctx.session.waitingForReceipt = false
+
+    const userId = ctx.from.id
+    const profile = getProfile(userId)
+
+    const userInfo = {
+      fio: profile.fio || `${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`,
+      city: profile.city || 'не указано',
+      church: profile.church || 'не указано',
+      username: ctx.from.username ? `@${ctx.from.username}` : 'нет',
+    }
+
+    const adminText = `
+💰 НОВАЯ ОПЛАТА — Контент для экранов
+
+👤 ${userInfo.fio}
+📍 Город: ${userInfo.city}
+⛪ Церковь: ${userInfo.church}
+🔗 ${userInfo.username} (ID: ${userId})
+
+🕒 ${new Date().toLocaleString('ru-RU')}
+
+Чек ниже ↓
+Проверь и подтверди вручную!
+    `.trim()
+
+    try {
+      if (ctx.message.photo) {
+        const photo = ctx.message.photo.at(-1)!
+        await ctx.api.sendPhoto(ADMIN_GROUP_ID, photo.file_id, {
+          caption: adminText,
+          parse_mode: 'Markdown',
+        })
+      } else if (ctx.message.document) {
+        await ctx.api.sendDocument(ADMIN_GROUP_ID, ctx.message.document.file_id, {
+          caption: adminText,
+          parse_mode: 'Markdown',
+        })
+      }
+
+      await ctx.reply(
+        '✅ Чек успешно отправлен администратору!\n' +
+          'Ожидай подтверждения (обычно в течение 5–30 минут).'
+      )
+
+      // Возврат в главное меню
+      goHome(userId)
+      await renderScreen(ctx, userId, 'main')
+    } catch (err) {
+      console.error('Ошибка отправки чека админу:', err)
+      await ctx.reply('❌ Не удалось отправить чек. Попробуй ещё раз или напиши @support')
+    }
   })
 
   // 🔹 Регистрация: ответы текстом
