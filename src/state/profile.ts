@@ -87,3 +87,24 @@ export function computeDaysLeft(input: string): { iso: string; daysLeft: number 
 
   return { iso, daysLeft }
 }
+
+/**
+ * Активирует подписку "Контент для экранов" на 1 год от сегодняшнего дня
+ */
+export function activateScreensSubscription(userId: number) {
+  const now = new Date()
+  const endDate = new Date(now)
+  endDate.setFullYear(endDate.getFullYear() + 1) // +1 год
+
+  const iso = endDate.toISOString().split('T')[0] // YYYY-MM-DD
+
+  const daysLeft = Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+  updateProfile(userId, {
+    hasScreens: true,
+    screensEndDate: iso,
+    screensDaysLeft: daysLeft,
+  })
+
+  console.log(`✅ Подписка "Контент для экранов" активирована для ${userId} до ${iso}`)
+}

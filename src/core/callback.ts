@@ -10,6 +10,8 @@ export type ActionId =
   | 'rub_method'
   | 'rub_payment'
   | 'paid'
+  | 'accept'
+  | 'reject'
 
 export type CbData = {
   a: ActionId
@@ -18,21 +20,30 @@ export type CbData = {
   m?: string
 }
 
-// Формат: a=open&s=help&p=faq
-// (простой, читаемый, хватает для большинства UI)
-export function packCb(d: CbData): string {
-  const parts: string[] = [`a=${d.a}`]
-  if (d.s) parts.push(`s=${d.s}`)
-  if (d.p) {
-    if (typeof d.p === 'string') {
-      parts.push(`p=${encodeURIComponent(d.p)}`)
+export function packCb(d: Record<string, any>): string {
+  const parts: string[] = []
+
+  // Проходим по всем ключам объекта
+  Object.entries(d).forEach(([key, value]) => {
+    if (value === undefined || value === null) return // пропускаем пустые
+
+    let encodedValue: string
+
+    if (typeof value === 'string') {
+      // обычная строка — просто url-encode
+      encodedValue = encodeURIComponent(value)
+    } else if (typeof value === 'number' || typeof value === 'boolean') {
+      // числа и булевы — как есть
+      encodedValue = String(value)
     } else {
-      // объект → превращаем в JSON и base64, чтобы влезло в 64 байта лимита Telegram
-      const json = JSON.stringify(d.p)
-      parts.push(`p=${Buffer.from(json).toString('base64')}`)
+      // объекты/массивы — json → base64
+      const json = JSON.stringify(value)
+      encodedValue = Buffer.from(json).toString('base64')
     }
-  }
-  if (d.m) parts.push(`m=${d.m}`)
+
+    parts.push(`${key}=${encodedValue}`)
+  })
+
   return parts.join('&')
 }
 

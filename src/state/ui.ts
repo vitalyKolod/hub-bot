@@ -11,6 +11,7 @@ export type ScreenId =
   | 'about_payment'
   | 'faq_other'
   | 'rub_payment'
+  | 'crypto_payment'
   | 'chat'
   | 'paid'
   | 'help'
@@ -22,6 +23,7 @@ export type ScreenId =
   | 'pay_method'
   | 'payment_info'
   | 'other'
+  | 'support'
 
 export type UiState = {
   userId: number
