@@ -37,7 +37,7 @@ export function profileScreen(userId: number): ScreenView {
   }
 
   // Общие кнопки
-  kb.text('🆘 Помощь', packCb({ a: 'open', s: 'help' })).row()
+  kb.text('🆘 Помощь', packCb({ a: 'open', s: 'support' })).row()
   kb.text('🏠 На главную', packCb({ a: 'home' }))
 
   return {

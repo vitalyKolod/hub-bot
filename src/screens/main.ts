@@ -11,7 +11,7 @@ export function mainScreen(userId: number): ScreenView {
     .row()
     .text('💬 Чат Хаб комьюнити', packCb({ a: 'open', s: 'chat' }))
     .row()
-    .text('❓ Помощь', packCb({ a: 'open', s: 'help' }))
+    .text('❓ Помощь', packCb({ a: 'open', s: 'support' }))
 
   return {
     photo: './public/main.png',

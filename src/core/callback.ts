@@ -25,7 +25,7 @@ export function packCb(d: Record<string, any>): string {
 
   // Проходим по всем ключам объекта
   Object.entries(d).forEach(([key, value]) => {
-    if (value === undefined || value === null) return // пропускаем пустые
+    if (value === undefined || value === null) return
 
     let encodedValue: string
 
