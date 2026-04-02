@@ -24,6 +24,7 @@ export type ScreenId =
   | 'payment_info'
   | 'other'
   | 'support'
+  | 'end_support'
 
 export type UiState = {
   userId: number

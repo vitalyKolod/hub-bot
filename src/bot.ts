@@ -228,7 +228,7 @@ ${invite.invite_link}
       return
     }
 
-    // Обычная навигация + оплата (всё как у тебя было)
+    // Обычная навигация + оплата
     if (parsed.a === 'open' && parsed.s) {
       goTo(userId, parsed.s)
       await renderScreen(ctx, userId, parsed.s, parsed.p)
@@ -317,13 +317,11 @@ ${invite.invite_link}
 
     const profile = getProfile(userId)
 
-    // Регистрация — высший приоритет
     if (profile.reg === 'in_progress') {
       await handleRegistrationText(ctx, userId, ctx.message.text)
       return
     }
 
-    // Поддержка текстом
     if (ctx.session.inSupportMode) {
       let threadId = ctx.session.supportThreadId
       if (!threadId) {
@@ -349,60 +347,21 @@ ${invite.invite_link}
     }
   })
 
-  // Медиа в поддержку
-  bot.on(
-    ['message:photo', 'message:video', 'message:voice', 'message:video_note', 'message:document'],
-    async (ctx) => {
-      if (!ctx.session.inSupportMode) return
-
-      let threadId = ctx.session.supportThreadId
-      if (!threadId) {
-        const username = ctx.from.username ? `@${ctx.from.username}` : `ID:${ctx.from.id}`
-        try {
-          const topic = await ctx.api.createForumTopic(SUPPORT_GROUP_ID, `Поддержка — ${username}`)
-          threadId = topic.message_thread_id
-          ctx.session.supportThreadId = threadId
-        } catch (err) {
-          console.error('Ошибка создания темы:', err)
-        }
-      }
-
-      try {
-        await ctx.copyMessage(SUPPORT_GROUP_ID, { message_thread_id: threadId })
-      } catch (err) {
-        console.error('Ошибка копирования медиа:', err)
-      }
-    }
-  )
-
-  // Пересылка от админа → юзеру
-  bot.on('message', async (ctx) => {
-    if (ctx.chat?.id !== SUPPORT_GROUP_ID) return
-    if (!ctx.from || ctx.from.is_bot) return
-
-    try {
-      await ctx.forwardMessage(ctx.from.id)
-    } catch (err) {
-      console.error('Не удалось переслать от админа:', err)
-    }
-  })
-
-  // Чек (фото/документ)
+  // ====================== ЧЕК (фото / документ) — ВЫСОКИЙ ПРИОРИТЕТ ======================
   bot.on(['message:photo', 'message:document'], async (ctx) => {
-    if (!ctx.session.waitingForReceipt) return
+    if (ctx.session.waitingForReceipt) {
+      ctx.session.waitingForReceipt = false
 
-    ctx.session.waitingForReceipt = false
+      const userId = ctx.from.id
+      const profile = getProfile(userId)
+      const username = ctx.from.username ? `@${ctx.from.username}` : `ID: ${userId}`
 
-    const userId = ctx.from.id
-    const profile = getProfile(userId)
-    const username = ctx.from.username ? `@${ctx.from.username}` : `ID: ${userId}`
+      const methodText =
+        ctx.session.payment?.method === 'crypto'
+          ? 'Крипта (USDT TRC20)'
+          : `Рубли (${ctx.session.payment?.rubMethod === 'card' ? 'На карту' : 'По СБП'})`
 
-    const methodText =
-      ctx.session.payment?.method === 'crypto'
-        ? 'Крипта (USDT TRC20)'
-        : `Рубли (${ctx.session.payment?.rubMethod === 'card' ? 'На карту' : 'По СБП'})`
-
-    const adminText = `
+      const adminText = `
 💰 НОВАЯ ОПЛАТА — Контент для экранов
 
 👤 ${profile.fio || 'не указано'}
@@ -416,44 +375,91 @@ ${invite.invite_link}
 🕒 ${new Date().toLocaleString('ru-RU')}
 
 Проверь и подтверди вручную!
-    `.trim()
+      `.trim()
 
-    let threadId: number | undefined
-    try {
-      const topic = await ctx.api.createForumTopic(ADMIN_GROUP_ID, `Новый заказ — ${username}`)
-      threadId = topic.message_thread_id
-    } catch (err) {
-      console.error('Ошибка создания темы:', err)
-    }
-
-    try {
-      const kb = new InlineKeyboard()
-        .text('✅ Принять', packCb({ a: 'accept' }))
-        .text('❌ Отклонить', packCb({ a: 'reject' }))
-
-      if (ctx.message.photo) {
-        const photo = ctx.message.photo.at(-1)!
-        await ctx.api.sendPhoto(ADMIN_GROUP_ID, photo.file_id, {
-          caption: adminText,
-          parse_mode: 'Markdown',
-          message_thread_id: threadId,
-          reply_markup: kb,
-        })
-      } else if (ctx.message.document) {
-        await ctx.api.sendDocument(ADMIN_GROUP_ID, ctx.message.document.file_id, {
-          caption: adminText,
-          parse_mode: 'Markdown',
-          message_thread_id: threadId,
-          reply_markup: kb,
-        })
+      let threadId: number | undefined
+      try {
+        const topic = await ctx.api.createForumTopic(ADMIN_GROUP_ID, `Новый заказ — ${username}`)
+        threadId = topic.message_thread_id
+      } catch (err) {
+        console.error('Ошибка создания темы:', err)
       }
 
-      await ctx.reply('✅ Чек успешно отправлен администратору!\nОжидай подтверждения', {
-        reply_markup: new InlineKeyboard().text('🏠 В главное меню', packCb({ a: 'home' })),
-      })
-    } catch (err) {
-      console.error('Ошибка отправки чека:', err)
-      await ctx.reply('❌ Не удалось отправить чек.')
+      try {
+        const kb = new InlineKeyboard()
+          .text('✅ Принять', packCb({ a: 'accept' }))
+          .text('❌ Отклонить', packCb({ a: 'reject' }))
+
+        if (ctx.message.photo) {
+          const photo = ctx.message.photo.at(-1)!
+          await ctx.api.sendPhoto(ADMIN_GROUP_ID, photo.file_id, {
+            caption: adminText,
+            parse_mode: 'Markdown',
+            message_thread_id: threadId,
+            reply_markup: kb,
+          })
+        } else if (ctx.message.document) {
+          await ctx.api.sendDocument(ADMIN_GROUP_ID, ctx.message.document.file_id, {
+            caption: adminText,
+            parse_mode: 'Markdown',
+            message_thread_id: threadId,
+            reply_markup: kb,
+          })
+        }
+
+        await ctx.reply('✅ Чек успешно отправлен администратору!\nОжидай подтверждения', {
+          reply_markup: new InlineKeyboard().text('🏠 В главное меню', packCb({ a: 'home' })),
+        })
+      } catch (err) {
+        console.error('Ошибка отправки чека:', err)
+        await ctx.reply('❌ Не удалось отправить чек.')
+      }
+      return
+    }
+
+    // Если не чек — проверяем поддержку
+    if (ctx.session.inSupportMode) {
+      let threadId = ctx.session.supportThreadId
+      if (!threadId) {
+        const username = ctx.from.username ? `@${ctx.from.username}` : `ID:${ctx.from.id}`
+        try {
+          const topic = await ctx.api.createForumTopic(SUPPORT_GROUP_ID, `Поддержка — ${username}`)
+          threadId = topic.message_thread_id
+          ctx.session.supportThreadId = threadId
+        } catch (err) {
+          console.error('Ошибка создания темы:', err)
+        }
+      }
+      try {
+        await ctx.copyMessage(SUPPORT_GROUP_ID, { message_thread_id: threadId })
+      } catch (err) {
+        console.error('Ошибка копирования медиа:', err)
+      }
+    }
+  })
+
+  // Пересылка от админа к юзеру
+  bot.on('message', async (ctx) => {
+    if (ctx.chat?.id !== SUPPORT_GROUP_ID) return
+    if (!ctx.from || ctx.from.is_bot) return
+
+    const threadId = ctx.message.message_thread_id
+    if (!threadId) return
+
+    // Ищем ID пользователя по первому сообщению темы
+    const firstMsg = ctx.message.reply_to_message
+    if (firstMsg) {
+      const textOrCaption = firstMsg.text || firstMsg.caption || ''
+      const match = textOrCaption.match(/ID:\s*(\d+)/i)
+      if (match) {
+        const userId = Number(match[1])
+        try {
+          await ctx.forwardMessage(userId)
+          console.log(`Сообщение от админа переслано юзеру ${userId}`)
+        } catch (err) {
+          console.error('Не удалось переслать юзеру:', err)
+        }
+      }
     }
   })
 
