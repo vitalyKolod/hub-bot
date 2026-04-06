@@ -25,7 +25,13 @@ export function registerScreens(registry: ScreenRegistry) {
  * 1) Пытаемся отредактировать существующий UI message
  * 2) Если не получилось — создаём новый и сохраняем его id
  */
-export async function renderScreen(ctx: any, userId: number, screenId: ScreenId, params?: any) {
+export async function renderScreen(
+  ctx: any,
+  userId: number,
+  screenId: ScreenId,
+  params?: any,
+  options?: { forceNew?: boolean }
+) {
   const ui = getUi(userId)
 
   const screenFactory = screens[screenId]
@@ -36,7 +42,7 @@ export async function renderScreen(ctx: any, userId: number, screenId: ScreenId,
   const view = screenFactory(userId, params, ctx)
 
   // 1️⃣ Пытаемся редактировать существующее сообщение
-  if (ui.uiMessageId) {
+  if (ui.uiMessageId && !options?.forceNew) {
     try {
       await ctx.api.editMessageMedia(
         userId,

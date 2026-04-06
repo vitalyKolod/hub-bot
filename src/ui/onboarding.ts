@@ -65,7 +65,7 @@ export function getOnboardingKeyboard(step: OnboardingStep): InlineKeyboard {
 
   // Подтверждение — только на последней странице
   if (step === last) {
-    kb.text('ПОДТВЕРДИТЬ И НАЧАТЬ', 'ui:onb:confirm')
+    kb.text('ПОДТВЕРДИТЬ И НАЧАТЬ', 'ui:onb:confirm').style('success')
   }
 
   return kb

@@ -58,7 +58,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
   )
 
   bot.command('start', async (ctx) => {
-    const kb = new InlineKeyboard().text('СТАРТ', 'ui:onb:start').success() // зеленая кнопка
+    const kb = new InlineKeyboard().text('СТАРТ', 'ui:onb:start').style('success')
 
     // Добавляем placeholders для всех emoji в тексте
     const text = 'Привет! 🙂 Добро пожаловать в ХАБ 🟢\n\nНажми “СТАРТ”, чтобы продолжить 🔵'
@@ -91,19 +91,19 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
   bot.command('main', async (ctx) => {
     goHome(ctx.from.id)
-    await renderScreen(ctx, ctx.from.id, 'main')
+    await renderScreen(ctx, ctx.from.id, 'main', undefined, { forceNew: true })
   })
 
   bot.command('profile', async (ctx) => {
     goTo(ctx.from.id, 'profile')
-    await renderScreen(ctx, ctx.from.id, 'profile')
+    await renderScreen(ctx, ctx.from.id, 'profile', undefined, { forceNew: true })
   })
 
   bot.command('support', async (ctx) => {
     ctx.session.inSupportMode = true
     ctx.session.supportThreadId = undefined
     goTo(ctx.from.id, 'support')
-    await renderScreen(ctx, ctx.from.id, 'support')
+    await renderScreen(ctx, ctx.from.id, 'support', undefined, { forceNew: true })
   })
 
   // ====================== CALLBACK QUERY ======================
@@ -156,7 +156,7 @@ ${invite.invite_link}
 
 Заходи скорее — ссылка сгорит после первого входа.
 
-Теперь твоя подписка отображается в профиле.
+Теперь твоя подписка отображается в профиле \n*Нажми /profile чтобы вернуться.*
             `.trim(),
               { parse_mode: 'Markdown' }
             )
@@ -431,9 +431,12 @@ ${invite.invite_link}
           })
         }
 
-        await ctx.reply('✅ Чек успешно отправлен администратору!\nОжидай подтверждения', {
-          reply_markup: new InlineKeyboard().text('🏠 В главное меню', packCb({ a: 'home' })),
-        })
+        await ctx.reply(
+          '✅ Чек успешно отправлен администратору!\nОжидай подтверждения \nЧтобы вернуться в профиль - нажми /profile',
+          {
+            parse_mode: 'Markdown',
+          }
+        )
       } catch (err) {
         console.error('Ошибка отправки чека:', err)
         await ctx.reply('❌ Не удалось отправить чек.')
