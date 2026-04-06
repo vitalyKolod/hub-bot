@@ -58,9 +58,33 @@ export function registerHandlers(bot: Bot<MyContext>) {
   )
 
   bot.command('start', async (ctx) => {
-    const kb = new InlineKeyboard().text('СТАРТ', 'ui:onb:start')
+    const kb = new InlineKeyboard().text('СТАРТ', 'ui:onb:start').success() // зеленая кнопка
+
+    // Добавляем placeholders для всех emoji в тексте
+    const text = 'Привет! 🙂 Добро пожаловать в ХАБ 🟢\n\nНажми “СТАРТ”, чтобы продолжить 🔵'
+
     await ctx.replyWithPhoto(ONBOARDING_ASSET, {
-      caption: 'Привет! Добро пожаловать в ХАБ.\n\nНажми “СТАРТ”, чтобы продолжить 🙂',
+      caption: text,
+      caption_entities: [
+        {
+          offset: text.indexOf('🙂'),
+          length: 2,
+          type: 'custom_emoji',
+          custom_emoji_id: '5463249828450424568', // первая иконка
+        },
+        {
+          offset: text.indexOf('🟢'),
+          length: 2,
+          type: 'custom_emoji',
+          custom_emoji_id: '5296665364346727584', // вторая иконка после "ХАБ"
+        },
+        {
+          offset: text.indexOf('🔵'),
+          length: 2,
+          type: 'custom_emoji',
+          custom_emoji_id: '5470177992950946662', // третья иконка после "продолжить"
+        },
+      ],
       reply_markup: kb,
     })
   })
