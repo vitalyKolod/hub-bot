@@ -15,25 +15,32 @@ export function profileScreen(userId: number): ScreenView {
     const days = p.proDaysLeft ?? 0
     const stream = p.proStreamNo ?? '#'
 
-    kb.text(`🟧 МОЙ ПОТОК (№${stream})`, packCb({ a: 'noop' })).row()
+    kb.text(`МОЙ ПОТОК (№${stream})`, packCb({ a: 'noop' }))
+      .icon('5453957997418004470')
+      .row()
 
-    lines.push(`🟧 *ProPresenter*`, `Поток: №${stream}`, `Осталось дней: ${days}`, '')
+    lines.push(`*ProPresenter*`, `Поток: №${stream}`, `Осталось дней: ${days}`, '')
   }
 
   // 🟪 Контент для экранов
   if (p.hasScreens) {
     const days = p.screensDaysLeft ?? 0
 
-    kb.text(`🟪 Контент для экранов`, packCb({ a: 'noop' })).row()
+    kb.text(`Контент для экранов`, packCb({ a: 'noop' }))
+      .icon('5251299351375937406')
+      .row()
 
-    lines.push(`🟪 *Контент для экранов*`, `Осталось дней: ${days}`, '')
+    lines.push(`*Контент для экранов*`, `Осталось дней: ${days}`, '')
   }
 
   // Если вообще нет подписок
   if (!p.hasProPresenter && !p.hasScreens) {
     lines.push('У вас пока нет активных подписок.', '', 'Вы можете приобрести новую подписку.')
 
-    kb.text('➕ Приобрести подписку', packCb({ a: 'open', s: 'add_subscription' })).row()
+    kb.text('Приобрести подписку', packCb({ a: 'open', s: 'add_subscription' }))
+      .icon('5397916757333654639')
+
+      .row()
   }
 
   // Общие кнопки

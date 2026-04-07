@@ -33,15 +33,18 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
 
   const kb = new InlineKeyboard()
 
-  kb.text('РУБЛИ', packCb({ a: 'pay_method', m: 'rub' })).row()
-  kb.text('КРИПТА (USDT)', packCb({ a: 'open', s: 'crypto_method' })).row()
+  kb.text('Рубли', packCb({ a: 'pay_method', m: 'rub' })).icon('5213291343232645210')
+  kb.text('Крипта (usdt)', packCb({ a: 'open', s: 'crypto_method' }))
+    .icon('5460978422111021593')
+    .row()
   kb.row()
-  kb.text(
-    'ПОДРОБНОСТИ ОБ ОПЛАТЕ',
-    packCb({ a: 'open', s: 'payment_details', p: { page: 1 } })
-  ).row()
+  kb.text('Подробности об оплате', packCb({ a: 'open', s: 'payment_details', p: { page: 1 } }))
+    .icon('5787544344906959608')
+    .row()
   kb.row()
-  kb.text('Назад', packCb({ a: 'back' })).text('На главную', packCb({ a: 'home' }))
+  kb.text('◀️ Назад', packCb({ a: 'back' }))
+    .text('На главную', packCb({ a: 'home' }))
+    .icon('5465226866321268133')
 
   return {
     photo: './public/payment.png',

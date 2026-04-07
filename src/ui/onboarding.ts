@@ -58,7 +58,7 @@ export function getOnboardingKeyboard(step: OnboardingStep): InlineKeyboard {
 
   // Стрелки умные: показываем только доступные
   if (step > 0) kb.text('◀️ назад', `ui:onb:${step - 1}`)
-  if (step < last) kb.text('▶️ вперёд', `ui:onb:${step + 1}`)
+  if (step < last) kb.text('вперёд ▶️', `ui:onb:${step + 1}`)
 
   // Чтобы кнопки не “прилипали” в один ряд при одиночной стрелке — ряд завершаем
   kb.row()

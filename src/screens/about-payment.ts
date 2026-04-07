@@ -7,18 +7,19 @@ import type { ScreenView } from '../core/render.js'
 export function aboutPaymentScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
-  kb.text('💳 Приобрести подписку ', packCb({ a: 'open', s: 'add_subscription' }))
-
+  kb.text('Приобрести подписку ', packCb({ a: 'open', s: 'add_subscription' }))
+    .icon('5310257187786878602')
     .row()
 
   kb.row()
 
-  kb.text('📋 Подробнее об оплате ', packCb({ a: 'open', s: 'payment_details', p: { page: 1 } }))
+  kb.text('Подробнее об оплате ', packCb({ a: 'open', s: 'payment_details', p: { page: 1 } }))
+    .icon('5215209935188534658')
 
     .row()
 
   kb.text('◀️ Назад ', packCb({ a: 'back' }))
-  kb.text('🏠 На главную ', packCb({ a: 'home' }))
+  kb.text('На Главную', packCb({ a: 'home' })).icon('5465226866321268133')
 
   return {
     photo: './public/payment.png', // зелёный скрин из твоей папки

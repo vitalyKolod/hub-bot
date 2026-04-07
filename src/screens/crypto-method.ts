@@ -6,15 +6,23 @@ import type { ScreenView } from '../core/render.js'
 export function cryptoMethodScreen(userId: number, ctx: any): ScreenView {
   const kb = new InlineKeyboard()
 
-  kb.text('TRC20 USDT 🟢', packCb({ a: 'crypto_selected', m: 'trc20' })).row()
-  kb.text('ERC20 USDT 🔵', packCb({ a: 'crypto_selected', m: 'erc20' })).row()
-  kb.text('TON 🟡', packCb({ a: 'crypto_selected', m: 'ton' })).row()
-  kb.text('Bybit 🟣', packCb({ a: 'crypto_selected', m: 'bybit' })).row()
+  kb.text('TRC20 USDT ', packCb({ a: 'crypto_selected', m: 'trc20' }))
+    .icon('5397915949879801627')
+    .row()
+  kb.text('ERC20 USDT ', packCb({ a: 'crypto_selected', m: 'erc20' }))
+    .icon('5433940370327088945')
+    .row()
+  kb.text('TON USDT', packCb({ a: 'crypto_selected', m: 'ton' }))
+    .icon('5370546279375982437')
+    .row()
+  kb.text('Bybit(без комиссии)', packCb({ a: 'crypto_selected', m: 'bybit' }))
+    .icon('5472387796574418157')
+    .row()
   kb.row()
-  kb.text('◀️ Назад', packCb({ a: 'open', s: 'payment' })).text(
-    '🏠 На главную',
-    packCb({ a: 'home' })
-  )
+  kb.text('◀️ Назад', packCb({ a: 'open', s: 'payment' }))
+
+    .text(' На главную', packCb({ a: 'home' }))
+    .icon('5465226866321268133')
 
   return {
     photo: './public/payment.png',
