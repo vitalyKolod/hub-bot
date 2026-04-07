@@ -15,6 +15,7 @@ import { aboutPaymentScreen } from './about-payment.js'
 import { rubPaymentScreen } from './rub-payments.js'
 import { cryptoPaymentScreen } from './crypto-payment.js'
 import { supportScreen } from './support.js'
+import { cryptoMethodScreen } from './crypto-method.js'
 
 export function initScreens() {
   const registry: Record<ScreenId, (userId: number, params?: any, ctx?: any) => ScreenView> = {
@@ -31,10 +32,11 @@ export function initScreens() {
     other: otherScreen,
     about_payment: aboutPaymentScreen,
     rub_payment: rubPaymentScreen,
+    crypto_payment: cryptoPaymentScreen,
     admin_chat: mainScreen,
     legal: legalScreen,
     pay_method: mainScreen,
-    crypto_payment: cryptoPaymentScreen,
+    crypto_method: cryptoMethodScreen,
     chat: mainScreen,
     faq_propresenter: mainScreen,
     faq_content_screens: mainScreen,

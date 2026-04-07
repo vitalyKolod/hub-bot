@@ -7,11 +7,14 @@ export type ActionId =
   | 'pay_method'
   | 'noop' // ничего (заглушка)
   | 'pay_product'
+  | 'crypto_selected'
   | 'rub_method'
   | 'rub_payment'
   | 'paid'
   | 'accept'
   | 'reject'
+  | 'crypto_network'
+  | 'crypto_payment'
 
 export type CbData = {
   a: ActionId

@@ -40,6 +40,7 @@ type MyContext = Context &
       product: string
       method: string | null
       rubMethod?: string | null
+      network?: string
     }
     waitingForReceipt?: boolean
     inSupportMode?: boolean
@@ -319,6 +320,24 @@ ${invite.invite_link}
       return
     }
 
+    if (parsed.a === 'crypto_network' && parsed.m) {
+      ctx.session.payment = { ...ctx.session.payment, network: parsed.m }
+      goTo(userId, 'crypto_method')
+      await renderScreen(ctx, userId, 'crypto_method')
+      await ack()
+      return
+    }
+    if (parsed.a === 'crypto_selected' && parsed.m) {
+      ctx.session.payment = { ...ctx.session.payment, network: parsed.m }
+      goTo(userId, 'crypto_payment')
+      await renderScreen(ctx, userId, 'crypto_payment', {
+        network: parsed.m,
+        product: ctx.session.payment?.product,
+      })
+      await ack()
+      return
+    }
+
     if (parsed.a === 'paid') {
       await ctx.editMessageCaption({
         caption:
@@ -380,10 +399,14 @@ ${invite.invite_link}
       const profile = getProfile(userId)
       const username = ctx.from.username ? `@${ctx.from.username}` : `ID: ${userId}`
 
-      const methodText =
-        ctx.session.payment?.method === 'crypto'
-          ? 'Крипта (USDT TRC20)'
-          : `Рубли (${ctx.session.payment?.rubMethod === 'card' ? 'На карту' : 'По СБП'})`
+      let methodText = ''
+
+      if (ctx.session.payment?.method === 'crypto' || ctx.session.payment?.network) {
+        const net = ctx.session.payment?.network || 'TRC20'
+        methodText = `Крипта (${net.toUpperCase()})`
+      } else {
+        methodText = `Рубли (${ctx.session.payment?.rubMethod === 'card' ? 'На карту' : 'По СБП'})`
+      }
 
       const adminText = `
 💰 НОВАЯ ОПЛАТА — Контент для экранов
