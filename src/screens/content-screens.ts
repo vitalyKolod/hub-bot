@@ -6,8 +6,12 @@ import type { ScreenView } from '../core/render.js'
 export function contentScreensScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
-  kb.text('❓ ЧАВО ПО ПРОДУКТУ', packCb({ a: 'open', s: 'faq_content_screens' })).row()
-  kb.text('💚 ОПЛАТИТЬ', packCb({ a: 'pay_product', p: 'content_screens' })).row()
+  kb.text('ЧАВО ПО ПРОДУКТУ', packCb({ a: 'open', s: 'faq_content_screens' }))
+    .icon('5436113877181941026')
+    .row()
+  kb.text('ОПЛАТИТЬ', packCb({ a: 'pay_product', p: 'content_screens' }))
+    .icon('5318912792428814144')
+    .row()
   kb.row()
   kb.text('◀️ Назад', packCb({ a: 'back' }))
 

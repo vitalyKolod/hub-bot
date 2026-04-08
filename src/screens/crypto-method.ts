@@ -21,8 +21,8 @@ export function cryptoMethodScreen(userId: number, ctx: any): ScreenView {
   kb.row()
   kb.text('◀️ Назад', packCb({ a: 'open', s: 'payment' }))
 
-    .text(' На главную', packCb({ a: 'home' }))
-    .icon('5465226866321268133')
+    .text('В каталог', packCb({ a: 'open', s: 'add_subscription' }))
+    .icon('5312361253610475399')
 
   return {
     photo: './public/payment.png',

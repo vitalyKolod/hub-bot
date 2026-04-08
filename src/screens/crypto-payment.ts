@@ -8,12 +8,13 @@ export function cryptoPaymentScreen(
   params?: { network: string; product?: string }
 ): ScreenView {
   const kb = new InlineKeyboard()
-  kb.text('Я ОПЛАТИЛ(А)', packCb({ a: 'paid' })).row()
+  kb.text('Я ОПЛАТИЛ(А)', packCb({ a: 'paid' }))
+    .icon('5317013291602553603')
+    .row()
   kb.row()
-  kb.text('◀️ К способам оплаты', packCb({ a: 'open', s: 'payment' })).text(
-    '🏠 На главную',
-    packCb({ a: 'home' })
-  )
+  kb.text('◀️ Назад', packCb({ a: 'open', s: 'crypto_method' }))
+    .text('К способам', packCb({ a: 'open', s: 'payment' }))
+    .icon('5332600543963522398')
 
   const network = params?.network || 'trc20'
   const product = params?.product || 'default'

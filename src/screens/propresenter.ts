@@ -7,8 +7,12 @@ import type { ScreenView } from '../core/render.js'
 export function propresenterScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
-  kb.text('❓ Чаво по продукту', packCb({ a: 'open', s: 'faq_propresenter' })).row()
-  kb.text('💚 Оплатить', packCb({ a: 'pay_product', p: 'propresenter' })).row()
+  kb.text('Чаво по продукту', packCb({ a: 'open', s: 'faq_propresenter' }))
+    .icon('5436113877181941026')
+    .row()
+  kb.text('Оплатить', packCb({ a: 'pay_product', p: 'propresenter' }))
+    .icon('5318912792428814144')
+    .row()
   kb.row()
   kb.text('◀️ Назад', packCb({ a: 'back' }))
 
@@ -17,7 +21,7 @@ export function propresenterScreen(userId: number): ScreenView {
     caption:
       `*ProPresenter*\n\n` +
       `ProPresenter — профессиональная программа для управления слайдами, видео, текстом и worship-контентом в церквях.\n\n` +
-      `Основные возможности:\n` +
+      `*Основные возможности:*\n` +
       `• Красивые анимированные фоны и переходы\n` +
       `• Интеграция с нотами, текстами песен, видео\n` +
       `• Поддержка нескольких экранов (основной + confidence monitor)\n` +

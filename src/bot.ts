@@ -15,6 +15,7 @@ import { activateScreensSubscription, getProfile } from './state/profile.js'
 import { startRegistration, handleRegistrationText } from './flows/registration.js'
 
 import dotenv from 'dotenv'
+import { getOrCreateUser } from './services/user.service.js'
 dotenv.config()
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
@@ -199,7 +200,7 @@ ${invite.invite_link}
       if (!onboardingParsed) return await ack()
 
       if (onboardingParsed.type === 'confirm') {
-        const profile = getProfile(userId)
+        const profile = await getOrCreateUser(userId)
         if (profile.reg !== 'done') {
           await startRegistration(ctx, userId)
         } else {
@@ -312,8 +313,11 @@ ${invite.invite_link}
 
       const kb = new InlineKeyboard()
         .text('Я ОПЛАТИЛ(А)', packCb({ a: 'paid' }))
+        .icon('5317013291602553603')
         .row()
-        .text('Отмена', packCb({ a: 'back' }))
+        .text('◀️ Назад', packCb({ a: 'open', s: 'rub_payment' }))
+        .text('К способам', packCb({ a: 'open', s: 'payment' }))
+        .icon('5332600543963522398')
 
       await ctx.editMessageCaption({ caption, parse_mode: 'Markdown', reply_markup: kb })
       await ack()
@@ -358,7 +362,7 @@ ${invite.invite_link}
     const userId = ctx.from?.id
     if (!userId) return
 
-    const profile = getProfile(userId)
+    const profile = await getOrCreateUser(userId)
 
     if (profile.reg === 'in_progress') {
       await handleRegistrationText(ctx, userId, ctx.message.text)
@@ -369,8 +373,8 @@ ${invite.invite_link}
       let threadId = ctx.session.supportThreadId
       if (!threadId) {
         const username = ctx.from.username ? `@${ctx.from.username}` : `ID:${userId}`
-        const profileData = getProfile(userId)
-        const userInfo = `🆘 Новое обращение\n👤 ${profileData.fio || 'не указано'}\nID: ${userId}`
+        const profile = await getOrCreateUser(userId)
+        const userInfo = `🆘 Новое обращение\n👤 ${profile.fio || 'не указано'}\nID: ${userId}`
 
         try {
           const topic = await ctx.api.createForumTopic(SUPPORT_GROUP_ID, `Поддержка — ${username}`)
@@ -396,7 +400,7 @@ ${invite.invite_link}
       ctx.session.waitingForReceipt = false
 
       const userId = ctx.from.id
-      const profile = getProfile(userId)
+      const profile = await getOrCreateUser(userId)
       const username = ctx.from.username ? `@${ctx.from.username}` : `ID: ${userId}`
 
       let methodText = ''

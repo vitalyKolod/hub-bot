@@ -25,24 +25,29 @@ export function initScreens() {
     profile: profileScreen,
 
     my_subscriptions: mainScreen,
+    //add subscription
     add_subscription: addSubscriptionScreen,
+
     propresenter: propresenterScreen,
+    faq_propresenter: mainScreen,
+
     contentScreens: contentScreensScreen,
-    faq_hub: faqHubScreen,
+    faq_content_screens: mainScreen,
+
     other: otherScreen,
+    faq_hub: faqHubScreen,
+    legal: legalScreen,
     about_payment: aboutPaymentScreen,
     rub_payment: rubPaymentScreen,
-    crypto_payment: cryptoPaymentScreen,
-    admin_chat: mainScreen,
-    legal: legalScreen,
-    pay_method: mainScreen,
-    crypto_method: cryptoMethodScreen,
-    chat: mainScreen,
-    faq_propresenter: mainScreen,
-    faq_content_screens: mainScreen,
-    help: mainScreen,
+
     payment: paymentScreen,
+    crypto_method: cryptoMethodScreen,
+    crypto_payment: cryptoPaymentScreen,
     payment_details: paymentDetailsScreen,
+    admin_chat: mainScreen,
+    pay_method: mainScreen,
+    chat: mainScreen,
+    help: mainScreen,
 
     support: supportScreen,
   }

@@ -1,19 +1,29 @@
 import { InlineKeyboard } from 'grammy'
 import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
-import { getProfile } from '../state/profile.js'
+import { getOrCreateUser } from '../services/user.service.js'
 
-export function profileScreen(userId: number): ScreenView {
-  const p = getProfile(userId)
+// считаем дни до даты
+function getDaysLeft(date?: Date | null) {
+  if (!date) return 0
+  const now = new Date()
+  const diff = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  return diff > 0 ? diff : 0
+}
+
+export async function profileScreen(userId: number): Promise<ScreenView> {
+  const user = await getOrCreateUser(userId)
 
   const kb = new InlineKeyboard()
-
   const lines: string[] = ['*👤 ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ*', '']
 
-  // 🟧 ProPresenter (Мой поток)
-  if (p.hasProPresenter) {
-    const days = p.proDaysLeft ?? 0
-    const stream = p.proStreamNo ?? '#'
+  const prop = user.subscriptions?.propresenter
+  const content = user.subscriptions?.content
+
+  // 🟧 ProPresenter
+  if (prop?.status === 'active') {
+    const days = getDaysLeft(prop.expiresAt)
+    const stream = prop.flow || '#'
 
     kb.text(`МОЙ ПОТОК (№${stream})`, packCb({ a: 'noop' }))
       .icon('5453957997418004470')
@@ -22,9 +32,9 @@ export function profileScreen(userId: number): ScreenView {
     lines.push(`*ProPresenter*`, `Поток: №${stream}`, `Осталось дней: ${days}`, '')
   }
 
-  // 🟪 Контент для экранов
-  if (p.hasScreens) {
-    const days = p.screensDaysLeft ?? 0
+  // 🟪 Контент
+  if (content?.status === 'active') {
+    const days = getDaysLeft(content.expiresAt)
 
     kb.text(`Контент для экранов`, packCb({ a: 'noop' }))
       .icon('5251299351375937406')
@@ -33,17 +43,16 @@ export function profileScreen(userId: number): ScreenView {
     lines.push(`*Контент для экранов*`, `Осталось дней: ${days}`, '')
   }
 
-  // Если вообще нет подписок
-  if (!p.hasProPresenter && !p.hasScreens) {
+  // ❌ нет подписок
+  if (prop?.status !== 'active' && content?.status !== 'active') {
     lines.push('У вас пока нет активных подписок.', '', 'Вы можете приобрести новую подписку.')
 
     kb.text('Приобрести подписку', packCb({ a: 'open', s: 'add_subscription' }))
       .icon('5397916757333654639')
-
       .row()
   }
 
-  // Общие кнопки
+  // общие кнопки
   kb.text('🆘 Помощь', packCb({ a: 'open', s: 'support' })).row()
   kb.text('🏠 На главную', packCb({ a: 'home' }))
 

@@ -1,6 +1,9 @@
-import { getProfile, updateProfile, computeDaysLeft } from '../state/profile.js'
 import { goHome } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
+import { getOrCreateUser } from '../services/user.service.js'
+import { UserModel } from '../models/User.js'
+
+// ---------------- UTILS ----------------
 
 function stepTitle(step: string): string {
   switch (step) {
@@ -25,45 +28,6 @@ function stepTitle(step: string): string {
   }
 }
 
-function buildQuestionText(userId: number): string {
-  const p = getProfile(userId)
-
-  const header = `*📝 РЕГИСТРАЦИЯ* — _${stepTitle(p.regStep)}_\n`
-
-  switch (p.regStep) {
-    case 'fio':
-      return header + '\nВведите *Имя и Фамилию* (отчество необязательно).\n\nПример: `Иван Петров`'
-    case 'city':
-      return header + '\nУкажите ваш *город*:'
-    case 'church':
-      return header + '\nУкажите вашу *церковь*:'
-    case 'has_prop':
-      return (
-        header + '\nУ вас уже есть действующая подписка *ProPresenter*?\n\nОтветьте: `да` или `нет`'
-      )
-    case 'prop_stream_no':
-      return header + '\nВведите *номер потока* ProPresenter.\n\nПример: `12`'
-    case 'prop_end_date':
-      return header + '\nДо какого числа оплачена подписка ProPresenter?\n\nФормат: `2026-12-31`'
-    case 'has_screens':
-      return header + '\nУ вас есть подписка *Контент для экранов*?\n\nОтветьте: `да` или `нет`'
-    case 'screens_end_date':
-      return (
-        header +
-        '\nДо какого числа оплачена подписка “Контент для экранов”?\n\nФормат: `2026-12-31`'
-      )
-    default:
-      return header + '\nРегистрация…'
-  }
-}
-
-async function sendOrEditPrompt(ctx: any, userId: number, text: string) {
-  // Всегда отправляем НОВОЕ сообщение с вопросом
-  await ctx.api.sendMessage(userId, text, {
-    parse_mode: 'Markdown',
-  })
-}
-
 function normalizeYesNo(input: string): 'yes' | 'no' | null {
   const t = input.trim().toLowerCase()
   if (['да', 'д', 'yes', 'y', '+', 'ага'].includes(t)) return 'yes'
@@ -71,167 +35,160 @@ function normalizeYesNo(input: string): 'yes' | 'no' | null {
   return null
 }
 
-export async function startRegistration(ctx: any, userId: number) {
-  updateProfile(userId, { reg: 'in_progress', regStep: 'fio' })
-  await sendOrEditPrompt(ctx, userId, buildQuestionText(userId))
+function computeDaysLeft(dateStr: string) {
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return null
+
+  const now = new Date()
+  const diff = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+  return { date: d, daysLeft: diff }
 }
 
-/**
- * Вызывается на каждое текстовое сообщение пользователя во время регистрации
- */
+// ---------------- UI ----------------
+
+async function buildQuestionText(userId: number): Promise<string> {
+  const user = await getOrCreateUser(userId)
+
+  const header = `*📝 РЕГИСТРАЦИЯ* — _${stepTitle(user.regStep)}_\n`
+
+  switch (user.regStep) {
+    case 'fio':
+      return header + '\nВведите *Имя и Фамилию*'
+    case 'city':
+      return header + '\nУкажите ваш *город*'
+    case 'church':
+      return header + '\nУкажите вашу *церковь*'
+    case 'has_prop':
+      return header + '\nЕсть подписка ProPresenter? (да/нет)'
+    case 'prop_stream_no':
+      return header + '\nВведите номер потока'
+    case 'prop_end_date':
+      return header + '\nВведите дату окончания (2026-12-31)'
+    case 'has_screens':
+      return header + '\nЕсть подписка экранов? (да/нет)'
+    case 'screens_end_date':
+      return header + '\nВведите дату окончания'
+    default:
+      return header
+  }
+}
+
+async function sendPrompt(ctx: any, userId: number, text: string) {
+  await ctx.api.sendMessage(userId, text, { parse_mode: 'Markdown' })
+}
+
+// ---------------- START ----------------
+
+export async function startRegistration(ctx: any, userId: number) {
+  await UserModel.updateOne({ telegramId: userId }, { reg: 'in_progress', regStep: 'fio' })
+
+  await sendPrompt(ctx, userId, await buildQuestionText(userId))
+}
+
+// ---------------- MAIN FLOW ----------------
+
 export async function handleRegistrationText(ctx: any, userId: number, text: string) {
-  const p = getProfile(userId)
-  if (p.reg !== 'in_progress') return
+  const user = await getOrCreateUser(userId)
+  if (user.reg !== 'in_progress') return
 
   const answer = text.trim()
 
-  switch (p.regStep) {
+  switch (user.regStep) {
     case 'fio':
-      if (answer.length < 3) {
-        await sendOrEditPrompt(
-          ctx,
-          userId,
-          buildQuestionText(userId) + '\n\n⚠️ Введите ФИО текстом.'
-        )
-        return
-      }
-      updateProfile(userId, { fio: answer, regStep: 'city' })
+      if (answer.length < 3) return sendPrompt(ctx, userId, 'Введите норм ФИО')
+
+      await UserModel.updateOne({ telegramId: userId }, { fio: answer, regStep: 'city' })
       break
 
     case 'city':
-      if (answer.length < 2) {
-        await sendOrEditPrompt(
-          ctx,
-          userId,
-          buildQuestionText(userId) + '\n\n⚠️ Город не может быть пустым.'
-        )
-        return
-      }
-      updateProfile(userId, { city: answer, regStep: 'church' })
+      await UserModel.updateOne({ telegramId: userId }, { city: answer, regStep: 'church' })
       break
 
     case 'church':
-      if (answer.length < 2) {
-        await sendOrEditPrompt(
-          ctx,
-          userId,
-          buildQuestionText(userId) + '\n\n⚠️ Церковь не может быть пустой.'
-        )
-        return
-      }
-      updateProfile(userId, { church: answer, regStep: 'has_prop' })
+      await UserModel.updateOne({ telegramId: userId }, { church: answer, regStep: 'has_prop' })
       break
 
     case 'has_prop': {
       const yn = normalizeYesNo(answer)
-      if (!yn) {
-        await sendOrEditPrompt(
-          ctx,
-          userId,
-          buildQuestionText(userId) + '\n\n⚠️ Ответьте строго: `да` или `нет`'
-        )
-        return
-      }
-      if (yn === 'yes') {
-        updateProfile(userId, { hasProPresenter: true, regStep: 'prop_stream_no' })
-      } else {
-        updateProfile(userId, { hasProPresenter: false, regStep: 'has_screens' })
-      }
+      if (!yn) return sendPrompt(ctx, userId, 'Ответь да или нет')
+
+      await UserModel.updateOne(
+        { telegramId: userId },
+        {
+          'subscriptions.propresenter.status': yn === 'yes' ? 'active' : 'none',
+          regStep: yn === 'yes' ? 'prop_stream_no' : 'has_screens',
+        }
+      )
       break
     }
 
-    case 'prop_stream_no': {
-      const n = Number(answer)
-      if (!Number.isFinite(n) || n <= 0) {
-        await sendOrEditPrompt(
-          ctx,
-          userId,
-          buildQuestionText(userId) + '\n\n⚠️ Введите номер потока числом, например: `12`'
-        )
-        return
-      }
-      updateProfile(userId, { proStreamNo: Math.floor(n), regStep: 'prop_end_date' })
+    case 'prop_stream_no':
+      await UserModel.updateOne(
+        { telegramId: userId },
+        {
+          'subscriptions.propresenter.flow': answer,
+          regStep: 'prop_end_date',
+        }
+      )
       break
-    }
 
     case 'prop_end_date': {
       const parsed = computeDaysLeft(answer)
-      if (!parsed) {
-        await sendOrEditPrompt(
-          ctx,
-          userId,
-          buildQuestionText(userId) + '\n\n⚠️ Неверный формат даты. Пример: `2026-12-31`'
-        )
-        return
-      }
-      updateProfile(userId, {
-        proEndDate: parsed.iso,
-        proDaysLeft: parsed.daysLeft,
-        regStep: 'has_screens',
-      })
+      if (!parsed) return sendPrompt(ctx, userId, 'Неверная дата')
+
+      await UserModel.updateOne(
+        { telegramId: userId },
+        {
+          'subscriptions.propresenter.expiresAt': parsed.date,
+          regStep: 'has_screens',
+        }
+      )
       break
     }
 
     case 'has_screens': {
       const yn = normalizeYesNo(answer)
-      if (!yn) {
-        await sendOrEditPrompt(
-          ctx,
-          userId,
-          buildQuestionText(userId) + '\n\n⚠️ Ответьте строго: `да` или `нет`'
-        )
-        return
-      }
-      if (yn === 'yes') {
-        updateProfile(userId, { hasScreens: true, regStep: 'screens_end_date' })
-      } else {
-        // регистрация завершена
-        updateProfile(userId, { hasScreens: false, reg: 'done', regStep: 'done' })
-        await finishRegistration(ctx, userId)
-        return
-      }
+      if (!yn) return sendPrompt(ctx, userId, 'Ответь да или нет')
+
+      await UserModel.updateOne(
+        { telegramId: userId },
+        {
+          'subscriptions.content.status': yn === 'yes' ? 'active' : 'none',
+          regStep: yn === 'yes' ? 'screens_end_date' : 'done',
+          reg: yn === 'yes' ? 'in_progress' : 'done',
+        }
+      )
+
+      if (yn === 'no') return finishRegistration(ctx, userId)
       break
     }
 
     case 'screens_end_date': {
       const parsed = computeDaysLeft(answer)
-      if (!parsed) {
-        await sendOrEditPrompt(
-          ctx,
-          userId,
-          buildQuestionText(userId) + '\n\n⚠️ Неверный формат даты. Пример: `2026-12-31`'
-        )
-        return
-      }
+      if (!parsed) return sendPrompt(ctx, userId, 'Неверная дата')
 
-      updateProfile(userId, {
-        screensEndDate: parsed.iso,
-        screensDaysLeft: parsed.daysLeft,
-        reg: 'done',
-        regStep: 'done',
-      })
-      await finishRegistration(ctx, userId)
-      return
+      await UserModel.updateOne(
+        { telegramId: userId },
+        {
+          'subscriptions.content.expiresAt': parsed.date,
+          reg: 'done',
+          regStep: 'done',
+        }
+      )
+
+      return finishRegistration(ctx, userId)
     }
-
-    default:
-      // если что-то странное — рестарт
-      updateProfile(userId, { reg: 'in_progress', regStep: 'fio' })
-      break
   }
 
-  await sendOrEditPrompt(ctx, userId, buildQuestionText(userId))
+  await sendPrompt(ctx, userId, await buildQuestionText(userId))
 }
 
-async function finishRegistration(ctx: any, userId: number) {
-  // Финальный текст в том же регистрационном сообщении
-  await sendOrEditPrompt(
-    ctx,
-    userId,
-    '*✅ Регистрация завершена!*\n\nТеперь доступно главное меню.'
-  )
+// ---------------- FINISH ----------------
 
-  // Дальше — экранный UI
+async function finishRegistration(ctx: any, userId: number) {
+  await ctx.api.sendMessage(userId, '✅ Регистрация завершена')
+
   goHome(userId)
   await renderScreen(ctx, userId, 'main')
 }
