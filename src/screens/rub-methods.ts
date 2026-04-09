@@ -4,13 +4,13 @@ import { packCb } from '../core/callback.js'
 
 import type { ScreenView } from '../core/render.js'
 
-export function rubPaymentScreen(userId: number, params: any, ctx: any): ScreenView {
+export function rubMethodsScreen(userId: number, params: any, ctx: any): ScreenView {
   const kb = new InlineKeyboard()
 
-  kb.text('На карту', packCb({ a: 'rub_method', m: 'card' }))
+  kb.text('На карту', packCb({ a: 'rub_type', m: 'card' }))
     .icon('5361847652046611502')
     .row()
-  kb.text('По СБП', packCb({ a: 'rub_method', m: 'sbp' }))
+  kb.text('По СБП', packCb({ a: 'rub_type', m: 'sbp' }))
     .icon('5368446439800197476')
     .row()
   kb.row()

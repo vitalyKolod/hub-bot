@@ -33,7 +33,7 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
 
   const kb = new InlineKeyboard()
 
-  kb.text('Рубли', packCb({ a: 'pay_method', m: 'rub' })).icon('5213291343232645210')
+  kb.text('Рубли', packCb({ a: 'open', s: 'rub_methods' })).icon('5213291343232645210')
   kb.text('Крипта (usdt)', packCb({ a: 'open', s: 'crypto_method' }))
     .icon('5460978422111021593')
     .row()

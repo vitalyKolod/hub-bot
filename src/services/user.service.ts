@@ -13,6 +13,19 @@ export async function getOrCreateUser(telegramId: number) {
   return user
 }
 
+export async function activateContentSubscription(userId: number) {
+  const expires = new Date()
+  expires.setFullYear(expires.getFullYear() + 1) // +1 год
+
+  await UserModel.updateOne(
+    { telegramId: userId },
+    {
+      'subscriptions.content.status': 'active',
+      'subscriptions.content.expiresAt': expires,
+    }
+  )
+}
+
 export async function updateUser(telegramId: number, data: any) {
   return UserModel.updateOne({ telegramId }, { $set: data })
 }
