@@ -12,10 +12,13 @@ import { legalScreen } from './legal.js'
 import { paymentScreen } from './payment.js'
 import { paymentDetailsScreen } from './payment-detail.js'
 import { aboutPaymentScreen } from './about-payment.js'
-import { rubPaymentScreen } from './rub-payments.js'
+import { rubMethodsScreen } from './rub-methods.js'
 import { cryptoPaymentScreen } from './crypto-payment.js'
 import { supportScreen } from './support.js'
 import { cryptoMethodScreen } from './crypto-method.js'
+import { cardMethods } from './cards-metods.js'
+import { sbpMethodsScreen } from './sbp-methods.js'
+import { rubPaymentScreen } from './rub-payment.js'
 
 export function initScreens() {
   const registry: Record<ScreenId, (userId: number, params?: any, ctx?: any) => ScreenView> = {
@@ -38,6 +41,9 @@ export function initScreens() {
     faq_hub: faqHubScreen,
     legal: legalScreen,
     about_payment: aboutPaymentScreen,
+    rub_methods: rubMethodsScreen,
+    rub_card_methods: cardMethods,
+    rub_sbp_methods: sbpMethodsScreen,
     rub_payment: rubPaymentScreen,
 
     payment: paymentScreen,

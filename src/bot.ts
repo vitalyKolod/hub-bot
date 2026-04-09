@@ -11,7 +11,7 @@ import { initScreens } from './screens/index.js'
 import { renderScreen } from './core/render.js'
 import { packCb, parseCb } from './core/callback.js'
 import { goTo, goBack, goHome } from './state/ui.js'
-import { activateScreensSubscription, getProfile } from './state/profile.js'
+import { activateContentSubscription } from './services/user.service.js'
 import { startRegistration, handleRegistrationText } from './flows/registration.js'
 
 import dotenv from 'dotenv'
@@ -42,6 +42,9 @@ type MyContext = Context &
       method: string | null
       rubMethod?: string | null
       network?: string
+      rubType?: 'card' | 'sbp'
+      rubCardType?: 'mir' | 'mastercard'
+      rubBank?: 'tbank' | 'ozon' | 'alfa'
     }
     waitingForReceipt?: boolean
     inSupportMode?: boolean
@@ -139,7 +142,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
         if (parsed.a === 'accept') {
           try {
-            activateScreensSubscription(targetUserId)
+            await activateContentSubscription(targetUserId)
 
             const invite = await ctx.api.createChatInviteLink(CONTENT_GROUP_ID, {
               member_limit: 1,
@@ -288,8 +291,8 @@ ${invite.invite_link}
       ctx.session.payment = { ...ctx.session.payment, method: parsed.m }
 
       if (parsed.m === 'rub') {
-        goTo(userId, 'rub_payment')
-        await renderScreen(ctx, userId, 'rub_payment', null, ctx)
+        goTo(userId, 'rub_methods')
+        await renderScreen(ctx, userId, 'rub_methods', null, ctx)
       } else if (parsed.m === 'crypto') {
         goTo(userId, 'crypto_payment')
         await renderScreen(ctx, userId, 'crypto_payment')
@@ -298,28 +301,53 @@ ${invite.invite_link}
       return
     }
 
-    if (parsed.a === 'rub_method' && parsed.m) {
-      ctx.session.payment = { ...ctx.session.payment, rubMethod: parsed.m }
-
-      let caption = `*ОПЛАТА — РУБЛИ (${parsed.m === 'card' ? 'На карту' : 'По СБП'})*\n\n`
-
-      if (parsed.m === 'card') {
-        caption += `Номер карты:\n\`2200 1234 5678 9012\`\nПолучатель: Виталий К.\n\n`
-      } else if (parsed.m === 'sbp') {
-        caption += `Номер телефона для СБП:\n\`+79990000000\`\nПолучатель: Виталий К.\n\n`
+    if (parsed.a === 'rub_type' && parsed.m) {
+      ctx.session.payment = {
+        ...ctx.session.payment,
+        method: 'rub',
+        rubType: parsed.m,
       }
 
-      caption += `После перевода нажмите "Я ОПЛАТИЛ(А)" и пришлите чек (фото).`
+      if (parsed.m === 'card') {
+        goTo(userId, 'rub_card_methods')
+        await renderScreen(ctx, userId, 'rub_card_methods')
+      } else {
+        goTo(userId, 'rub_sbp_methods')
+        await renderScreen(ctx, userId, 'rub_sbp_methods')
+      }
 
-      const kb = new InlineKeyboard()
-        .text('Я ОПЛАТИЛ(А)', packCb({ a: 'paid' }))
-        .icon('5317013291602553603')
-        .row()
-        .text('◀️ Назад', packCb({ a: 'open', s: 'rub_payment' }))
-        .text('К способам', packCb({ a: 'open', s: 'payment' }))
-        .icon('5332600543963522398')
+      await ack()
+      return
+    }
+    if (parsed.a === 'rub_card_type' && parsed.m) {
+      ctx.session.payment = {
+        ...ctx.session.payment,
+        rubCardType: parsed.m,
+      }
 
-      await ctx.editMessageCaption({ caption, parse_mode: 'Markdown', reply_markup: kb })
+      if (parsed.m === 'mastercard') {
+        // сразу на оплату
+        goTo(userId, 'rub_payment')
+        await renderScreen(ctx, userId, 'rub_payment', ctx.session.payment)
+      } else {
+        // МИР → выбираем банк
+        goTo(userId, 'rub_sbp_methods')
+        await renderScreen(ctx, userId, 'rub_sbp_methods')
+      }
+
+      await ack()
+      return
+    }
+
+    if (parsed.a === 'rub_bank' && parsed.m) {
+      ctx.session.payment = {
+        ...ctx.session.payment,
+        rubBank: parsed.m,
+      }
+
+      goTo(userId, 'rub_payment')
+      await renderScreen(ctx, userId, 'rub_payment', ctx.session.payment)
+
       await ack()
       return
     }
@@ -409,7 +437,7 @@ ${invite.invite_link}
         const net = ctx.session.payment?.network || 'TRC20'
         methodText = `Крипта (${net.toUpperCase()})`
       } else {
-        methodText = `Рубли (${ctx.session.payment?.rubMethod === 'card' ? 'На карту' : 'По СБП'})`
+        methodText = `Рубли (${ctx.session.payment?.rubType === 'card' ? 'На карту' : 'По СБП'})`
       }
 
       const adminText = `

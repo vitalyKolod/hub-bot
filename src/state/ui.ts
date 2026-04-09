@@ -25,6 +25,9 @@ export type ScreenId =
   | 'payment_info'
   | 'other'
   | 'support'
+  | 'rub_card_methods'
+  | 'rub_methods'
+  | 'rub_sbp_methods'
   | 'end_support'
 
 export type UiState = {
