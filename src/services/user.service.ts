@@ -7,6 +7,11 @@ export async function getOrCreateUser(telegramId: number) {
     user = await UserModel.create({
       telegramId,
       reg: 'none',
+      regStep: 'fio',
+      subscriptions: {
+        propresenter: { status: 'none' },
+        content: { status: 'none' },
+      },
     })
   }
 

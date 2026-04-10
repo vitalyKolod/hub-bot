@@ -48,7 +48,8 @@ function computeDaysLeft(dateStr: string) {
 // ---------------- UI ----------------
 
 async function buildQuestionText(userId: number): Promise<string> {
-  const user = await getOrCreateUser(userId)
+  const user = await UserModel.findOne({ telegramId: userId })
+  if (!user) throw new Error('User not found')
 
   const header = `*📝 РЕГИСТРАЦИЯ* — _${stepTitle(user.regStep)}_\n`
 
@@ -60,13 +61,13 @@ async function buildQuestionText(userId: number): Promise<string> {
     case 'church':
       return header + '\nУкажите вашу *церковь*'
     case 'has_prop':
-      return header + '\nЕсть подписка ProPresenter? (да/нет)'
+      return header + '\nЕсть подписка ProPresenter? (да/нет)\n Если волонтер - ответь нет'
     case 'prop_stream_no':
       return header + '\nВведите номер потока'
     case 'prop_end_date':
       return header + '\nВведите дату окончания (2026-12-31)'
     case 'has_screens':
-      return header + '\nЕсть подписка экранов? (да/нет)'
+      return header + '\nЕсть подписка для экранов? (да/нет)\n Если волонтер - ответь нет'
     case 'screens_end_date':
       return header + '\nВведите дату окончания'
     default:
@@ -83,6 +84,7 @@ async function sendPrompt(ctx: any, userId: number, text: string) {
 export async function startRegistration(ctx: any, userId: number) {
   await UserModel.updateOne({ telegramId: userId }, { reg: 'in_progress', regStep: 'fio' })
 
+  const user = await getOrCreateUser(userId) // 🔥 подтягиваем актуального юзера
   await sendPrompt(ctx, userId, await buildQuestionText(userId))
 }
 
@@ -96,17 +98,31 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
 
   switch (user.regStep) {
     case 'fio':
-      if (answer.length < 3) return sendPrompt(ctx, userId, 'Введите норм ФИО')
+      if (answer.length < 3) {
+        return sendPrompt(ctx, userId, 'Введите норм ФИО')
+      }
 
-      await UserModel.updateOne({ telegramId: userId }, { fio: answer, regStep: 'city' })
+      await UserModel.updateOne(
+        { telegramId: userId },
+        { fio: answer, regStep: 'city' },
+        { upsert: true }
+      )
       break
 
     case 'city':
-      await UserModel.updateOne({ telegramId: userId }, { city: answer, regStep: 'church' })
+      await UserModel.updateOne(
+        { telegramId: userId },
+        { city: answer, regStep: 'church' },
+        { upsert: true }
+      )
       break
 
     case 'church':
-      await UserModel.updateOne({ telegramId: userId }, { church: answer, regStep: 'has_prop' })
+      await UserModel.updateOne(
+        { telegramId: userId },
+        { church: answer, regStep: 'has_prop' },
+        { upsert: true }
+      )
       break
 
     case 'has_prop': {
@@ -118,20 +134,28 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
         {
           'subscriptions.propresenter.status': yn === 'yes' ? 'active' : 'none',
           regStep: yn === 'yes' ? 'prop_stream_no' : 'has_screens',
-        }
+        },
+        { upsert: true }
       )
       break
     }
 
-    case 'prop_stream_no':
+    case 'prop_stream_no': {
+      const n = Number(answer)
+      if (!Number.isFinite(n) || n <= 0) {
+        return sendPrompt(ctx, userId, 'Введите норм номер потока (например 12)')
+      }
+
       await UserModel.updateOne(
         { telegramId: userId },
         {
-          'subscriptions.propresenter.flow': answer,
+          'subscriptions.propresenter.flow': Math.floor(n),
           regStep: 'prop_end_date',
-        }
+        },
+        { upsert: true }
       )
       break
+    }
 
     case 'prop_end_date': {
       const parsed = computeDaysLeft(answer)
@@ -142,7 +166,8 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
         {
           'subscriptions.propresenter.expiresAt': parsed.date,
           regStep: 'has_screens',
-        }
+        },
+        { upsert: true }
       )
       break
     }
@@ -157,10 +182,14 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
           'subscriptions.content.status': yn === 'yes' ? 'active' : 'none',
           regStep: yn === 'yes' ? 'screens_end_date' : 'done',
           reg: yn === 'yes' ? 'in_progress' : 'done',
-        }
+        },
+        { upsert: true }
       )
 
-      if (yn === 'no') return finishRegistration(ctx, userId)
+      if (yn === 'no') {
+        return finishRegistration(ctx, userId)
+      }
+
       break
     }
 
@@ -174,13 +203,15 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
           'subscriptions.content.expiresAt': parsed.date,
           reg: 'done',
           regStep: 'done',
-        }
+        },
+        { upsert: true }
       )
 
       return finishRegistration(ctx, userId)
     }
   }
 
+  const updatedUser = await getOrCreateUser(userId)
   await sendPrompt(ctx, userId, await buildQuestionText(userId))
 }
 

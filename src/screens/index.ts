@@ -19,6 +19,7 @@ import { cryptoMethodScreen } from './crypto-method.js'
 import { cardMethods } from './cards-metods.js'
 import { sbpMethodsScreen } from './sbp-methods.js'
 import { rubPaymentScreen } from './rub-payment.js'
+import { SundayScreensScreen } from './sunday-screens.js'
 
 export function initScreens() {
   const registry: Record<ScreenId, (userId: number, params?: any, ctx?: any) => ScreenView> = {
@@ -36,6 +37,8 @@ export function initScreens() {
 
     contentScreens: contentScreensScreen,
     faq_content_screens: mainScreen,
+
+    sunday_screens: SundayScreensScreen,
 
     other: otherScreen,
     faq_hub: faqHubScreen,
