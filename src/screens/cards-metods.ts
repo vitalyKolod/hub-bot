@@ -16,7 +16,7 @@ export function cardMethods(userId: number, ctx: any): ScreenView {
   kb.text('◀️ Назад', packCb({ a: 'open', s: 'rub_methods' }))
 
     .text('К способам', packCb({ a: 'open', s: 'payment' }))
-    .icon('5312361253610475399')
+    .icon('5332600543963522398')
 
   return {
     photo: './public/payment.png',

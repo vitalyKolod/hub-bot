@@ -208,6 +208,7 @@ ${invite.invite_link}
           await startRegistration(ctx, userId)
         } else {
           goHome(userId)
+
           await renderScreen(ctx, userId, 'main')
         }
         await ack()

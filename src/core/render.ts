@@ -8,7 +8,10 @@ export type ScreenView = {
   keyboard: InlineKeyboard
 }
 
-type ScreenRegistry = Record<ScreenId, (userId: number, params?: any, ctx?: any) => ScreenView>
+type ScreenRegistry = Record<
+  ScreenId,
+  (userId: number, params?: any, ctx?: any) => Promise<ScreenView> | ScreenView
+>
 
 /**
  * Здесь будет регистрироваться набор экранов.
@@ -39,7 +42,7 @@ export async function renderScreen(
     throw new Error(`Screen "${screenId}" not registered`)
   }
 
-  const view = screenFactory(userId, params, ctx)
+  const view = await screenFactory(userId, params, ctx)
 
   // 1️⃣ Пытаемся редактировать существующее сообщение
   if (ui.uiMessageId && !options?.forceNew) {

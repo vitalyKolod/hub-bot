@@ -11,7 +11,7 @@ export function mainScreen(userId: number): ScreenView {
     .text('Добавить подписку', packCb({ a: 'open', s: 'add_subscription' }))
     .icon('5397916757333654639')
     .row()
-    .text('Чат Хаб комьюнити', packCb({ a: 'open', s: 'chat' }))
+    .url('Чат Хаб комьюнити', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
     .icon('5465300082628763143')
     .row()
     .text('🆘 Помощь', packCb({ a: 'open', s: 'support' }))

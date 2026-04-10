@@ -20,6 +20,7 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
   const productNames = {
     propresenter: 'ProPresenter',
     content_screens: 'Контент для экранов',
+    sunday_screens: 'Sunday Screens',
     other: 'ДРУГОЕ',
   }
 

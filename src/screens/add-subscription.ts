@@ -18,7 +18,7 @@ export function addSubscriptionScreen(userId: number): ScreenView {
     .icon('5251299351375937406')
     .row()
 
-  kb.text('Sunday Screens', packCb({ a: 'open', s: 'sundayScreens' }))
+  kb.text('Sunday Screens', packCb({ a: 'open', s: 'sunday_screens' }))
 
     .icon('5291749654017381020')
     .row()
@@ -33,8 +33,8 @@ export function addSubscriptionScreen(userId: number): ScreenView {
   kb.text('Юридические аспекты и нюансы', packCb({ a: 'open', s: 'legal' }))
     .icon('5461152608804689572')
     .row()
+  kb.text('◀️ Назад', packCb({ a: 'home' }))
   kb.text('Об оплате', packCb({ a: 'open', s: 'about_payment' })).icon('5282961772972615494')
-  kb.text('На Главную', packCb({ a: 'home' })).icon('5465226866321268133')
 
   return {
     photo: './public/add-subscription.png',
