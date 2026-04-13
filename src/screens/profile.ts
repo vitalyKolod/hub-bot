@@ -13,12 +13,17 @@ function getDaysLeft(date?: Date | null) {
 
 export async function profileScreen(userId: number): Promise<ScreenView> {
   const user = await getOrCreateUser(userId)
+  const isVolunteer = !!user.volunteer?.ownerId
 
   const kb = new InlineKeyboard()
   const lines: string[] = ['*👤 ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ*', '']
 
   const prop = user.subscriptions?.propresenter
   const content = user.subscriptions?.content
+
+  const volunteers = user.subscriptions?.volunteers || []
+  const volunteersCount = volunteers.length
+  const maxVolunteers = 5
 
   // 🟧 ProPresenter
   if (prop?.status === 'active') {
@@ -36,11 +41,43 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
   if (content?.status === 'active') {
     const days = getDaysLeft(content.expiresAt)
 
-    kb.text(`Контент для экранов`, packCb({ a: 'noop' }))
+    kb.url(`Контент для экранов`, 'https://t.me/+Pv-uHdH-X7JiMjky')
       .icon('5251299351375937406')
       .row()
 
-    lines.push(`*Контент для экранов*`, `Осталось дней: ${days}`, '')
+    lines.push(`*Контент для экранов*`, `Осталось дней: ${days}`)
+
+    // 👉 ЕСЛИ ЭТО ВОЛОНТЁР
+    if (isVolunteer) {
+      lines.push(`Роль: Волонтёр`)
+
+      if (user.volunteer?.ownerId) {
+        lines.push(`ID владельца: ${user.volunteer.ownerId}`)
+      }
+
+      lines.push('')
+    } else {
+      // 👉 ЕСЛИ ЭТО ВЛАДЕЛЕЦ
+      const count = user.subscriptions?.volunteers?.length || 0
+
+      lines.push(`Волонтёры: ${count}/5`, '')
+
+      if (volunteers.length > 0) {
+        lines.push('*Твои волонтёры:*')
+
+        for (const v of volunteers) {
+          lines.push(`• ${v.fio || 'Без имени'} (ID: ${v.telegramId})`)
+        }
+
+        lines.push('')
+      }
+
+      if (count < maxVolunteers) {
+        kb.text('Добавить волонтера', packCb({ a: 'open', s: 'add_volunteer' }))
+          .icon('5258362837411045098')
+          .row()
+      }
+    }
   }
 
   // ❌ нет подписок
@@ -53,8 +90,9 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
   }
 
   // общие кнопки
-  kb.text('🆘 Помощь', packCb({ a: 'open', s: 'support' })).row()
-  kb.text('🏠 На главную', packCb({ a: 'home' }))
+  kb.text('◀️ Назад', packCb({ a: 'open', s: 'main' }))
+    .text('Помощь', packCb({ a: 'open', s: 'support' }))
+    .icon('5238025132177369293')
 
   return {
     photo: './public/user-profile.png',

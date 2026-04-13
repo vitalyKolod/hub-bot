@@ -9,6 +9,7 @@ const PRODUCT_PRICES = {
   propresenter: 2000,
   content_screens: 1500,
   other: null, // по договорённости
+  volunteer: 250,
 } as const
 
 export function paymentScreen(userId: number, params: any, ctx: any): ScreenView {
@@ -22,9 +23,16 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
     content_screens: 'Контент для экранов',
     sunday_screens: 'Sunday Screens',
     other: 'ДРУГОЕ',
+    volunteer: 'Добавление волонтёра',
   }
 
   const productName = productNames[product] || 'подписка'
+
+  let extraInfo = ''
+
+  if (product === 'volunteer' && ctx.session.payment?.volunteerId) {
+    extraInfo = `\n👤 Волонтёр ID: ${ctx.session.payment.volunteerId}`
+  }
 
   // Цена
   const price = PRODUCT_PRICES[product]
@@ -51,7 +59,7 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
     photo: './public/payment.png',
     caption:
       `*ОПЛАТА — ${productName.toUpperCase()}*\n\n` +
-      `Вы выбрали: ${productName}\n` +
+      `Вы выбрали: ${productName}${extraInfo}\n` +
       `${priceText}\n\n` +
       `Вы можете оплатить:\n` +
       `• Рублёвый перевод\n` +

@@ -16,6 +16,7 @@ import { startRegistration, handleRegistrationText } from './flows/registration.
 
 import dotenv from 'dotenv'
 import { getOrCreateUser } from './services/user.service.js'
+import { activateVolunteer } from './services/volunteer.service.js'
 dotenv.config()
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
@@ -40,13 +41,20 @@ type MyContext = Context &
     payment: null | {
       product: string
       method: string | null
+      volunteerId?: number
       rubMethod?: string | null
       network?: string
       rubType?: 'card' | 'sbp'
       rubCardType?: 'mir' | 'mastercard'
       rubBank?: 'tbank' | 'ozon' | 'alfa'
     }
+    // volunteer: {
+    //   ownerId: number
+    //   expiresAt: Date
+    // }
     waitingForReceipt?: boolean
+    volunteerId?: number
+    waitingForVolunteer?: boolean
     inSupportMode?: boolean
     supportThreadId?: number
   }>
@@ -132,6 +140,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
       const parsed = parseCb(data)
       if (parsed) {
         const caption = message.caption || ''
+
         const userIdMatch = caption.match(/ID:\s*(\d+)/i) || caption.match(/\(ID:\s*(\d+)\)/i)
         if (!userIdMatch) {
           await ctx.answerCallbackQuery({ text: 'ID не найден' })
@@ -142,6 +151,57 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
         if (parsed.a === 'accept') {
           try {
+            const volunteerMatch = caption.match(/ID волонт[её]ра:\s*(\d+)/i)
+            const volunteerId = volunteerMatch ? Number(volunteerMatch[1]) : null
+
+            if (volunteerId) {
+              // 1. активируем волонтёра
+              const { activateVolunteer } = await import('./services/volunteer.service.js')
+
+              await activateVolunteer(targetUserId, volunteerId)
+
+              // 2. создаем ссылку
+              const invite = await ctx.api.createChatInviteLink(CONTENT_GROUP_ID, {
+                member_limit: 1,
+                name: `Ссылка для волонтёра ${volunteerId}`,
+                expire_date: Math.floor(Date.now() / 1000) + 1800,
+              })
+
+              // 3. отправляем ВОЛОНТЁРУ
+              await ctx.api.sendMessage(
+                volunteerId,
+                `
+🎉 *Вам выдан доступ!*
+
+Вы добавлены как волонтёр.
+
+Вот ссылка в группу:
+${invite.invite_link}
+
+Ссылка одноразовая.
+`.trim(),
+                { parse_mode: 'Markdown' }
+              )
+
+              // 4. уведомляем владельца
+              await ctx.api.sendMessage(
+                targetUserId,
+                `
+✅ Волонтёр успешно добавлен!
+
+Теперь он имеет доступ к контенту.
+`.trim(),
+                { parse_mode: 'Markdown' }
+              )
+
+              // 5. обновляем сообщение админу
+              await ctx.api.editMessageCaption(String(ADMIN_GROUP_ID), message.message_id, {
+                caption: `${caption}\n\n✅ Волонтёр добавлен`,
+              })
+
+              await ctx.answerCallbackQuery({ text: 'Волонтёр добавлен ✓' })
+              return
+            }
             await activateContentSubscription(targetUserId)
 
             const invite = await ctx.api.createChatInviteLink(CONTENT_GROUP_ID, {
@@ -384,6 +444,32 @@ ${invite.invite_link}
     }
 
     await ack()
+
+    if (parsed.a === 'add_volunteer_contact') {
+      await ctx.reply('Нажмите на кнопку ниже и выберите волонтёра:', {
+        reply_markup: {
+          keyboard: [
+            [
+              {
+                text: '📱 Выбрать волонтера',
+                request_users: {
+                  request_id: 1,
+                  user_is_bot: false, // не боты
+                  max_quantity: 1,
+                },
+              },
+            ],
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        },
+      })
+
+      ctx.session.waitingForVolunteer = true
+
+      await ack()
+      return
+    }
   })
 
   // ====================== СООБЩЕНИЯ ======================
@@ -423,7 +509,7 @@ ${invite.invite_link}
     }
   })
 
-  // ====================== ЧЕК (фото / документ) — ВЫСОКИЙ ПРИОРИТЕТ ======================
+  // ========== ЧЕК (фото / документ) — ВЫСОКИЙ ПРИОРИТЕТ===========
   bot.on(['message:photo', 'message:document'], async (ctx) => {
     if (ctx.session.waitingForReceipt) {
       ctx.session.waitingForReceipt = false
@@ -441,21 +527,48 @@ ${invite.invite_link}
         methodText = `Рубли (${ctx.session.payment?.rubType === 'card' ? 'На карту' : 'По СБП'})`
       }
 
+      let volunteerText = ''
+
+      if (ctx.session.payment?.volunteerId) {
+        try {
+          const volunteer = await getOrCreateUser(ctx.session.payment.volunteerId)
+
+          volunteerText = `
+🙋 Волонтёр: ${volunteer.fio || 'не указано'}
+🆔 ID волонтёра: ${ctx.session.payment.volunteerId}
+`
+        } catch {
+          volunteerText = `\n🙋 Волонтёр ID: ${ctx.session.payment.volunteerId}`
+        }
+      }
+
+      let productText = ''
+
+      if (ctx.session.payment?.product === 'volunteer') {
+        productText = '👥 Добавление волонтёра'
+      } else {
+        productText = '📦 Контент для экранов'
+      }
+
+      const isVolunteer = ctx.session.payment?.product === 'volunteer'
+
       const adminText = `
-💰 НОВАЯ ОПЛАТА — Контент для экранов
+💰 *НОВАЯ ОПЛАТА*
+
+${productText}
 
 👤 ${profile.fio || 'не указано'}
-📍 Город: ${profile.city || 'не указано'}
-⛪ Церковь: ${profile.church || 'не указано'}
-🔗 ${username}
 🆔 ID: ${userId}
 
-Способ: ${methodText}
+💳 Способ оплаты: ${methodText}
+${volunteerText}
+
+${ctx.session.payment?.product === 'volunteer' ? 'TYPE:VOLUNTEER' : 'TYPE:CONTENT'}
 
 🕒 ${new Date().toLocaleString('ru-RU')}
 
 Проверь и подтверди вручную!
-      `.trim()
+`.trim()
 
       let threadId: number | undefined
       try {
@@ -488,7 +601,7 @@ ${invite.invite_link}
         }
 
         await ctx.reply(
-          '✅ Чек успешно отправлен администратору!\nОжидай подтверждения \nЧтобы вернуться в профиль - нажми /profile',
+          '✅ Чек успешно отправлен администратору!\nОжидай подтверждения \nЧтобы вернуться в главное меню - нажми /main',
           {
             parse_mode: 'Markdown',
           }
@@ -519,6 +632,51 @@ ${invite.invite_link}
         console.error('Ошибка копирования медиа:', err)
       }
     }
+  })
+  bot.on('message:users_shared', async (ctx) => {
+    if (!ctx.session.waitingForVolunteer) return
+
+    ctx.session.waitingForVolunteer = false
+
+    const shared = ctx.message.users_shared
+    if (!shared || !shared.users || shared.users.length === 0) {
+      await ctx.reply('❌ Не удалось получить пользователя')
+      return
+    }
+
+    const volunteerTelegramId = shared.users[0].user_id
+
+    // Дальше твоя логика
+    const volunteer = await getOrCreateUser(volunteerTelegramId)
+
+    if (volunteer.reg !== 'done') {
+      await ctx.reply('❌ Волонтёр ещё не прошёл регистрацию в боте')
+      return
+    }
+
+    // Проверка canAddVolunteer и т.д.
+    const { canAddVolunteer } = await import('./services/volunteer.service.js')
+    const check = await canAddVolunteer(ctx.from.id, volunteerTelegramId)
+
+    if (!check.ok) {
+      await ctx.reply(`❌ ${check.reason || 'Нельзя добавить этого волонтёра'}`)
+      return
+    }
+
+    // 💾 сохраняем в сессию
+    ctx.session.payment = {
+      product: 'volunteer',
+      method: null,
+      volunteerId: volunteerTelegramId,
+    }
+
+    await ctx.reply(
+      `✅ Волонтёр выбран: ${shared.users[0].first_name || 'Без имени'}\n\nПереходим к оплате...`
+    )
+
+    // 👉 переход в оплату
+    goTo(ctx.from.id, 'payment')
+    await renderScreen(ctx, ctx.from.id, 'payment', undefined, { forceNew: true })
   })
 
   // Пересылка от админа к юзеру

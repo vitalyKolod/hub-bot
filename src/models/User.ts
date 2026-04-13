@@ -22,8 +22,8 @@ const userSchema = new mongoose.Schema(
     // Подписки
     subscriptions: {
       propresenter: {
-        status: { type: String, default: 'none' }, // none | pending | active
-        flow: String, // номер потока
+        status: { type: String, default: 'none' },
+        flow: String,
         email: String,
         password: String,
         expiresAt: Date,
@@ -37,6 +37,18 @@ const userSchema = new mongoose.Schema(
         status: { type: String, default: 'none' },
         expiresAt: Date,
       },
+
+      // Волонтеры
+      volunteers: [
+        {
+          telegramId: Number,
+          fio: String,
+        },
+      ],
+    },
+
+    volunteer: {
+      ownerId: Number,
     },
   },
   { timestamps: true }
