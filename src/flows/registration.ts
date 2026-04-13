@@ -61,7 +61,7 @@ async function buildQuestionText(userId: number): Promise<string> {
     case 'church':
       return header + '\nУкажите вашу *церковь*'
     case 'has_prop':
-      return header + '\nЕсть подписка ProPresenter? (да/нет)\n Если волонтер - ответь нет'
+      return header + '\nЕсть подписка ProPresenter? (да/нет)\nЕсли волонтер - ответь нет'
     case 'prop_stream_no':
       return header + '\nВведите номер потока'
     case 'prop_end_date':

@@ -10,6 +10,7 @@ export type ScreenId =
   | 'faq_learning'
   | 'about_payment'
   | 'faq_other'
+  | 'add_volunteer'
   | 'rub_payment'
   | 'crypto_payment'
   | 'crypto_method'

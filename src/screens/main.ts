@@ -14,7 +14,8 @@ export function mainScreen(userId: number): ScreenView {
     .url('Чат Хаб комьюнити', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
     .icon('5465300082628763143')
     .row()
-    .text('🆘 Помощь', packCb({ a: 'open', s: 'support' }))
+    .text('Помощь', packCb({ a: 'open', s: 'support' }))
+    .icon('5238025132177369293')
 
   return {
     photo: './public/main.png',

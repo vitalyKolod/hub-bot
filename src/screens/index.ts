@@ -20,6 +20,7 @@ import { cardMethods } from './cards-metods.js'
 import { sbpMethodsScreen } from './sbp-methods.js'
 import { rubPaymentScreen } from './rub-payment.js'
 import { SundayScreensScreen } from './sunday-screens.js'
+import { addVolunteerScreen } from './volunteer-add.js'
 
 export function initScreens() {
   const registry: Record<ScreenId, (userId: number, params?: any, ctx?: any) => ScreenView> = {
@@ -31,6 +32,7 @@ export function initScreens() {
     my_subscriptions: mainScreen,
     //add subscription
     add_subscription: addSubscriptionScreen,
+    add_volunteer: addVolunteerScreen,
 
     propresenter: propresenterScreen,
     faq_propresenter: mainScreen,

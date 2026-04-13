@@ -9,6 +9,7 @@ export type ActionId =
   | 'pay_product'
   | 'crypto_selected'
   | 'rub_method'
+  | 'add_volunteer_contact'
   | 'rub_payment'
   | 'paid'
   | 'accept'

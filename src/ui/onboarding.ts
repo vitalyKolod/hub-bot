@@ -2,7 +2,7 @@ import { InlineKeyboard, InputFile } from 'grammy'
 
 export type OnboardingStep = 0 | 1 | 2
 
-export const ONBOARDING_ASSET = new InputFile('./public/welcome.png')
+export const ONBOARDING_ASSET = new InputFile('./public/welcome-final.png')
 
 const PAGES = [
   {
