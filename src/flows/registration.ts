@@ -34,14 +34,21 @@ function normalizeYesNo(input: string): 'yes' | 'no' | null {
   return null
 }
 
-function computeDaysLeft(dateStr: string) {
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return null
+function computeDaysLeft(input: string) {
+  const parts = input.split('.')
+  if (parts.length !== 3) return null
+
+  const [day, month, year] = parts.map(Number)
+
+  const date = new Date(year, month - 1, day)
+
+  if (isNaN(date.getTime())) return null
 
   const now = new Date()
-  const diff = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
-  return { date: d, daysLeft: diff }
+  const diff = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+  return { date, daysLeft: diff }
 }
 
 // ---------------- UI ----------------
@@ -64,9 +71,9 @@ async function buildQuestionText(userId: number): Promise<string> {
     case 'prop_stream_no':
       return header + '\nВведите номер потока'
     case 'has_screens':
-      return header + '\nЕсть подписка для экранов? (да/нет)\n Если волонтер - ответьте нет'
+      return header + '\nЕсть подписка для экранов? (да/нет)\nЕсли волонтер - ответьте нет'
     case 'screens_end_date':
-      return header + '\nВведите дату окончания в формате 2026-08-21'
+      return header + '\nВведите дату окончания в формате 28.06.2026'
     default:
       return header
   }
@@ -154,21 +161,6 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
       )
       break
     }
-
-    // case 'prop_end_date': {
-    //   const parsed = computeDaysLeft(answer)
-    //   if (!parsed) return sendPrompt(ctx, userId, 'Неверная дата')
-
-    //   await UserModel.updateOne(
-    //     { telegramId: userId },
-    //     {
-    //       'subscriptions.propresenter.expiresAt': parsed.date,
-    //       regStep: 'has_screens',
-    //     },
-    //     { upsert: true }
-    //   )
-    //   break
-    // }
 
     case 'has_screens': {
       const yn = normalizeYesNo(answer)

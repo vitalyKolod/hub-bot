@@ -5,10 +5,20 @@ import type { ScreenView } from '../core/render.js'
 import { getOrCreateUser } from '../services/user.service.js'
 
 // считаем дни до даты
-function getDaysLeft(date?: Date | null) {
+function getDaysLeft(date?: Date | string | null) {
   if (!date) return 0
+
+  const target = new Date(date)
+  if (isNaN(target.getTime())) return 0
+
   const now = new Date()
-  const diff = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+  // 💥 ВАЖНО: обнуляем время
+  target.setHours(0, 0, 0, 0)
+  now.setHours(0, 0, 0, 0)
+
+  const diff = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
   return diff > 0 ? diff : 0
 }
 
@@ -28,9 +38,10 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
 
   // 🟧 ProPresenter
   if (prop?.status === 'active') {
-    const days = getDaysLeft(prop.expiresAt)
     const stream = prop.flow || '#'
     const flowData = PROP_FLOWS.find((f) => f.flow === Number(prop.flow))
+    const days = getDaysLeft(flowData?.expiresAt)
+
     kb.url(`💬 Чат потока №${prop.flow}`, flowData.chatFlow).row()
 
     lines.push(
@@ -38,6 +49,7 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
       `Поток: №${stream}`,
       `Логин: ${prop.email || '-'}`,
       `Пароль: ${prop.password || '-'}`,
+      `Дата окончания: ${flowData?.expiresAt?.toLocaleDateString('ru-RU')}`,
       `Осталось дней: ${days}`,
       ''
     )
@@ -60,7 +72,11 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
     kb.url('Чат котента для экранов', 'https://t.me/+Pv-uHdH-X7JiMjky')
       .icon('5373330964372004748')
       .row()
-    lines.push(`*Контент для экранов*`, `Осталось дней: ${days}`)
+    lines.push(
+      `*Контент для экранов*`,
+      `Дата окончания: ${user.subscriptions.content.expiresAt?.toLocaleDateString('ru-RU')}`,
+      `Осталось дней: ${days}`
+    )
 
     if (isVolunteer) {
       lines.push(`Роль: Волонтёр`)
