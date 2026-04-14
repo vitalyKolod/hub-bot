@@ -2,6 +2,7 @@ import { goHome } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
 import { getOrCreateUser } from '../services/user.service.js'
 import { UserModel } from '../models/User.js'
+import { InlineKeyboard } from 'grammy'
 
 // ---------------- UTILS ----------------
 
@@ -17,8 +18,6 @@ function stepTitle(step: string): string {
       return 'Шаг 4/6'
     case 'prop_stream_no':
       return 'Шаг 5/6'
-    case 'prop_end_date':
-      return 'Шаг 6/6'
     case 'has_screens':
       return 'Доп. шаг'
     case 'screens_end_date':
@@ -61,15 +60,13 @@ async function buildQuestionText(userId: number): Promise<string> {
     case 'church':
       return header + '\nУкажите вашу *церковь*'
     case 'has_prop':
-      return header + '\nЕсть подписка ProPresenter? (да/нет)\nЕсли волонтер - ответь нет'
+      return header + '\nЕсть подписка ProPresenter? (да/нет)\nЕсли волонтер - ответьте нет'
     case 'prop_stream_no':
       return header + '\nВведите номер потока'
-    case 'prop_end_date':
-      return header + '\nВведите дату окончания (2026-12-31)'
     case 'has_screens':
-      return header + '\nЕсть подписка для экранов? (да/нет)\n Если волонтер - ответь нет'
+      return header + '\nЕсть подписка для экранов? (да/нет)\n Если волонтер - ответьте нет'
     case 'screens_end_date':
-      return header + '\nВведите дату окончания'
+      return header + '\nВведите дату окончания в формате 2026-08-21'
     default:
       return header
   }
@@ -99,7 +96,7 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
   switch (user.regStep) {
     case 'fio':
       if (answer.length < 3) {
-        return sendPrompt(ctx, userId, 'Введите норм ФИО')
+        return sendPrompt(ctx, userId, 'Введите правильное ФИО')
       }
 
       await UserModel.updateOne(
@@ -127,7 +124,7 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
 
     case 'has_prop': {
       const yn = normalizeYesNo(answer)
-      if (!yn) return sendPrompt(ctx, userId, 'Ответь да или нет')
+      if (!yn) return sendPrompt(ctx, userId, 'Ответьте, пожалуйста, да или нет')
 
       await UserModel.updateOne(
         { telegramId: userId },
@@ -150,36 +147,37 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
         { telegramId: userId },
         {
           'subscriptions.propresenter.flow': Math.floor(n),
-          regStep: 'prop_end_date',
+          'subscriptions.propresenter.status': 'pending', // 🔥 ВАЖНО
+          regStep: 'has_screens', // 🔥 ПЕРЕСКАКИВАЕМ ДАТУ
         },
         { upsert: true }
       )
       break
     }
 
-    case 'prop_end_date': {
-      const parsed = computeDaysLeft(answer)
-      if (!parsed) return sendPrompt(ctx, userId, 'Неверная дата')
+    // case 'prop_end_date': {
+    //   const parsed = computeDaysLeft(answer)
+    //   if (!parsed) return sendPrompt(ctx, userId, 'Неверная дата')
 
-      await UserModel.updateOne(
-        { telegramId: userId },
-        {
-          'subscriptions.propresenter.expiresAt': parsed.date,
-          regStep: 'has_screens',
-        },
-        { upsert: true }
-      )
-      break
-    }
+    //   await UserModel.updateOne(
+    //     { telegramId: userId },
+    //     {
+    //       'subscriptions.propresenter.expiresAt': parsed.date,
+    //       regStep: 'has_screens',
+    //     },
+    //     { upsert: true }
+    //   )
+    //   break
+    // }
 
     case 'has_screens': {
       const yn = normalizeYesNo(answer)
-      if (!yn) return sendPrompt(ctx, userId, 'Ответь да или нет')
+      if (!yn) return sendPrompt(ctx, userId, 'Ответьте, пожалуйста, да или нет')
 
       await UserModel.updateOne(
         { telegramId: userId },
         {
-          'subscriptions.content.status': yn === 'yes' ? 'active' : 'none',
+          'subscriptions.content.status': yn === 'yes' ? 'draft' : 'none',
           regStep: yn === 'yes' ? 'screens_end_date' : 'done',
           reg: yn === 'yes' ? 'in_progress' : 'done',
         },
@@ -201,6 +199,7 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
         { telegramId: userId },
         {
           'subscriptions.content.expiresAt': parsed.date,
+          'subscriptions.content.status': 'pending',
           reg: 'done',
           regStep: 'done',
         },
@@ -218,7 +217,71 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
 // ---------------- FINISH ----------------
 
 async function finishRegistration(ctx: any, userId: number) {
-  await ctx.api.sendMessage(userId, '✅ Регистрация завершена')
+  const user = await getOrCreateUser(userId)
+
+  let text = `
+🆕 *НОВАЯ РЕГИСТРАЦИЯ*
+
+👤 ${user.fio || 'не указано'}
+🆔 ID: ${userId}
+🌍 ${user.city || '-'}
+⛪ ${user.church || '-'}
+`
+
+  // --- ProPresenter ---
+  if (user.subscriptions?.propresenter?.status === 'pending') {
+    text += `
+
+🟧 *ProPresenter*
+Поток: №${user.subscriptions.propresenter.flow}
+`
+  }
+
+  // --- Контент ---
+  if (user.subscriptions?.content?.status === 'pending') {
+    text += `
+
+🟪 *Контент для экранов*
+До: ${user.subscriptions.content.expiresAt?.toLocaleDateString('ru-RU')}
+`
+  }
+
+  text += `
+
+Проверь данные и подтверди
+`
+
+  const { ADMIN_GROUP_ID } = process.env
+
+  const kb = new InlineKeyboard()
+
+  // кнопки динамически
+  if (user.subscriptions?.propresenter?.status === 'pending') {
+    kb.text('✅ Принять ProPresenter', `verify:prop:${userId}`).row()
+  }
+
+  if (user.subscriptions?.content?.status === 'pending') {
+    kb.text('✅ Принять Контент', `verify:content:${userId}`).row()
+  }
+
+  kb.text('❌ Отклонить всё', `verify:reject:${userId}`)
+
+  await ctx.api.sendMessage(Number(ADMIN_GROUP_ID), text, {
+    parse_mode: 'Markdown',
+    reply_markup: kb,
+  })
+
+  // юзеру
+  await ctx.api.sendMessage(
+    userId,
+    `✅ *Регистрация завершена!*
+
+⏳ Ваши данные отправлены на проверку администратору.
+
+После подтверждения вы получите уведомление.`,
+    { parse_mode: 'Markdown' }
+  )
+  await renderScreen(ctx, userId, 'main', undefined, { forceNew: true })
 
   goHome(userId)
   await renderScreen(ctx, userId, 'main')
