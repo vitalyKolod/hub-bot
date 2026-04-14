@@ -1,3 +1,4 @@
+import { PROP_FLOWS } from './../../data/ProPresenterFLows'
 import { InlineKeyboard } from 'grammy'
 import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
@@ -29,25 +30,38 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
   if (prop?.status === 'active') {
     const days = getDaysLeft(prop.expiresAt)
     const stream = prop.flow || '#'
+    const flowData = PROP_FLOWS.find((f) => f.flow === Number(prop.flow))
+    kb.url(`💬 Чат потока №${prop.flow}`, flowData.chatFlow).row()
 
-    kb.text(`МОЙ ПОТОК (№${stream})`, packCb({ a: 'noop' }))
-      .icon('5453957997418004470')
-      .row()
-
-    lines.push(`*ProPresenter*`, `Поток: №${stream}`, `Осталось дней: ${days}`, '')
+    lines.push(
+      `*ProPresenter*`,
+      `Поток: №${stream}`,
+      `Логин: ${prop.email || '-'}`,
+      `Пароль: ${prop.password || '-'}`,
+      `Осталось дней: ${days}`,
+      ''
+    )
+  } else if (prop?.status === 'pending') {
+    lines.push(`*ProPresenter*`, `⏳ На проверке (поток №${prop.flow})`, '')
   }
 
   // 🟪 Контент
+  if (content?.status === 'pending') {
+    lines.push(
+      `*Контент для экранов*`,
+      `⏳ На проверке, дата: ${user.subscriptions.content.expiresAt?.toLocaleDateString('ru-RU')}`,
+      ''
+    )
+  }
+
   if (content?.status === 'active') {
     const days = getDaysLeft(content.expiresAt)
 
-    kb.url(`Контент для экранов`, 'https://t.me/+Pv-uHdH-X7JiMjky')
-      .icon('5251299351375937406')
+    kb.url('Чат котента для экранов', 'https://t.me/+Pv-uHdH-X7JiMjky')
+      .icon('5373330964372004748')
       .row()
-
     lines.push(`*Контент для экранов*`, `Осталось дней: ${days}`)
 
-    // 👉 ЕСЛИ ЭТО ВОЛОНТЁР
     if (isVolunteer) {
       lines.push(`Роль: Волонтёр`)
 
@@ -57,10 +71,9 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
 
       lines.push('')
     } else {
-      // 👉 ЕСЛИ ЭТО ВЛАДЕЛЕЦ
-      const count = user.subscriptions?.volunteers?.length || 0
+      const count = volunteers.length
 
-      lines.push(`Волонтёры: ${count}/5`, '')
+      lines.push(`Волонтёры: ${count}/${maxVolunteers}`, '')
 
       if (volunteers.length > 0) {
         lines.push('*Твои волонтёры:*')

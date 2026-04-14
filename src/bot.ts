@@ -1,3 +1,4 @@
+import { PROP_FLOWS } from './../data/ProPresenterFLows'
 import { Bot, InlineKeyboard, session, type Context, type SessionFlavor } from 'grammy'
 import {
   ONBOARDING_ASSET,
@@ -17,6 +18,7 @@ import { startRegistration, handleRegistrationText } from './flows/registration.
 import dotenv from 'dotenv'
 import { getOrCreateUser } from './services/user.service.js'
 import { activateVolunteer } from './services/volunteer.service.js'
+import { UserModel } from './models/User.js'
 dotenv.config()
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
@@ -134,6 +136,69 @@ export function registerHandlers(bot: Bot<MyContext>) {
     console.log('callback data:', data)
 
     const message = ctx.callbackQuery.message
+
+    // ===== VERIFY FLOW =====
+    if (data.startsWith('verify:')) {
+      const [, type, userIdStr] = data.split(':')
+      const targetUserId = Number(userIdStr)
+
+      if (!targetUserId) return
+
+      const user = await getOrCreateUser(targetUserId)
+
+      // --- REJECT ---
+      if (type === 'reject') {
+        await ctx.api.sendMessage(targetUserId, '❌ Ваши данные не прошли проверку')
+
+        await ctx.answerCallbackQuery({ text: 'Отклонено' })
+        return
+      }
+
+      // --- PROPRESENTER ---
+      if (type === 'prop') {
+        const flow = user.subscriptions?.propresenter?.flow
+
+        const flowData = PROP_FLOWS.find((f) => f.flow === Number(flow))
+
+        if (!flowData) {
+          await ctx.answerCallbackQuery({ text: 'Поток не найден' })
+          return
+        }
+
+        await UserModel.updateOne(
+          { telegramId: targetUserId },
+          {
+            'subscriptions.propresenter.status': 'active',
+            'subscriptions.propresenter.email': flowData.email,
+            'subscriptions.propresenter.password': flowData.password,
+            'subscriptions.propresenter.chatFlow': flowData.chatFlow,
+            'subscriptions.propresenter.expiresAt': flowData.expiresAt,
+          }
+        )
+
+        await ctx.api.sendMessage(
+          targetUserId,
+          `✅ ProPresenter подтверждён! Все отоброжается в профиле \n*Нажми /profile чтобы вернуться.*`
+        )
+
+        await ctx.answerCallbackQuery({ text: 'ProPresenter активирован' })
+      }
+
+      // --- CONTENT ---
+      if (type === 'content') {
+        await UserModel.updateOne(
+          { telegramId: targetUserId },
+          {
+            'subscriptions.content.status': 'active',
+          }
+        )
+
+        await ctx.api.sendMessage(targetUserId, '✅ Подписка "Контент для экранов" подтверждена')
+
+        await ctx.answerCallbackQuery({ text: 'Контент активирован' })
+        return
+      }
+    }
 
     // Админ-кнопки
     if (message && message.message_thread_id) {
