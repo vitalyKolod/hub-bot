@@ -3,8 +3,9 @@ import { Bot } from 'grammy'
 import { config } from './src/config.js'
 import { registerHandlers } from './src/bot.js'
 import { connectDB } from './db.js'
+import { runReminders } from './src/services/reminder.service.js'
 
-async function start() {
+export async function start() {
   try {
     console.log('Starting HUB bot...')
 
@@ -22,6 +23,7 @@ async function start() {
       console.error('BOT ERROR:', err)
     })
 
+    console.log('✅ Бот запущен')
     // 5. Запускаем
     await bot.start()
 

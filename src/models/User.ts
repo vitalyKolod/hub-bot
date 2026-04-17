@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: 'fio',
     },
+    reminders: {
+      type: [String],
+      default: [],
+    },
 
     // Подписки
     subscriptions: {

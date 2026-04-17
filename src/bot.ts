@@ -1,4 +1,4 @@
-import { PROP_FLOWS } from './../data/ProPresenterFLows'
+import { PROP_FLOWS } from './data/ProPresenterFLows.js'
 import { Bot, InlineKeyboard, session, type Context, type SessionFlavor } from 'grammy'
 import {
   ONBOARDING_ASSET,
@@ -12,13 +12,17 @@ import { initScreens } from './screens/index.js'
 import { renderScreen } from './core/render.js'
 import { packCb, parseCb } from './core/callback.js'
 import { goTo, goBack, goHome } from './state/ui.js'
-import { activateContentSubscription } from './services/user.service.js'
+import {
+  // activateContentSubscription,
+  activateOrExtendContentSubscription,
+} from './services/user.service.js'
 import { startRegistration, handleRegistrationText } from './flows/registration.js'
 
 import dotenv from 'dotenv'
 import { getOrCreateUser } from './services/user.service.js'
 import { activateVolunteer } from './services/volunteer.service.js'
 import { UserModel } from './models/User.js'
+import { runReminders } from './services/reminder.service.js'
 dotenv.config()
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
@@ -58,6 +62,8 @@ type MyContext = Context &
     volunteerId?: number
     waitingForVolunteer?: boolean
     inSupportMode?: boolean
+    isExtension: boolean
+
     supportThreadId?: number
   }>
 
@@ -267,29 +273,36 @@ ${invite.invite_link}
               await ctx.answerCallbackQuery({ text: 'Волонтёр добавлен ✓' })
               return
             }
-            await activateContentSubscription(targetUserId)
 
-            const invite = await ctx.api.createChatInviteLink(CONTENT_GROUP_ID, {
-              member_limit: 1,
-              name: `Ссылка для ${targetUserId}`,
-              expire_date: Math.floor(Date.now() / 1000) + 1800,
-            })
+            const result = await activateOrExtendContentSubscription(targetUserId)
 
-            await ctx.api.sendMessage(
-              targetUserId,
-              `
+            // если новая подписка → даём ссылку
+            if (result.type === 'activated') {
+              const invite = await ctx.api.createChatInviteLink(CONTENT_GROUP_ID, {
+                member_limit: 1,
+                expire_date: Math.floor(Date.now() / 1000) + 1800,
+              })
+
+              await ctx.api.sendMessage(
+                targetUserId,
+                `
 ✅ *Подписка активирована!*
 
-Одноразовая ссылка в группу **"Контент для экранов"** (действует 30 минут):
-
+Вот ссылка в чат:
 ${invite.invite_link}
-
-Заходи скорее — ссылка сгорит после первого входа.
-
-Теперь твоя подписка отображается в профиле \n*Нажми /profile чтобы вернуться.*
-            `.trim(),
-              { parse_mode: 'Markdown' }
-            )
+`,
+                { parse_mode: 'Markdown' }
+              )
+            } else {
+              // если продление → НИКАКИХ ССЫЛОК
+              await ctx.api.sendMessage(
+                targetUserId,
+                '🔄 Подписка Контент для экранов продлена на 1 год!',
+                {
+                  parse_mode: 'Markdown',
+                }
+              )
+            }
 
             await ctx.api.editMessageCaption(String(ADMIN_GROUP_ID), message.message_id, {
               caption: `${caption}\n\n✅ Принято! Ссылка отправлена. Подписка активирована на 1 год.`,
@@ -406,7 +419,16 @@ ${invite.invite_link}
     }
 
     if (parsed.a === 'pay_product' && parsed.p) {
-      ctx.session.payment = { product: parsed.p, method: null }
+      const user = await getOrCreateUser(userId)
+
+      const isExtension =
+        parsed.p === 'content_screens' && user.subscriptions?.content?.status === 'active'
+
+      ctx.session.payment = {
+        product: parsed.p,
+        method: null,
+        isExtension,
+      }
       goTo(userId, 'payment')
       await renderScreen(ctx, userId, 'payment')
       await ack()
@@ -768,6 +790,12 @@ ${ctx.session.payment?.product === 'volunteer' ? 'TYPE:VOLUNTEER' : 'TYPE:CONTEN
       }
     }
   })
-
-  console.log('✅ Бот запущен')
+  setInterval(
+    async () => {
+      console.log('⏰ Проверка напоминаний...')
+      await runReminders(bot)
+    },
+    1000 * 60 * 60 * 24
+  ) // раз в сутки
 }
+console.log('✅ Бот запущен')

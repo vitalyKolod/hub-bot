@@ -49,7 +49,7 @@ export const PROP_FLOWS = [
     flow: 8,
     email: 'streameight08@gmail.com',
     password: 'J3hG6fD9sA2wE5',
-    expiresAt: new Date('2026-10-18'),
+    expiresAt: new Date('2026-10-18'), // Changed '2026-10-18'
     chatFlow: 'https://t.me/+7oBVPwFg0IkyZTgy',
   },
 
@@ -67,7 +67,7 @@ export const PROP_FLOWS = [
     flow: 10,
     email: 'ten10potok@gmail.com',
     password: 'K7mP9xL2vQ8rT4',
-    expiresAt: new Date('2026-01-30'),
+    expiresAt: new Date('2026-05-14'),
     chatFlow: 'https://t.me/+7GBpPvSI9O4zMDk6',
   },
 
