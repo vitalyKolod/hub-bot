@@ -1,8 +1,9 @@
-import { PROP_FLOWS } from './../../data/ProPresenterFLows'
+import { PROP_FLOWS } from '../data/ProPresenterFLows.js'
 import { InlineKeyboard } from 'grammy'
 import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
 import { getOrCreateUser } from '../services/user.service.js'
+import { UserModel } from '../models/User.js'
 
 // считаем дни до даты
 function getDaysLeft(date?: Date | string | null) {
@@ -17,7 +18,7 @@ function getDaysLeft(date?: Date | string | null) {
   target.setHours(0, 0, 0, 0)
   now.setHours(0, 0, 0, 0)
 
-  const diff = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const diff = Math.floor((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
   return diff > 0 ? diff : 0
 }
@@ -49,7 +50,7 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
       `Поток: №${stream}`,
       `Логин: ${prop.email || '-'}`,
       `Пароль: ${prop.password || '-'}`,
-      `Дата окончания: ${flowData?.expiresAt?.toLocaleDateString('ru-RU')}`,
+      `Дата окончания: ${flowData?.expiresAt ? new Date(flowData.expiresAt).toLocaleDateString('ru-RU') : '-'}`,
       `Осталось дней: ${days}`,
       ''
     )
@@ -61,13 +62,17 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
   if (content?.status === 'pending') {
     lines.push(
       `*Контент для экранов*`,
-      `⏳ На проверке, дата: ${user.subscriptions.content.expiresAt?.toLocaleDateString('ru-RU')}`,
+      `⏳ На проверке, дата: ${content.expiresAt ? new Date(content.expiresAt).toLocaleDateString('ru-RU') : '-'}`,
       ''
     )
   }
 
   if (content?.status === 'active') {
     const days = getDaysLeft(content.expiresAt)
+    // 👉 если меньше или равно 30 дней — показываем кнопку продления
+    if (days <= 30) {
+      kb.text('💳 Продлить ProContent', packCb({ a: 'pay_product', p: 'content_screens' })).row()
+    }
 
     kb.url('Чат котента для экранов', 'https://t.me/+Pv-uHdH-X7JiMjky')
       .icon('5373330964372004748')
@@ -81,9 +86,14 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
     if (isVolunteer) {
       lines.push(`Роль: Волонтёр`)
 
+      let owner = null
       if (user.volunteer?.ownerId) {
-        lines.push(`ID владельца: ${user.volunteer.ownerId}`)
+        owner = await UserModel.findOne({
+          telegramId: user.volunteer.ownerId,
+        })
       }
+
+      lines.push(`Владелец: ${owner?.fio || 'Не найден'}ID: ${user.volunteer?.ownerId || '-'}`)
 
       lines.push('')
     } else {

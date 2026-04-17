@@ -27,8 +27,19 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
   }
 
   const productName = productNames[product] || 'подписка'
+  const isExtension = session?.payment?.isExtension
 
   let extraInfo = ''
+
+  let extensionInfo = ''
+
+  if (isExtension) {
+    extensionInfo =
+      '\n\n🔄 *Продление подписки*\n' +
+      '• К текущему сроку добавится +1 год\n' +
+      '• Все оставшиеся дни сохранятся\n' +
+      '• Доступ у волонтёров также продлится\n'
+  }
 
   if (product === 'volunteer' && ctx.session.payment?.volunteerId) {
     extraInfo = `\n👤 Волонтёр ID: ${ctx.session.payment.volunteerId}`
@@ -58,9 +69,10 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
   return {
     photo: './public/payment.png',
     caption:
-      `*ОПЛАТА — ${productName.toUpperCase()}*\n\n` +
+      `*${isExtension ? 'ПРОДЛЕНИЕ' : 'ОПЛАТА'} — ${productName.toUpperCase()}*\n\n` +
       `Вы выбрали: ${productName}${extraInfo}\n` +
-      `${priceText}\n\n` +
+      `${priceText}\n` +
+      `${extensionInfo}\n` +
       `Вы можете оплатить:\n` +
       `• Рублёвый перевод\n` +
       `• Криптовалютный перевод в USDT (предпочтительнее)\n\n` +
