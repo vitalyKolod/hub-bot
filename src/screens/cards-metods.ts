@@ -1,6 +1,6 @@
 import { InlineKeyboard } from 'grammy'
 import { packCb } from '../core/callback.js'
-import { config } from '../config.js'
+
 import type { ScreenView } from '../core/render.js'
 
 export function cardMethods(userId: number, ctx: any): ScreenView {
