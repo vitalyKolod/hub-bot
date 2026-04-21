@@ -30,6 +30,7 @@ export async function start() {
     console.log('✅ Bot started')
   } catch (err) {
     console.error('❌ Start failed:', err)
+    console.log(process.env.MONGO_URI)
     process.exit(1)
   }
 }

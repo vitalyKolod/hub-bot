@@ -382,19 +382,19 @@ ${invite.invite_link}
       return
     }
 
-    if (parsed.a === 'end_support') {
-      ctx.session.inSupportMode = false
-      ctx.session.supportThreadId = undefined
-      await ctx.reply('✅ Диалог с поддержкой завершён.\n\nНапиши /main чтобы вернуться в меню.')
-      await ack()
-      return
-    }
+    // if (parsed.a === 'end_support') {
+    //   ctx.session.inSupportMode = false
+    //   ctx.session.supportThreadId = undefined
+    //   await ctx.reply('✅ Диалог с поддержкой завершён.\n\nНапиши /main чтобы вернуться в меню.')
+    //   await ack()
+    //   return
+    // }
 
-    if (ctx.session.inSupportMode) {
-      await ctx.answerCallbackQuery({ text: 'Вы в чате поддержки' })
-      await ack()
-      return
-    }
+    // if (ctx.session.inSupportMode) {
+    //   await ctx.answerCallbackQuery({ text: 'Вы в чате поддержки' })
+    //   await ack()
+    //   return
+    // }
 
     // Обычная навигация + оплата
     if (parsed.a === 'open' && parsed.s) {
@@ -603,7 +603,10 @@ ${invite.invite_link}
 
       const userId = ctx.from.id
       const profile = await getOrCreateUser(userId)
-      const username = ctx.from.username ? `@${ctx.from.username}` : `ID: ${userId}`
+
+      const userLink = ctx.from.username
+        ? `@${ctx.from.username}`
+        : `[Открыть профиль](tg://user?id=${userId})`
 
       let methodText = ''
 
@@ -645,6 +648,7 @@ ${invite.invite_link}
 ${productText}
 
 👤 ${profile.fio || 'не указано'}
+📱 ${userLink}
 🆔 ID: ${userId}
 
 💳 Способ оплаты: ${methodText}

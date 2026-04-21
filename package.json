@@ -15,7 +15,7 @@
     "dotenv": "^17.2.4",
     "grammy": "^1.40.0",
     "luxon": "^3.7.2",
-    "mongodb": "^7.1.1",
+    "mongodb": "^7.2.0",
     "mongoose": "^9.4.1"
   },
   "devDependencies": {

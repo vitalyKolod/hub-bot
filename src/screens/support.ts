@@ -8,10 +8,17 @@ export function supportScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
     .url('Вопрос по подписке?', 'https://t.me/k1r4r1k')
+    .icon('5332600543963522398')
     .url('Вопрос по обучению?', 'https://t.me/imacport')
+    .icon('5472411062412254753')
     .row()
 
     .url('Вопрос на счет программы?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
+    .icon('5251272469175631339')
+    .row()
+
+    .url('Написать разработчику?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
+    .icon('5818813162815753343')
     .row()
   kb.text('◀️ Назад', packCb({ a: 'home' }))
 
