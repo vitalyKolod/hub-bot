@@ -113,7 +113,7 @@ export const PROP_FLOWS = [
     email: 'ucpfpropres15@yahoo.com',
     password: 'M9kL3pQ6wE8rT2',
     expiresAt: new Date('2026-12-20'),
-    chatFlow: 'https://t.me/+j87u3w2-1_xjYTdi',
+    chatFlow: 'https://t.me/+Y2eDnbZbMoMxOGUy',
   },
 
   // Поток 16
