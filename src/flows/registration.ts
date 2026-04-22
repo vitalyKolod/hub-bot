@@ -86,9 +86,13 @@ async function sendPrompt(ctx: any, userId: number, text: string) {
 // ---------------- START ----------------
 
 export async function startRegistration(ctx: any, userId: number) {
-  await UserModel.updateOne({ telegramId: userId }, { reg: 'in_progress', regStep: 'fio' })
+  await UserModel.updateOne(
+    { telegramId: userId },
+    { reg: 'in_progress', regStep: 'fio', username: ctx.from?.username || 'нету' },
+    { upsert: true }
+  )
 
-  const user = await getOrCreateUser(userId) // 🔥 подтягиваем актуального юзера
+  const user = await getOrCreateUser(userId)
   await sendPrompt(ctx, userId, await buildQuestionText(userId))
 }
 
@@ -154,8 +158,8 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
         { telegramId: userId },
         {
           'subscriptions.propresenter.flow': Math.floor(n),
-          'subscriptions.propresenter.status': 'pending', // 🔥 ВАЖНО
-          regStep: 'has_screens', // 🔥 ПЕРЕСКАКИВАЕМ ДАТУ
+          'subscriptions.propresenter.status': 'pending',
+          regStep: 'has_screens',
         },
         { upsert: true }
       )
@@ -210,11 +214,15 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
 
 async function finishRegistration(ctx: any, userId: number) {
   const user = await getOrCreateUser(userId)
+  const usernameText = user.username ? `@${user.username}` : 'не указано'
 
   let text = `
 🆕 *НОВАЯ РЕГИСТРАЦИЯ*
 
 👤 ${user.fio || 'не указано'}
+
+Username: ${usernameText}
+
 🆔 ID: ${userId}
 🌍 ${user.city || '-'}
 ⛪ ${user.church || '-'}
@@ -245,23 +253,14 @@ async function finishRegistration(ctx: any, userId: number) {
 
   const { ADMIN_GROUP_ID } = process.env
 
-  const kb = new InlineKeyboard()
-
-  // кнопки динамически
-  if (user.subscriptions?.propresenter?.status === 'pending') {
-    kb.text('✅ Принять ProPresenter', `verify:prop:${userId}`).row()
-  }
-
-  if (user.subscriptions?.content?.status === 'pending') {
-    kb.text('✅ Принять Контент', `verify:content:${userId}`).row()
-  }
-
-  kb.text('❌ Отклонить всё', `verify:reject:${userId}`)
+  const kb = buildAdminKeyboard(user, userId)
 
   await ctx.api.sendMessage(Number(ADMIN_GROUP_ID), text, {
     parse_mode: 'Markdown',
     reply_markup: kb,
   })
+
+  // кнопки динамически
 
   // юзеру
   await ctx.api.sendMessage(
@@ -277,4 +276,23 @@ async function finishRegistration(ctx: any, userId: number) {
 
   goHome(userId)
   await renderScreen(ctx, userId, 'main')
+}
+
+export function buildAdminKeyboard(user: any, userId: number) {
+  const kb = new InlineKeyboard()
+
+  if (user.subscriptions?.propresenter?.status === 'pending') {
+    kb.text('✅ Принять ProPresenter', `verify:prop:${userId}`).row()
+  }
+
+  if (user.subscriptions?.content?.status === 'pending') {
+    kb.text('✅ Принять Контент', `verify:content:${userId}`).row()
+  }
+
+  kb.text('❌ Отклонить всё', `verify:reject:${userId}`)
+    .row()
+    .url('Написать юзеру', `tg://user?id=${userId}`)
+    .icon('5258011929993026890')
+
+  return kb
 }

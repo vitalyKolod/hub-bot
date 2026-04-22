@@ -24,6 +24,7 @@ import { activateVolunteer } from './services/volunteer.service.js'
 import { UserModel } from './models/User.js'
 import { runReminders } from './services/reminder.service.js'
 dotenv.config()
+import { buildAdminKeyboard } from './flows/registration.js'
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const CONTENT_GROUP_ID = Number(process.env.CONTENT_GROUP_ID)
@@ -60,7 +61,7 @@ type MyContext = Context &
       rubCardType?: 'mir' | 'mastercard'
       rubBank?: 'tbank' | 'ozon' | 'alfa'
     }
-    // volunteer: {
+    // volunteer:
     //   ownerId: number
     //   expiresAt: Date
     // }
@@ -158,18 +159,14 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
       const user = await getOrCreateUser(targetUserId)
 
-      // --- REJECT ---
       if (type === 'reject') {
         await ctx.api.sendMessage(targetUserId, '❌ Ваши данные не прошли проверку')
-
         await ctx.answerCallbackQuery({ text: 'Отклонено' })
         return
       }
 
-      // --- PROPRESENTER ---
       if (type === 'prop') {
         const flow = user.subscriptions?.propresenter?.flow
-
         const flowData = PROP_FLOWS.find((f) => f.flow === Number(flow))
 
         if (!flowData) {
@@ -190,13 +187,12 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
         await ctx.api.sendMessage(
           targetUserId,
-          `✅ ProPresenter подтверждён! Все отоброжается в профиле \n*Нажми /profile чтобы вернуться.*`
+          `✅ ProPresenter подтверждён! \n\n Чтобы вернуться в профиль - нажмите /profile`
         )
 
         await ctx.answerCallbackQuery({ text: 'ProPresenter активирован' })
       }
 
-      // --- CONTENT ---
       if (type === 'content') {
         await UserModel.updateOne(
           { telegramId: targetUserId },
@@ -205,11 +201,19 @@ export function registerHandlers(bot: Bot<MyContext>) {
           }
         )
 
-        await ctx.api.sendMessage(targetUserId, '✅ Подписка "Контент для экранов" подтверждена')
+        await ctx.api.sendMessage(
+          targetUserId,
+          '✅ Подписка "Контент для экранов" подтверждена \n\n Чтобы вернуться в профиль - нажмите /profile'
+        )
 
         await ctx.answerCallbackQuery({ text: 'Контент активирован' })
-        return
       }
+
+      const updatedUser = await getOrCreateUser(targetUserId)
+
+      await ctx.api.editMessageReplyMarkup(message.chat.id, message.message_id, {
+        reply_markup: buildAdminKeyboard(updatedUser, targetUserId),
+      })
     }
 
     // Админ-кнопки
@@ -810,9 +814,7 @@ ${ctx.session.payment?.product === 'volunteer' ? 'TYPE:VOLUNTEER' : 'TYPE:CONTEN
       volunteerId: volunteerTelegramId,
     }
 
-    await ctx.reply(
-      `✅ Волонтёр выбран: ${shared.users[0].first_name || 'Без имени'}\n\nПереходим к оплате...`
-    )
+    await ctx.reply(`✅ Волонтёр выбран: ${volunteer.fio || 'Без имени'}\n\nПереходим к оплате...`)
 
     // 👉 переход в оплату
     goTo(ctx.from.id, 'payment')

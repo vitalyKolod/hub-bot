@@ -12,7 +12,7 @@ export const PROP_FLOWS = [
   {
     flow: 2,
     email: 'syroezhkin.egor2@yandex.ru',
-    password: 'H7mN4kL9pQ2wX5',
+    password: 'pE3-mNV-fuh-UJ5',
     expiresAt: new Date('2026-05-24'),
     chatFlow: 'https://t.me/+8y-tubmWKqY2YTky',
   },
@@ -21,7 +21,7 @@ export const PROP_FLOWS = [
   {
     flow: 3,
     email: 'proprezentortretijpotok@gmail.com',
-    password: 'V8bN3mK6lP9qW2',
+    password: 'Tili-Tili-@3',
     expiresAt: new Date('2026-06-02'),
     chatFlow: 'https://t.me/+DVxjxFjqTlsyZTRi',
   },
@@ -30,7 +30,7 @@ export const PROP_FLOWS = [
   {
     flow: 6,
     email: 'potashnik2279@mail.ru',
-    password: 'P3qW8rT5yU2vB9',
+    password: 'abc220579D',
     expiresAt: new Date('2026-05-12'),
     chatFlow: 'https://t.me/+O8tOxhUHBwM0N2M6',
   },
@@ -39,7 +39,7 @@ export const PROP_FLOWS = [
   {
     flow: 7,
     email: '7potokpp@gmail.com',
-    password: 'Q9wE6rT3yU8iO2',
+    password: '2g528HyucuXCK4N@',
     expiresAt: new Date('2026-07-31'),
     chatFlow: 'https://t.me/+uEVDe5PtWCphMzEy',
   },
@@ -48,7 +48,7 @@ export const PROP_FLOWS = [
   {
     flow: 8,
     email: 'streameight08@gmail.com',
-    password: 'J3hG6fD9sA2wE5',
+    password: 'Community#08PP',
     expiresAt: new Date('2026-10-18'), // Changed '2026-10-18'
     chatFlow: 'https://t.me/+7oBVPwFg0IkyZTgy',
   },
@@ -57,7 +57,7 @@ export const PROP_FLOWS = [
   {
     flow: 9,
     email: '009potok@gmail.com',
-    password: 'B2nV8mX5cZ7kL4',
+    password: 'MaV-3NV-3kJ-e3x',
     expiresAt: new Date('2026-12-17'),
     chatFlow: 'https://t.me/+I5n0O7OhBMYzNWVi',
   },
@@ -66,7 +66,7 @@ export const PROP_FLOWS = [
   {
     flow: 10,
     email: 'ten10potok@gmail.com',
-    password: 'K7mP9xL2vQ8rT4',
+    password: 'T10potok!',
     expiresAt: new Date('2026-05-14'),
     chatFlow: 'https://t.me/+7GBpPvSI9O4zMDk6',
   },
@@ -75,8 +75,8 @@ export const PROP_FLOWS = [
   {
     flow: 11,
     email: 'propres2025@gmail.com',
-    password: 'T5hJ9nB2vC7mX4',
-    expiresAt: new Date('2026-03-19'),
+    password: 'Rty54cd81@12',
+    expiresAt: new Date('2027-03-19'),
     chatFlow: 'https://t.me/+bbJPSNwulkM2ZjA6',
   },
 
@@ -84,7 +84,7 @@ export const PROP_FLOWS = [
   {
     flow: 12,
     email: 'unitedchurchproductiontwelve@gmail.com',
-    password: 'C4xZ7vB2nM8kL5',
+    password: 'Trali-Vali-12@',
     expiresAt: new Date('2026-06-05'),
     chatFlow: 'https://t.me/+_iu0sfLyi4IwNmE6',
   },
@@ -93,7 +93,7 @@ export const PROP_FLOWS = [
   {
     flow: 13,
     email: 'unitedchurchproduction13@gmail.com',
-    password: 'L5pM8nK2vB7xZ4',
+    password: 'UCProPres13@',
     expiresAt: new Date('2026-08-14'),
     chatFlow: 'https://t.me/+5bURbAX8mMk5Yzgy',
   },
@@ -102,7 +102,7 @@ export const PROP_FLOWS = [
   {
     flow: 14,
     email: 'ucppropres14@gmail.com',
-    password: 'T7yU4rE9wQ2pL5',
+    password: 'pp-Ucp@14!',
     expiresAt: new Date('2026-10-20'),
     chatFlow: 'https://t.me/+j87u3w2-1_xjYTdi',
   },
@@ -111,7 +111,7 @@ export const PROP_FLOWS = [
   {
     flow: 15,
     email: 'ucpfpropres15@yahoo.com',
-    password: 'M9kL3pQ6wE8rT2',
+    password: 'Community#15PP!',
     expiresAt: new Date('2026-12-20'),
     chatFlow: 'https://t.me/+Y2eDnbZbMoMxOGUy',
   },
@@ -120,8 +120,8 @@ export const PROP_FLOWS = [
   {
     flow: 16,
     email: 'ucpfpropres16@yahoo.com',
-    password: 'B3nW8fH5qZ2xP9',
-    expiresAt: new Date('2026-02-06'),
+    password: 'commUnity@16PP',
+    expiresAt: new Date('2027-02-06'),
     chatFlow: 'https://t.me/+6Q-Os2Fbok5mOTli',
   },
 
@@ -129,8 +129,8 @@ export const PROP_FLOWS = [
   {
     flow: 17,
     email: 'ucpfpropres17@yahoo.com',
-    password: 'R9vL4kM7pQ2wX8',
-    expiresAt: new Date('2026-03-07'),
+    password: 'coMmUnity@17PP!',
+    expiresAt: new Date('2027-03-07'),
     chatFlow: 'https://t.me/+GsSgWVx6I_ExN2Fi',
   },
 ]

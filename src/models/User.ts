@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema(
     fio: String,
     city: String,
     church: String,
+    username: String,
 
     reg: {
       type: String,

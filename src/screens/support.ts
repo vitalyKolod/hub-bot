@@ -17,7 +17,7 @@ export function supportScreen(userId: number): ScreenView {
     .icon('5251272469175631339')
     .row()
 
-    .url('Написать разработчику?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
+    .url('Вопроспо боту?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
     .icon('5818813162815753343')
     .row()
   kb.text('◀️ Назад', packCb({ a: 'home' }))
