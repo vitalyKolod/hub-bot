@@ -11,14 +11,13 @@ export function supportScreen(userId: number): ScreenView {
     .icon('5332600543963522398')
     .url('Вопрос по обучению?', 'https://t.me/imacport')
     .icon('5472411062412254753')
-    .row()
 
     .url('Вопрос на счет программы?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
     .icon('5251272469175631339')
-    .row()
 
-    .url('Вопроспо боту?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
+    .url('Вопрос по боту?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
     .icon('5818813162815753343')
+    .url('Бот помощник', 'https://t.me/hubbbhelp_bot')
     .row()
   kb.text('◀️ Назад', packCb({ a: 'home' }))
 
