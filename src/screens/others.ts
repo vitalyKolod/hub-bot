@@ -5,7 +5,9 @@ import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
 
 export function otherScreen(userId: number): ScreenView {
-  const kb = new InlineKeyboard().url('ЧАТ С АДМИНОМ', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
+  const kb = new InlineKeyboard()
+    .url('ЧАТ С АДМИНОМ', 'https://t.me/k1r4r1k')
+    .icon('5465300082628763143')
   kb.row()
   kb.text('◀️ Назад', packCb({ a: 'back' }))
 

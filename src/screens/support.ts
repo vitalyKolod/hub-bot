@@ -22,6 +22,7 @@ export function supportScreen(userId: number): ScreenView {
     .icon('5818813162815753343')
     .row()
     .url('Бот помощник', 'https://t.me/hubbbhelp_bot')
+    .icon('6030400221232501136')
     .row()
   kb.text('◀️ Назад', packCb({ a: 'home' }))
 
