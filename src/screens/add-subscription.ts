@@ -18,10 +18,10 @@ export function addSubscriptionScreen(userId: number): ScreenView {
     .icon('5251299351375937406')
     .row()
 
-  kb.text('Sunday Screens', packCb({ a: 'open', s: 'sunday_screens' }))
+  // kb.text('Sunday Screens', packCb({ a: 'open', s: 'sunday_screens' }))
 
-    .icon('5291749654017381020')
-    .row()
+  //   .icon('5291749654017381020')
+  //   .row()
 
   kb.text('Другое', packCb({ a: 'open', s: 'other' }))
     .icon('5215209935188534658')

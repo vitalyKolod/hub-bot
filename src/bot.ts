@@ -28,6 +28,12 @@ dotenv.config()
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const CONTENT_GROUP_ID = Number(process.env.CONTENT_GROUP_ID)
 const SUPPORT_GROUP_ID = Number(process.env.SUPPORT_GROUP_ID)
+const SUNDAY_SCREENS_GROUP_ID = Number(process.env.SUNDAY_SCREENS_GROUP_ID)
+
+if (!SUNDAY_SCREENS_GROUP_ID) {
+  console.error('SUNDAY_SCREENS_GROUP_ID не задан')
+  process.exit(1)
+}
 
 if (!ADMIN_GROUP_ID) {
   console.error('ADMIN_GROUP_ID не задан в .env')
@@ -277,8 +283,15 @@ ${invite.invite_link}
             const result = await activateOrExtendContentSubscription(targetUserId)
 
             // если новая подписка → даём ссылку
+            // создаём ссылку Sunday Screens ВСЕГДА
+            const sundayInvite = await ctx.api.createChatInviteLink(SUNDAY_SCREENS_GROUP_ID, {
+              member_limit: 1,
+              expire_date: Math.floor(Date.now() / 1000) + 1800,
+            })
+
+            // если новая подписка → даём ОБЕ ссылки
             if (result.type === 'activated') {
-              const invite = await ctx.api.createChatInviteLink(CONTENT_GROUP_ID, {
+              const contentInvite = await ctx.api.createChatInviteLink(CONTENT_GROUP_ID, {
                 member_limit: 1,
                 expire_date: Math.floor(Date.now() / 1000) + 1800,
               })
@@ -288,19 +301,30 @@ ${invite.invite_link}
                 `
 ✅ *Подписка активирована!*
 
-Вот ссылка в чат:
-${invite.invite_link}
+📦 Контент для экранов:
+${contentInvite.invite_link}
+
+🎬 Sunday Screens:
+${sundayInvite.invite_link}
 `,
                 { parse_mode: 'Markdown' }
               )
             } else {
-              // если продление → НИКАКИХ ССЫЛОК
+              // продление → только Sunday Screens
               await ctx.api.sendMessage(
                 targetUserId,
-                '🔄 Подписка Контент для экранов продлена на 1 год!',
-                {
-                  parse_mode: 'Markdown',
-                }
+                `
+🔄 Подписка на ProContent продлена!
+
+🎬 Вам доступна подписка Sunday Screens:
+
+Вот ссылка 👇
+${sundayInvite.invite_link}
+
+
+Чтобы посмотреть Ваши подписки - нажмите /profile
+`,
+                { parse_mode: 'Markdown' }
               )
             }
 
@@ -603,10 +627,11 @@ ${invite.invite_link}
 
       const userId = ctx.from.id
       const profile = await getOrCreateUser(userId)
+      const username = ctx.from.username ? `@${ctx.from.username}` : `ID:${ctx.from.id}`
 
-      const userLink = ctx.from.username
-        ? `@${ctx.from.username}`
-        : `[Открыть профиль](tg://user?id=${userId})`
+      // const userLink = ctx.from.username
+      //   ? `@${ctx.from.username}`
+      //   : `[Открыть профиль](tg://user?id=${userId})`
 
       let methodText = ''
 
@@ -614,7 +639,25 @@ ${invite.invite_link}
         const net = ctx.session.payment?.network || 'TRC20'
         methodText = `Крипта (${net.toUpperCase()})`
       } else {
-        methodText = `Рубли (${ctx.session.payment?.rubType === 'card' ? 'На карту' : 'По СБП'})`
+        const bankMap: any = {
+          tbank: 'Т-Банк',
+          ozon: 'Озон-Банк',
+          alfa: 'Альфа-Банк',
+        }
+
+        const bank = bankMap[ctx.session.payment?.rubBank] || 'Не указан'
+
+        if (ctx.session.payment?.rubType === 'sbp') {
+          methodText = `Рубли — СБП (${bank})`
+        }
+
+        if (ctx.session.payment?.rubType === 'card') {
+          if (ctx.session.payment?.rubCardType === 'mastercard') {
+            methodText = `Рубли — Карта (MasterCard)`
+          } else {
+            methodText = `Рубли — Карта МИР (${bank})`
+          }
+        }
       }
 
       let volunteerText = ''
@@ -642,14 +685,19 @@ ${invite.invite_link}
 
       const isVolunteer = ctx.session.payment?.product === 'volunteer'
 
+      const usernameText = ctx.from.username ? `@${ctx.from.username}` : 'не указано'
       const adminText = `
+
 💰 *НОВАЯ ОПЛАТА*
 
 ${productText}
 
 👤 ${profile.fio || 'не указано'}
-📱 ${userLink}
+
+😎 ЮзерНейм: ${usernameText}
+
 🆔 ID: ${userId}
+
 
 💳 Способ оплаты: ${methodText}
 ${volunteerText}
@@ -673,7 +721,8 @@ ${ctx.session.payment?.product === 'volunteer' ? 'TYPE:VOLUNTEER' : 'TYPE:CONTEN
         const kb = new InlineKeyboard()
           .text('✅ Принять', packCb({ a: 'accept' }))
           .text('❌ Отклонить', packCb({ a: 'reject' }))
-
+          .row()
+          .url('Написать юзеру', `tg://user?id=${userId}`)
         if (ctx.message.photo) {
           const photo = ctx.message.photo.at(-1)!
           await ctx.api.sendPhoto(ADMIN_GROUP_ID, photo.file_id, {
