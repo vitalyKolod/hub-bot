@@ -9,14 +9,18 @@ export function supportScreen(userId: number): ScreenView {
 
     .url('Вопрос по подписке?', 'https://t.me/k1r4r1k')
     .icon('5332600543963522398')
+    .row()
     .url('Вопрос по обучению?', 'https://t.me/imacport')
     .icon('5472411062412254753')
+    .row()
 
     .url('Вопрос на счет программы?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
     .icon('5251272469175631339')
+    .row()
 
     .url('Вопрос по боту?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
     .icon('5818813162815753343')
+    .row()
     .url('Бот помощник', 'https://t.me/hubbbhelp_bot')
     .row()
   kb.text('◀️ Назад', packCb({ a: 'home' }))

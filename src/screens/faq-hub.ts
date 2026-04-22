@@ -14,7 +14,7 @@ export function faqHubScreen(userId: number): ScreenView {
   kb.text('Контент для экранов', packCb({ a: 'open', s: 'faq_content_screens' }))
     .icon('5251299351375937406')
     .row()
-  kb.text('Обучение', packCb({ a: 'open', s: 'faq_learning' }))
+    .url('Обучение', 'https://t.me/imacport')
     .icon('5226512880362332956')
     .row()
   kb.text('Другое', packCb({ a: 'open', s: 'other' }))
