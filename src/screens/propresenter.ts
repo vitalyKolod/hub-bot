@@ -6,7 +6,9 @@ import type { ScreenView } from '../core/render.js'
 
 export function propresenterScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
-
+    .url('ОСТАВИТЬ ЗАЯВКУ', 'https://t.me/c/2060673111/2')
+    .icon('5215209935188534658')
+    .row()
     .url('ОСТАЛИСЬ ВОПРОСЫ?', 'https://t.me/hubbbhelp_bot')
     .icon('5436113877181941026')
     .row()
