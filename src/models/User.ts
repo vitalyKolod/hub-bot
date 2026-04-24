@@ -53,6 +53,8 @@ const userSchema = new mongoose.Schema(
     },
 
     volunteer: {
+      volunteerUserName: String,
+
       ownerId: Number,
     },
   },

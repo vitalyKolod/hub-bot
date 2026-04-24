@@ -670,8 +670,11 @@ ${sundayInvite.invite_link}
         try {
           const volunteer = await getOrCreateUser(ctx.session.payment.volunteerId)
 
+          const volunteerUserName = volunteer.username ? '@' + volunteer.username : 'не указан'
+
           volunteerText = `
 🙋 Волонтёр: ${volunteer.fio || 'не указано'}
+😎 Юзернейм: ${volunteerUserName}
 🆔 ID волонтёра: ${ctx.session.payment.volunteerId}
 `
         } catch {
@@ -697,9 +700,7 @@ ${sundayInvite.invite_link}
 ${productText}
 
 👤 ${profile.fio || 'не указано'}
-
 😎 ЮзерНейм: ${usernameText}
-
 🆔 ID: ${userId}
 
 
