@@ -8,10 +8,10 @@ export function faqHubScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
   // Вертикальный список категорий (как на скрине)
-  kb.text('PRO PRESENTER', packCb({ a: 'open', s: 'faq_propresenter' }))
+  kb.text('PRO PRESENTER', packCb({ a: 'open', s: 'propresenter' }))
     .icon('5251272469175631339')
     .row()
-  kb.text('КОНТЕНТ ДЛЯ ЭКРАНОВ', packCb({ a: 'open', s: 'faq_content_screens' }))
+  kb.text('КОНТЕНТ ДЛЯ ЭКРАНОВ', packCb({ a: 'open', s: 'contentScreens' }))
     .icon('5251299351375937406')
     .row()
     .url('ОБУЧЕНИЕ', 'https://t.me/imacport')

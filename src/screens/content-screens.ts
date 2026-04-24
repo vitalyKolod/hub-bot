@@ -6,11 +6,11 @@ import type { ScreenView } from '../core/render.js'
 export function contentScreensScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
-    .url('ОСТАЛИСЬ ВОПРОСЫ?', 'https://t.me/hubbbhelp_bot')
-    .icon('5436113877181941026')
-    .row()
   kb.text('ОПЛАТИТЬ', packCb({ a: 'pay_product', p: 'content_screens' }))
     .icon('5318912792428814144')
+    .row()
+    .url('ОСТАЛИСЬ ВОПРОСЫ?', 'https://t.me/hubbbhelp_bot')
+    .icon('5436113877181941026')
     .row()
   kb.row()
   kb.text('◀️ Назад', packCb({ a: 'back' }))

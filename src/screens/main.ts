@@ -19,7 +19,7 @@ export function mainScreen(userId: number): ScreenView {
 
   return {
     photo: './public/profile.png',
-    caption: '*ГЛАВНОЕ МЕНЮ*\n\nВыбери раздел:',
+    caption: 'Выберите раздел:',
     keyboard,
   }
 }
