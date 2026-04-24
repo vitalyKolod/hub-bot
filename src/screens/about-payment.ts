@@ -24,7 +24,6 @@ export function aboutPaymentScreen(userId: number): ScreenView {
   return {
     photo: './public/about-payment.png', // зелёный скрин из твоей папки
     caption:
-      `*ОПЛАТА*\n\n` +
       `Вы можете совершить оплату вашей подписки или подписки любого другого продукта ХАБа несколькими способами:\n\n` +
       `• Рублёвый перевод\n` +
       `• Криптовалютный перевод в USDT (предпочтительнее)\n\n` +
