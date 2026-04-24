@@ -5,7 +5,7 @@ export const PROP_FLOWS = [
     email: 'timsanxyz@mail.ru',
     password: 'Уточните',
     expiresAt: new Date('2027-03-31'),
-    chatFlow: '@timsanxyz',
+    chatFlow: 'https://t.me/timsanxyz',
   },
 
   // Поток 2
@@ -67,7 +67,7 @@ export const PROP_FLOWS = [
     flow: 10,
     email: 'ten10potok@gmail.com',
     password: 'T10potok!',
-    expiresAt: new Date('2026-05-14'),
+    expiresAt: new Date('2027-01-30'),
     chatFlow: 'https://t.me/+7GBpPvSI9O4zMDk6',
   },
 

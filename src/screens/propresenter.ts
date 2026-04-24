@@ -19,8 +19,7 @@ export function propresenterScreen(userId: number): ScreenView {
   return {
     photo: './public/propres.jpg',
     caption:
-      `*ProPresenter*\n\n` +
-      `— профессиональная программа для управления слайдами, видео, текстом и worship-контентом в церквях.\n\n` +
+      `*ProPresenter*— профессиональная программа для управления слайдами, видео, текстом и worship-контентом в церквях.\n\n` +
       `*Основные возможности описаны на*` +
       `[ сайте разработчика](https://www.renewedvision.com/propresenter)\n\n` +
       `` +

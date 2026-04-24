@@ -38,7 +38,7 @@ export function addSubscriptionScreen(userId: number): ScreenView {
 
   return {
     photo: './public/add-subscription.png',
-    caption: '*ДОБАВИТЬ ПОДПИСКУ*\n\nВыберите подписку из списка, доступных в ХАБе:',
+    caption: '*Выберите подписку из списка, доступных в ХАБе:*',
     keyboard: kb,
   }
 }

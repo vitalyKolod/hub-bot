@@ -28,7 +28,7 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
   const isVolunteer = !!user.volunteer?.ownerId
 
   const kb = new InlineKeyboard()
-  const lines: string[] = ['*👤 ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ*', '']
+  const lines: string[] = ['', '']
 
   const prop = user.subscriptions?.propresenter
   const content = user.subscriptions?.content
