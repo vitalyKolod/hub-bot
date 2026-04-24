@@ -3,7 +3,7 @@ export const PROP_FLOWS = [
   {
     flow: 1,
     email: 'timsanxyz@mail.ru',
-    password: 'Уточните',
+    password: 'Уточните (нажмите на чат потока)',
     expiresAt: new Date('2027-03-31'),
     chatFlow: 'https://t.me/timsanxyz',
   },
