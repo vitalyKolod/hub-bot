@@ -26,7 +26,7 @@ export function propresenterScreen(userId: number): ScreenView {
       `[ сайте разработчика](https://www.renewedvision.com/propresenter)\n\n` +
       `💰 *Стоимость "в складчину" через ХАБ:40$/год*\n` +
       `или от 3750₽/год (в зависимости от курса USDT на P2P)\n\n` +
-      `📡 *Доступ через приватный ПОТОК:*\n` +
+      `📡 *Доступ через приватный ПОТОК:*\n\n` +
       `➕ *Выберите действие ниже:*`,
 
     keyboard: kb,
