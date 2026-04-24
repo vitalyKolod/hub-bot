@@ -49,7 +49,7 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
       `*ProPresenter*`,
       `Поток: №${stream}`,
       `Логин: ${prop.email || '-'}`,
-      `Пароль: ${prop.password || '-'}`,
+      `Пароль: \`${prop.password || '-'}\``,
       `Дата окончания: ${flowData?.expiresAt ? new Date(flowData.expiresAt).toLocaleDateString('ru-RU') : '-'}`,
       `Осталось дней: ${days}`,
       ''
