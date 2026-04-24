@@ -10,7 +10,7 @@ export function addVolunteerScreen(): ScreenView {
   kb.text('◀️ Назад', packCb({ a: 'back' })).text('🏠 На главную', packCb({ a: 'home' }))
 
   return {
-    photo: './public/other.png',
+    photo: './public/others.jpg',
     caption:
       `*➕ ДОБАВЛЕНИЕ ВОЛОНТЁРА*\n\n` +
       `Перед тем как продолжить:\n\n` +
