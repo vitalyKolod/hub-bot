@@ -5,20 +5,20 @@ import type { ScreenView } from '../core/render.js'
 
 export function mainScreen(userId: number): ScreenView {
   const keyboard = new InlineKeyboard()
-    .text('Мои подписки', packCb({ a: 'open', s: 'profile' }))
+    .text('МОИ ПОДПИСКИ', packCb({ a: 'open', s: 'profile' }))
     .icon('5258513401784573443')
     .row()
-    .text('Добавить подписку', packCb({ a: 'open', s: 'add_subscription' }))
+    .text('ДОБАВИТЬ ПОДПИСКУ', packCb({ a: 'open', s: 'add_subscription' }))
     .icon('5397916757333654639')
     .row()
-    .url('Чат Хаб комьюнити', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
+    .url('ХАБ КОМЬЮНИТИ', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
     .icon('5465300082628763143')
     .row()
-    .text('Помощь', packCb({ a: 'open', s: 'support' }))
+    .text('ПОМОЩЬ', packCb({ a: 'open', s: 'support' }))
     .icon('5238025132177369293')
 
   return {
-    photo: './public/main.png',
+    photo: './public/profile.png',
     caption: '*ГЛАВНОЕ МЕНЮ*\n\nВыбери раздел:',
     keyboard,
   }

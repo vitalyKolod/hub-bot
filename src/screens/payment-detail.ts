@@ -35,23 +35,23 @@ export function paymentDetailsScreen(userId: number, params?: { page: number }):
 
   // Умные стрелки: показываем только доступные
   if (page > 1) {
-    kb.text('◀️ Предыдущая', packCb({ a: 'open', s: 'payment_details', p: { page: page - 1 } }))
+    kb.text('◀️ ПРЕДЫДУЩАЯ', packCb({ a: 'open', s: 'payment_details', p: { page: page - 1 } }))
   }
   if (page < TOTAL_PAGES) {
-    kb.text('Следующая ▶️', packCb({ a: 'open', s: 'payment_details', p: { page: page + 1 } }))
+    kb.text('СЛЕДУЮЩАЯ ▶️', packCb({ a: 'open', s: 'payment_details', p: { page: page + 1 } }))
   }
 
   kb.row()
 
   // Кнопка "Назад к оплате" появляется ТОЛЬКО на последней странице
   if (page === TOTAL_PAGES) {
-    kb.text('Назад к оплате', packCb({ a: 'open', s: 'about_payment' })).row()
+    kb.text('НАЗАД К ОПЛАТЕ', packCb({ a: 'open', s: 'about_payment' })).row()
   }
 
-  kb.text('На главную', packCb({ a: 'home' }))
+  kb.text('НА ГЛАВНУЮ', packCb({ a: 'home' })).icon('5465226866321268133')
 
   return {
-    photo: './public/payment-details.png',
+    photo: './public/help.jpg',
     caption: `*ПОДРОБНОСТИ ОБ ОПЛАТЕ*\n\n${PAGES[page - 1]}\n\n`,
     keyboard: kb,
   }

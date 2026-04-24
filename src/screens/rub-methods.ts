@@ -19,7 +19,7 @@ export function rubMethodsScreen(userId: number, params: any, ctx: any): ScreenV
     .icon('5312361253610475399')
 
   return {
-    photo: './public/payment.png', // тот же зелёный фон
+    photo: './public/methods-rub.jpg', // тот же зелёный фон
     caption: `*ОПЛАТА — РУБЛИ*\n\n` + `Выберите способ перевода:\n\n`,
 
     keyboard: kb,

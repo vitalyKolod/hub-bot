@@ -9,12 +9,12 @@ export function addSubscriptionScreen(userId: number): ScreenView {
 
   // Вертикальный список с иконками (как на скрине)
 
-  kb.text('Pro Presenter', packCb({ a: 'open', s: 'propresenter' }))
+  kb.text('PRO PRESENTER', packCb({ a: 'open', s: 'propresenter' }))
 
     .icon('5251272469175631339')
     .row()
 
-  kb.text('Контент для экранов', packCb({ a: 'open', s: 'contentScreens' }))
+  kb.text('КОНТЕНТ ДЛЯ ЭКРАНОВ', packCb({ a: 'open', s: 'contentScreens' }))
     .icon('5251299351375937406')
     .row()
 
@@ -23,18 +23,18 @@ export function addSubscriptionScreen(userId: number): ScreenView {
   //   .icon('5291749654017381020')
   //   .row()
 
-  kb.text('Другое', packCb({ a: 'open', s: 'other' }))
+  kb.text('ДРУГОЕ', packCb({ a: 'open', s: 'other' }))
     .icon('5215209935188534658')
     .row()
   kb.row()
-  kb.text('Чаво по ХАБу (FAQ)', packCb({ a: 'open', s: 'faq_hub' }))
+  kb.text('ЧАВО ПО ХАБУ (FAQ)', packCb({ a: 'open', s: 'faq_hub' }))
     .icon('5368414803071081408')
     .row()
-  kb.text('Юридические аспекты и нюансы', packCb({ a: 'open', s: 'legal' }))
+  kb.text('ЮРИДИЧЕСКИЕ АСПЕКТЫ И НЮАНСЫ', packCb({ a: 'open', s: 'legal' }))
     .icon('5461152608804689572')
     .row()
-  kb.text('◀️ Назад', packCb({ a: 'home' }))
-  kb.text('Об оплате', packCb({ a: 'open', s: 'about_payment' })).icon('5282961772972615494')
+  kb.text('◀️ НАЗАД', packCb({ a: 'home' }))
+  kb.text('ОБ ОПЛАТЕ', packCb({ a: 'open', s: 'about_payment' })).icon('5282961772972615494')
 
   return {
     photo: './public/add-subscription.png',

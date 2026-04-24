@@ -2,6 +2,7 @@ import { InlineKeyboard } from 'grammy'
 import { config } from '../config.js'
 import { packCb } from '../core/callback.js'
 import { ScreenView } from '../core/render.js'
+import { PRODUCT_PRICES } from './payment.js'
 
 export function cryptoPaymentScreen(
   userId: number,
@@ -12,8 +13,8 @@ export function cryptoPaymentScreen(
     .icon('5317013291602553603')
     .row()
   kb.row()
-  kb.text('◀️ Назад', packCb({ a: 'open', s: 'crypto_method' }))
-    .text('К способам', packCb({ a: 'open', s: 'payment' }))
+  kb.text('◀️ НАЗАД', packCb({ a: 'open', s: 'crypto_method' }))
+    .text('К СПОСОБАМ', packCb({ a: 'open', s: 'payment' }))
     .icon('5332600543963522398')
 
   const network = params?.network || 'trc20'
@@ -26,8 +27,8 @@ export function cryptoPaymentScreen(
   else if (network === 'bybit') wallet = config.PAYMENT_BYBIT
 
   // сумма по продукту
-  let amount = 'Не указано'
-  if (product === 'content') amount = config.PRICE_CONTENT
+  let amount = PRODUCT_PRICES[product]
+  if (product === 'content_screens') amount = config.PRICE_CONTENT
   else if (product === 'propresenter') amount = config.PRICE_PROPRESENTER
 
   return {

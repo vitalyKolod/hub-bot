@@ -24,7 +24,7 @@ export const config = {
   PAYMENT_TON: 'UQBAQvGg6hJiGPkQsysC3ZrkuqFcC2-B7vX4D4MGHAjK_vOZ',
   PAYMENT_BYBIT: '210547658',
 
-  PRICE_CONTENT: '500₽',
+  PRICE_CONTENT: '1000₽',
   PRICE_PROPRESENTER: '1000₽',
 
   ADMIN_GROUP_ID: Number(process.env.ADMIN_GROUP_ID || '0'),

@@ -5,9 +5,9 @@ import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
 
 // Цены по продуктам (можно вынести в отдельный файл потом)
-const PRODUCT_PRICES = {
+export const PRODUCT_PRICES = {
   propresenter: 2000,
-  content_screens: 1500,
+  content_screens: 1000,
   other: null, // по договорённости
   volunteer: 250,
 } as const

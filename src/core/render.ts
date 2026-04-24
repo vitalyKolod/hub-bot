@@ -6,6 +6,7 @@ export type ScreenView = {
   photo: string
   caption: string
   keyboard: InlineKeyboard
+  parse_mode?: 'Markdown' | 'HTML' | 'MarkdownV2'
 }
 
 type ScreenRegistry = Record<
@@ -54,7 +55,7 @@ export async function renderScreen(
           type: 'photo',
           media: new InputFile(view.photo),
           caption: view.caption,
-          parse_mode: 'Markdown',
+          parse_mode: view.parse_mode ?? 'Markdown',
         },
         {
           reply_markup: view.keyboard,

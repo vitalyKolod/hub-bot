@@ -2,7 +2,7 @@ import { InlineKeyboard, InputFile } from 'grammy'
 
 export type OnboardingStep = 0 | 1 | 2
 
-export const ONBOARDING_ASSET = new InputFile('./public/welcome-final.png')
+export const ONBOARDING_ASSET = new InputFile('./public/welcome.jpg')
 
 const PAGES = [
   {
@@ -57,8 +57,8 @@ export function getOnboardingKeyboard(step: OnboardingStep): InlineKeyboard {
   const kb = new InlineKeyboard()
 
   // Стрелки умные: показываем только доступные
-  if (step > 0) kb.text('◀️ назад', `ui:onb:${step - 1}`)
-  if (step < last) kb.text('вперёд ▶️', `ui:onb:${step + 1}`)
+  if (step > 0) kb.text('◀️ НАЗАД', `ui:onb:${step - 1}`)
+  if (step < last) kb.text('ВПЕРЕД ▶️', `ui:onb:${step + 1}`)
 
   // Чтобы кнопки не “прилипали” в один ряд при одиночной стрелке — ряд завершаем
   kb.row()

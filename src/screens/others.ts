@@ -12,7 +12,7 @@ export function otherScreen(userId: number): ScreenView {
   kb.text('◀️ Назад', packCb({ a: 'back' }))
 
   return {
-    photo: './public/other.png', // жёлтый скрин из твоей папки public
+    photo: './public/others.jpg', // жёлтый скрин из твоей папки public
     // если файла нет — fallback: './public/main-menu.png'
     caption:
       `*ДРУГОЕ*\n\n` +

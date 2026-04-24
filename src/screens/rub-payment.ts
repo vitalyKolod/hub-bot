@@ -2,6 +2,7 @@ import { InlineKeyboard } from 'grammy'
 import { packCb } from '../core/callback.js'
 import { config } from '../config.js'
 import type { ScreenView } from '../core/render.js'
+import { PRODUCT_PRICES } from './payment.js'
 
 export function rubPaymentScreen(userId: number, params?: any): ScreenView {
   const kb = new InlineKeyboard()
@@ -11,8 +12,8 @@ export function rubPaymentScreen(userId: number, params?: any): ScreenView {
     .row()
 
   kb.row()
-  kb.text('◀️ Назад', packCb({ a: 'back' }))
-    .text('К способам', packCb({ a: 'open', s: 'payment' }))
+  kb.text('◀️ НАЗАД', packCb({ a: 'back' }))
+    .text('К СПОСОБАМ', packCb({ a: 'open', s: 'payment' }))
     .icon('5332600543963522398')
 
   let details = ''
@@ -49,17 +50,21 @@ export function rubPaymentScreen(userId: number, params?: any): ScreenView {
 
   if (!params) {
     return {
-      photo: './public/payment.png',
+      photo: './public/methods-rub.jpg',
       caption: 'Ошибка: данные оплаты не найдены',
       keyboard: new InlineKeyboard().text('Назад', packCb({ a: 'back' })),
     }
   }
 
+  const product = params?.product || 'default'
+  let amount = PRODUCT_PRICES[product]
+
   return {
-    photo: './public/payment.png',
+    photo: './public/methods-rub.jpg',
     caption:
       `*ОПЛАТА — РУБЛИ*\n\n` +
       `Способ: **${methodText}**\n\n` +
+      `Сумма: **${amount}**\n\n` +
       `Реквизиты:\n\`\`\`\n${details}\n\`\`\`\n\n` +
       `Получатель: ${config.PAYMENT_RECEIVER_NAME}\n\n` +
       `После перевода нажмите "Я ОПЛАТИЛ(А)"`,

@@ -7,21 +7,21 @@ import type { ScreenView } from '../core/render.js'
 export function supportScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
-    .url('Вопрос по подписке?', 'https://t.me/k1r4r1k')
-    .icon('5332600543963522398')
-    .row()
-    .url('Вопрос по обучению?', 'https://t.me/imacport')
-    .icon('5472411062412254753')
-    .row()
+    // .url('Вопрос по подписке?', 'https://t.me/k1r4r1k')
+    // .icon('5332600543963522398')
+    // .row()
+    // .url('Вопрос по обучению?', 'https://t.me/imacport')
+    // .icon('5472411062412254753')
+    // .row()
 
-    .url('Вопрос на счет программы?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
-    .icon('5251272469175631339')
-    .row()
+    // .url('Вопрос на счет программы?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
+    // .icon('5251272469175631339')
+    // .row()
 
-    .url('Вопрос по боту?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
+    .url('ВОПРОС ПО БОТУ?', 'https://t.me/vitaly_kolodchenko')
     .icon('5818813162815753343')
     .row()
-    .url('Бот помощник', 'https://t.me/hubbbhelp_bot')
+    .url('БОТ ПОМОЩНИК', 'https://t.me/hubbbhelp_bot')
     .icon('6030400221232501136')
     .row()
   kb.text('◀️ Назад', packCb({ a: 'home' }))
@@ -29,13 +29,10 @@ export function supportScreen(userId: number): ScreenView {
   // .text('❌ Завершить диалог', packCb({ a: 'end_support' })).row()
 
   return {
-    photo: './public/profile.png',
+    photo: './public/help.jpg',
     caption:
       `*ЧАТ С ПОДДЕРЖКОЙ*\n\n` +
-      `Вы в режиме общения с поддержкой.\n\n` +
-      `Теперь **любое** ваше сообщение (текст, фото, видео, голосовое, кружок, документ) ` +
-      `автоматически будет отправлено админам.\n\n` +
-      `Пожалуйста, не нажимайте другие кнопки бота, пока идёт диалог.`,
+      `Если у вас остались какие-то вопросы по процессам работы ХАБ КОМЬЮНИТИ или есть сложности с ботом / обнаружили баги...\nВыберите соответствующий раздел:`,
 
     keyboard: kb,
   }

@@ -22,7 +22,7 @@ export function sbpMethodsScreen(userId: number, ctx: any): ScreenView {
     .icon('5332600543963522398')
 
   return {
-    photo: './public/payment.png',
+    photo: './public/methods-rub.jpg',
     caption:
       `*💸 Оплата через СБП*\n\n` +
       `Выберите удобный вариант оплаты:\n\n` +

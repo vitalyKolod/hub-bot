@@ -71,10 +71,10 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
     const days = getDaysLeft(content.expiresAt)
     // 👉 если меньше или равно 30 дней — показываем кнопку продления
     if (days <= 30) {
-      kb.text('💳 Продлить ProContent', packCb({ a: 'pay_product', p: 'content_screens' })).row()
+      kb.text('💳 ПРОДЛИТЬ PRO CONTENT', packCb({ a: 'pay_product', p: 'content_screens' })).row()
     }
 
-    kb.url('Чат котента для экранов', 'https://t.me/+Pv-uHdH-X7JiMjky')
+    kb.url('ЧАТ КОНТЕНТ ДЛЯ ЭКРАНОВ', 'https://t.me/+Pv-uHdH-X7JiMjky')
       .icon('5373330964372004748')
       .row()
     lines.push(
@@ -112,7 +112,7 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
       }
 
       if (count < maxVolunteers) {
-        kb.text('Добавить волонтера', packCb({ a: 'open', s: 'add_volunteer' }))
+        kb.text('ДОБАВИТЬ ВОЛОНТЕРА', packCb({ a: 'open', s: 'add_volunteer' }))
           .icon('5258362837411045098')
           .row()
       }
@@ -123,18 +123,18 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
   if (prop?.status !== 'active' && content?.status !== 'active') {
     lines.push('У вас пока нет активных подписок.', '', 'Вы можете приобрести новую подписку.')
 
-    kb.text('Приобрести подписку', packCb({ a: 'open', s: 'add_subscription' }))
+    kb.text('ПРИОБРЕСТИ ПОДПИСКУ', packCb({ a: 'open', s: 'add_subscription' }))
       .icon('5397916757333654639')
       .row()
   }
 
   // общие кнопки
-  kb.text('◀️ Назад', packCb({ a: 'open', s: 'main' }))
-    .text('Помощь', packCb({ a: 'open', s: 'support' }))
+  kb.text('◀️ НАЗАД', packCb({ a: 'open', s: 'main' }))
+    .text('ПОМОЩЬ', packCb({ a: 'open', s: 'support' }))
     .icon('5238025132177369293')
 
   return {
-    photo: './public/user-profile.png',
+    photo: './public/profile.png',
     caption: lines.join('\n'),
     keyboard: kb,
   }
