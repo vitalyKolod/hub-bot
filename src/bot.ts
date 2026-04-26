@@ -25,6 +25,7 @@ import { UserModel } from './models/User.js'
 import { runReminders } from './services/reminder.service.js'
 dotenv.config()
 import { buildAdminKeyboard } from './flows/registration.js'
+import { safeUsername, escapeMarkdown, escapeUnderscore } from './utils/escape.js'
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const CONTENT_GROUP_ID = Number(process.env.CONTENT_GROUP_ID)
@@ -342,8 +343,12 @@ ${sundayInvite.invite_link}
               )
             }
 
+            const safeCaption = escapeUnderscore(
+              `${caption}\n\n✅ Принято! Ссылка отправлена. Подписка активирована на 1 год.`
+            )
+
             await ctx.api.editMessageCaption(String(ADMIN_GROUP_ID), message.message_id, {
-              caption: `${caption}\n\n✅ Принято! Ссылка отправлена. Подписка активирована на 1 год.`,
+              caption: safeCaption,
               parse_mode: 'Markdown',
             })
 
@@ -680,7 +685,9 @@ ${sundayInvite.invite_link}
         try {
           const volunteer = await getOrCreateUser(ctx.session.payment.volunteerId)
 
-          const volunteerUserName = volunteer.username ? '@' + volunteer.username : 'не указан'
+          const volunteerUserName = volunteer.username
+            ? '@' + escapeUnderscore(volunteer.username)
+            : 'не указан'
 
           volunteerText = `
 🙋 Волонтёр: ${volunteer.fio || 'не указано'}
@@ -702,7 +709,9 @@ ${sundayInvite.invite_link}
 
       const isVolunteer = ctx.session.payment?.product === 'volunteer'
 
-      const usernameText = ctx.from.username ? `@${ctx.from.username}` : 'не указано'
+      const usernameText = ctx.from.username
+        ? '@' + escapeUnderscore(ctx.from.username)
+        : 'не указано'
       const adminText = `
 
 💰 *НОВАЯ ОПЛАТА*
