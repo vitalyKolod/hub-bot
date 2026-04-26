@@ -242,9 +242,14 @@ export function registerHandlers(bot: Bot<MyContext>) {
               await activateVolunteer(targetUserId, volunteerId)
 
               // 2. создаем ссылку
-              const invite = await ctx.api.createChatInviteLink(CONTENT_GROUP_ID, {
+              const inviteContent = await ctx.api.createChatInviteLink(CONTENT_GROUP_ID, {
                 member_limit: 1,
                 name: `Ссылка для волонтёра ${volunteerId}`,
+                expire_date: Math.floor(Date.now() / 1000) + 1800,
+              })
+
+              const sundayInvite = await ctx.api.createChatInviteLink(SUNDAY_SCREENS_GROUP_ID, {
+                member_limit: 1,
                 expire_date: Math.floor(Date.now() / 1000) + 1800,
               })
 
@@ -254,10 +259,13 @@ export function registerHandlers(bot: Bot<MyContext>) {
                 `
 🎉 *Вам выдан доступ!*
 
-Вы добавлены как волонтёр.
+Вы добавлены как волонтёр. Вот Ваши ссылки для
 
-Вот ссылка в группу:
-${invite.invite_link}
+📦 Контент для экранов:
+${inviteContent.invite_link}
+
+🎬 Sunday Screens:
+${sundayInvite.invite_link}
 
 Ссылка одноразовая.
 `.trim(),
@@ -304,6 +312,8 @@ ${invite.invite_link}
                 targetUserId,
                 `
 ✅ *Подписка активирована!*
+
+Вот Ваши ссылки для:
 
 📦 Контент для экранов:
 ${contentInvite.invite_link}
