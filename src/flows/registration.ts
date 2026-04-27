@@ -3,6 +3,7 @@ import { renderScreen } from '../core/render.js'
 import { getOrCreateUser } from '../services/user.service.js'
 import { UserModel } from '../models/User.js'
 import { InlineKeyboard } from 'grammy'
+import { escapeUnderscore } from '../utils/escape.js'
 
 // ---------------- UTILS ----------------
 
@@ -214,15 +215,13 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
 
 async function finishRegistration(ctx: any, userId: number) {
   const user = await getOrCreateUser(userId)
-  const usernameText = user.username ? `@${user.username}` : 'не указано'
+  const usernameText = ctx.from.username ? '@' + escapeUnderscore(ctx.from.username) : 'не указано'
 
   let text = `
 🆕 *НОВАЯ РЕГИСТРАЦИЯ*
 
 👤 ${user.fio || 'не указано'}
-
-Username: ${usernameText}
-
+😎 ${usernameText}
 🆔 ID: ${userId}
 🌍 ${user.city || '-'}
 ⛪ ${user.church || '-'}
@@ -231,7 +230,6 @@ Username: ${usernameText}
   // --- ProPresenter ---
   if (user.subscriptions?.propresenter?.status === 'pending') {
     text += `
-
 🟧 *ProPresenter*
 Поток: №${user.subscriptions.propresenter.flow}
 `
@@ -240,14 +238,12 @@ Username: ${usernameText}
   // --- Контент ---
   if (user.subscriptions?.content?.status === 'pending') {
     text += `
-
 🟪 *Контент для экранов*
 До: ${user.subscriptions.content.expiresAt?.toLocaleDateString('ru-RU')}
 `
   }
 
   text += `
-
 Проверь данные и подтверди
 `
 
