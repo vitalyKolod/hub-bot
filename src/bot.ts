@@ -269,6 +269,8 @@ ${inviteContent.invite_link}
 ${sundayInvite.invite_link}
 
 Ссылка одноразовая.
+
+Нажмите /profile, чтобы вернуться в профиль.
 `.trim(),
                 { parse_mode: 'Markdown' }
               )
@@ -280,6 +282,8 @@ ${sundayInvite.invite_link}
 ✅ Волонтёр успешно добавлен!
 
 Теперь он имеет доступ к контенту.
+
+Нажмите /profile, чтобы вернуться в профиль.
 `.trim(),
                 { parse_mode: 'Markdown' }
               )
@@ -715,18 +719,16 @@ ${sundayInvite.invite_link}
       const adminText = `
 
 💰 *НОВАЯ ОПЛАТА*
-
 ${productText}
 
 👤 ${profile.fio || 'не указано'}
 😎 ЮзерНейм: ${usernameText}
 🆔 ID: ${userId}
 
+${ctx.session.payment?.product === 'volunteer' ? 'TYPE:VOLUNTEER' : 'TYPE:CONTENT'}
 
 💳 Способ оплаты: ${methodText}
 ${volunteerText}
-
-${ctx.session.payment?.product === 'volunteer' ? 'TYPE:VOLUNTEER' : 'TYPE:CONTENT'}
 
 🕒 ${new Date().toLocaleString('ru-RU')}
 

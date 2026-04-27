@@ -133,4 +133,13 @@ export const PROP_FLOWS = [
     expiresAt: new Date('2027-03-07'),
     chatFlow: 'https://t.me/+GsSgWVx6I_ExN2Fi',
   },
+
+  // Поток 18
+  {
+    flow: 18,
+    email: 'ucpfpropres18@yahoo.com',
+    password: 'HcoMmUnity@18PP!',
+    expiresAt: new Date('2027-04-22'),
+    chatFlow: 'https://t.me/+GsSgWVx6I_ExN2Fi',
+  },
 ]
