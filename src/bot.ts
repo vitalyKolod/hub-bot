@@ -265,9 +265,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
 📦 Контент для экранов:
 ${inviteContent.invite_link}
 
-🎬 Sunday Screens:
-${sundayInvite.invite_link}
-
 Ссылка одноразовая.
 
 Нажмите /profile, чтобы вернуться в профиль.
