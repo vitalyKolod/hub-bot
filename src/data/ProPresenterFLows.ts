@@ -29,9 +29,9 @@ export const PROP_FLOWS = [
   // Поток 6
   {
     flow: 6,
-    email: 'potashnik2279@mail.ru',
-    password: 'abc220579D',
-    expiresAt: new Date('2026-05-12'),
+    email: 'ucpfpropres6@gmail.com',
+    password: 'hCoMmUnity@6pP!)',
+    expiresAt: new Date('2027-05-12'),
     chatFlow: 'https://t.me/+O8tOxhUHBwM0N2M6',
   },
 
