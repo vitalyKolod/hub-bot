@@ -47,9 +47,7 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
 
   // Цена
   const price = PRODUCT_PRICES[product]
-  const priceText = price
-    ? `Стоимость: *${price} руб/год*`
-    : 'Стоимость: по договорённости с админом'
+  const priceText = price ? `Стоимость: *${price} ₽/год*` : 'Стоимость: по договорённости с админом'
 
   const kb = new InlineKeyboard()
 
