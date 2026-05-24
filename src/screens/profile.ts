@@ -73,7 +73,6 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
     lines.push(`*ProPresenter*`, `⏳ На проверке (поток №${prop.flow})`, '')
   }
 
-  // 🟪 Контент (НЕ ТРОГАЕМ ЛОГИКУ)
   if (content?.status === 'pending') {
     lines.push(
       `*Контент для экранов*`,

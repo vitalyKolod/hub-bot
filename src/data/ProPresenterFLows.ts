@@ -14,7 +14,7 @@ export const PROP_FLOWS = [
     email: 'syroezhkin.egor2@yandex.ru',
     password: 'pE3-mNV-fuh-UJ5',
     expiresAt: new Date('2026-05-24'),
-    chatFlow: 'https://t.me/+8y-tubmWKqY2YTky',
+    chatFlow: 'ucpfpropres02@gmail.com',
   },
 
   // Поток 3
