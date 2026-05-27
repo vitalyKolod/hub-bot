@@ -8,6 +8,10 @@ const userSchema = new mongoose.Schema(
     city: String,
     church: String,
     username: String,
+    isVolunteer: {
+      type: Boolean,
+      default: false,
+    },
 
     reg: {
       type: String,
