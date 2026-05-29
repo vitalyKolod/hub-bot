@@ -10,15 +10,17 @@ import { escapeUnderscore } from '../utils/escape.js'
 function stepTitle(step: string): string {
   switch (step) {
     case 'fio':
-      return 'Шаг 1/6'
+      return 'Шаг 1/7'
     case 'city':
-      return 'Шаг 2/6'
+      return 'Шаг 2/7'
     case 'church':
-      return 'Шаг 3/6'
+      return 'Шаг 3/7'
+    case 'is_volunteer':
+      return 'Шаг 4/7'
     case 'has_prop':
-      return 'Шаг 4/6'
+      return 'Шаг 5/7'
     case 'prop_stream_no':
-      return 'Шаг 5/6'
+      return 'Шаг 6/7'
     case 'has_screens':
       return 'Доп. шаг'
     case 'screens_end_date':
@@ -67,14 +69,16 @@ async function buildQuestionText(userId: number): Promise<string> {
       return header + '\nУкажите ваш *город*'
     case 'church':
       return header + '\nУкажите вашу *церковь*'
+    case 'is_volunteer':
+      return header + '\nВы волонтёр? Ответьте (да/нет)'
     case 'has_prop':
-      return header + '\nЕсть подписка ProPresenter? (да/нет)\nЕсли волонтер - ответьте нет'
+      return header + '\nЕсть подписка ProPresenter? (да/нет)'
     case 'prop_stream_no':
       return header + '\nВведите номер потока'
     case 'has_screens':
-      return header + '\nЕсть подписка для экранов? (да/нет)\nЕсли волонтер - ответьте нет'
+      return header + '\nЕсть подписка для экранов? (да/нет)'
     case 'screens_end_date':
-      return header + '\nВведите дату окончания в формате 28.06.2026'
+      return header + '\nВведите дату окончания в формате 28.08.2026'
     default:
       return header
   }
@@ -129,23 +133,66 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
     case 'church':
       await UserModel.updateOne(
         { telegramId: userId },
-        { church: answer, regStep: 'has_prop' },
+        {
+          church: answer,
+          regStep: 'is_volunteer',
+        },
         { upsert: true }
       )
       break
 
+    case 'is_volunteer': {
+      const yn = normalizeYesNo(answer)
+
+      if (!yn) {
+        return sendPrompt(ctx, userId, 'Ответьте: да или нет')
+      }
+
+      // ВОЛОНТЁР
+      if (yn === 'yes') {
+        await UserModel.updateOne(
+          { telegramId: userId },
+          {
+            isVolunteer: true,
+            reg: 'done',
+            regStep: 'done',
+          },
+          { upsert: true }
+        )
+
+        return finishRegistration(ctx, userId)
+      }
+
+      // ОБЫЧНЫЙ ЮЗЕР
+      await UserModel.updateOne(
+        { telegramId: userId },
+        {
+          isVolunteer: false,
+          regStep: 'has_prop',
+        },
+        { upsert: true }
+      )
+
+      break
+    }
+
     case 'has_prop': {
       const yn = normalizeYesNo(answer)
-      if (!yn) return sendPrompt(ctx, userId, 'Ответьте, пожалуйста, да или нет')
+
+      if (!yn) {
+        return sendPrompt(ctx, userId, 'Ответьте, пожалуйста: да или нет')
+      }
 
       await UserModel.updateOne(
         { telegramId: userId },
         {
-          'subscriptions.propresenter.status': yn === 'yes' ? 'active' : 'none',
+          'subscriptions.propresenter.status': yn === 'yes' ? 'draft' : 'none',
+
           regStep: yn === 'yes' ? 'prop_stream_no' : 'has_screens',
         },
         { upsert: true }
       )
+
       break
     }
 
@@ -226,6 +273,10 @@ async function finishRegistration(ctx: any, userId: number) {
 🌍 ${user.city || '-'}
 ⛪ ${user.church || '-'}
 `
+
+  if (user.isVolunteer) {
+    text += `\n🙋 *ВОЛОНТЁР*\n`
+  }
 
   // --- ProPresenter ---
   if (user.subscriptions?.propresenter?.status === 'pending') {
