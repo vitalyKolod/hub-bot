@@ -78,7 +78,7 @@ async function buildQuestionText(userId: number): Promise<string> {
     case 'has_screens':
       return header + '\nЕсть подписка для экранов? (да/нет)'
     case 'screens_end_date':
-      return header + '\nВведите дату окончания в формате 28.06.2026'
+      return header + '\nВведите дату окончания в формате 28.08.2026'
     default:
       return header
   }
