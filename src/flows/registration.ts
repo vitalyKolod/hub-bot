@@ -25,6 +25,8 @@ function stepTitle(step: string): string {
       return 'Доп. шаг'
     case 'screens_end_date':
       return 'Доп. шаг'
+    case 'confirm_registration':
+      return 'Проверка данных'
     default:
       return 'Регистрация'
   }
@@ -37,7 +39,7 @@ function normalizeYesNo(input: string): 'yes' | 'no' | null {
   return null
 }
 
-function computeDaysLeft(input: string) {
+export function computeDaysLeft(input: string) {
   const parts = input.split('.')
   if (parts.length !== 3) return null
 
@@ -79,13 +81,69 @@ async function buildQuestionText(userId: number): Promise<string> {
       return header + '\nЕсть подписка для экранов? (да/нет)'
     case 'screens_end_date':
       return header + '\nВведите дату окончания в формате 28.08.2026'
+    case 'confirm_registration':
+      return await buildConfirmationText(userId)
     default:
       return header
   }
 }
 
+export async function buildConfirmationText(userId: number): Promise<string> {
+  const user = await UserModel.findOne({ telegramId: userId })
+
+  if (!user) return 'Ошибка загрузки данных'
+
+  let text = `*📋 ПРОВЕРКА ДАННЫХ*
+
+👤 *ФИО:* ${user.fio || '-'}
+🌍 *Город:* ${user.city || '-'}
+⛪ *Церковь:* ${user.church || '-'}
+`
+
+  if (user.subscriptions?.propresenter?.status !== 'none') {
+    text += `
+
+🟧 *ProPresenter*
+📡 Поток: №${user.subscriptions.propresenter.flow || '-'}
+`
+  }
+
+  if (user.subscriptions?.content?.status !== 'none') {
+    text += `
+
+🟪 *Контент для экранов*
+📅 До: ${
+      user.subscriptions.content.expiresAt
+        ? new Date(user.subscriptions.content.expiresAt).toLocaleDateString('ru-RU')
+        : '-'
+    }
+`
+  }
+
+  text += `
+
+Всё верно?`
+  return text
+}
+
 async function sendPrompt(ctx: any, userId: number, text: string) {
-  await ctx.api.sendMessage(userId, text, { parse_mode: 'Markdown' })
+  const user = await UserModel.findOne({ telegramId: userId })
+
+  if (user?.regStep === 'confirm_registration') {
+    const kb = new InlineKeyboard()
+      .text('✅ Подтвердить', 'confirm_registration')
+      .row()
+      .text('✏️ Изменить данные', 'edit_registration')
+
+    return ctx.api.sendMessage(userId, text, {
+      parse_mode: 'Markdown',
+      reply_markup: kb,
+    })
+  }
+
+  await ctx.api.sendMessage(userId, text, {
+    parse_mode: 'Markdown',
+  })
 }
 
 // ---------------- START ----------------
@@ -216,21 +274,19 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
 
     case 'has_screens': {
       const yn = normalizeYesNo(answer)
-      if (!yn) return sendPrompt(ctx, userId, 'Ответьте, пожалуйста, да или нет')
+
+      if (!yn) {
+        return sendPrompt(ctx, userId, 'Ответьте, пожалуйста, да или нет')
+      }
 
       await UserModel.updateOne(
         { telegramId: userId },
         {
           'subscriptions.content.status': yn === 'yes' ? 'draft' : 'none',
-          regStep: yn === 'yes' ? 'screens_end_date' : 'done',
-          reg: yn === 'yes' ? 'in_progress' : 'done',
+          regStep: yn === 'yes' ? 'screens_end_date' : 'confirm_registration',
         },
         { upsert: true }
       )
-
-      if (yn === 'no') {
-        return finishRegistration(ctx, userId)
-      }
 
       break
     }
@@ -244,23 +300,22 @@ export async function handleRegistrationText(ctx: any, userId: number, text: str
         {
           'subscriptions.content.expiresAt': parsed.date,
           'subscriptions.content.status': 'pending',
-          reg: 'done',
-          regStep: 'done',
+
+          regStep: 'confirm_registration',
         },
         { upsert: true }
       )
 
-      return finishRegistration(ctx, userId)
+      break
     }
   }
 
-  const updatedUser = await getOrCreateUser(userId)
   await sendPrompt(ctx, userId, await buildQuestionText(userId))
 }
 
 // ---------------- FINISH ----------------
 
-async function finishRegistration(ctx: any, userId: number) {
+export async function finishRegistration(ctx: any, userId: number) {
   const user = await getOrCreateUser(userId)
   const usernameText = ctx.from.username ? '@' + escapeUnderscore(ctx.from.username) : 'не указано'
 
@@ -329,17 +384,30 @@ export function buildAdminKeyboard(user: any, userId: number) {
   const kb = new InlineKeyboard()
 
   if (user.subscriptions?.propresenter?.status === 'pending') {
-    kb.text('✅ Принять ProPresenter', `verify:prop:${userId}`).row()
+    kb.text('Принять ProPresenter', `verify:prop:${userId}`)
+      .icon('5237794483843655211')
+
+      .text('Отклонить ProPresenter', `verify:reject_prop:${userId}`)
+      .icon('5237755382461391050')
+
+      .row()
   }
 
   if (user.subscriptions?.content?.status === 'pending') {
-    kb.text('✅ Принять Контент', `verify:content:${userId}`).row()
+    kb.text(' Принять Контент', `verify:content:${userId}`)
+      .icon('5237794483843655211')
+
+      .text(' Отклонить Контент', `verify:reject_content:${userId}`)
+      .icon('5237755382461391050')
+
+      .row()
   }
 
-  kb.text('❌ Отклонить всё', `verify:reject:${userId}`)
+  kb.text(' Отклонить всё', `verify:reject:${userId}`)
+    .icon('5237755382461391050')
+
     .row()
     .url('Написать юзеру', `tg://user?id=${userId}`)
-    .icon('5258011929993026890')
 
   return kb
 }

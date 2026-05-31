@@ -16,7 +16,11 @@ import {
   // activateContentSubscription,
   activateOrExtendContentSubscription,
 } from './services/user.service.js'
-import { startRegistration, handleRegistrationText } from './flows/registration.js'
+import {
+  startRegistration,
+  handleRegistrationText,
+  finishRegistration,
+} from './flows/registration.js'
 
 import dotenv from 'dotenv'
 import { getOrCreateUser } from './services/user.service.js'
@@ -25,7 +29,8 @@ import { UserModel } from './models/User.js'
 import { runReminders } from './services/reminder.service.js'
 dotenv.config()
 import { buildAdminKeyboard } from './flows/registration.js'
-import { safeUsername, escapeMarkdown, escapeUnderscore } from './utils/escape.js'
+import { escapeUnderscore } from './utils/escape.js'
+import { computeDaysLeft } from './flows/registration.js'
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const CONTENT_GROUP_ID = Number(process.env.CONTENT_GROUP_ID)
@@ -69,6 +74,7 @@ type MyContext = Context &
     waitingForReceipt?: boolean
     volunteerId?: number
     waitingForVolunteer?: boolean
+    editingField?: 'fio' | 'city' | 'church' | 'prop_stream_no' | 'screens_end_date'
     inSupportMode?: boolean
     isExtension: boolean
 
@@ -105,7 +111,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
           offset: text.indexOf('🟢'),
           length: 2,
           type: 'custom_emoji',
-          custom_emoji_id: '5296665364346727584', // вторая иконка после "ХАБ"
+          custom_emoji_id: '5379559474405092361', // вторая иконка после "ХАБ"
         },
         {
           offset: text.indexOf('🔵'),
@@ -151,6 +157,83 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     const message = ctx.callbackQuery.message
 
+    //Редактирование поля
+    if (data === 'edit_registration') {
+      const kb = new InlineKeyboard()
+        .text('ФИО', 'edit_field:fio')
+        .icon('5258011929993026890')
+        .row()
+        .text('Город', 'edit_field:city')
+        .icon('5453906530824903181')
+        .row()
+        .text('Церковь', 'edit_field:church')
+        .icon('5370857213533379300')
+        .row()
+
+      const user = await getOrCreateUser(userId)
+
+      if (user.subscriptions?.propresenter?.status !== 'none') {
+        kb.text('Поток', 'edit_field:prop_stream_no').icon('5251272469175631339').row()
+      }
+
+      if (user.subscriptions?.content?.status !== 'none') {
+        kb.text('Дата контента', 'edit_field:screens_end_date').icon('5251299351375937406').row()
+      }
+
+      await ctx.editMessageText('Что хотите изменить?', {
+        reply_markup: kb,
+      })
+
+      await ctx.answerCallbackQuery()
+      return
+    }
+
+    if (data.startsWith('edit_field:')) {
+      const field = data.split(':')[1]
+
+      ctx.session.editingField = field as any
+
+      let text = ''
+
+      switch (field) {
+        case 'fio':
+          text = 'Введите новое ФИО'
+          break
+        case 'city':
+          text = 'Введите новый город'
+          break
+        case 'church':
+          text = 'Введите новую церковь'
+          break
+        case 'prop_stream_no':
+          text = 'Введите новый номер потока'
+          break
+        case 'screens_end_date':
+          text = 'Введите новую дату (дд.мм.гггг)'
+          break
+      }
+
+      await ctx.api.sendMessage(ctx.from.id, text)
+      await ctx.answerCallbackQuery()
+      return
+    }
+
+    if (data === 'confirm_registration') {
+      await UserModel.updateOne(
+        { telegramId: userId },
+        {
+          reg: 'done',
+          regStep: 'done',
+        }
+      )
+
+      await finishRegistration(ctx, userId)
+
+      await ctx.answerCallbackQuery()
+
+      return
+    }
+
     // ===== VERIFY FLOW =====
     if (data.startsWith('verify:')) {
       const [, type, userIdStr] = data.split(':')
@@ -162,6 +245,52 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
       if (type === 'reject') {
         await ctx.api.sendMessage(targetUserId, '❌ Ваши данные не прошли проверку')
+        await ctx.answerCallbackQuery({ text: 'Отклонено' })
+        return
+      }
+      if (type === 'reject_prop') {
+        await UserModel.updateOne(
+          { telegramId: targetUserId },
+          {
+            'subscriptions.propresenter.status': 'none',
+            'subscriptions.propresenter.flow': undefined,
+          }
+        )
+
+        await ctx.api.sendMessage(
+          targetUserId,
+          '❌ Поток ProPresenter не прошёл проверку\nСвяжитесь с админом для уточнения! \n\n Чтобы вернуться в профиль - нажмите /profile'
+        )
+
+        const updatedUser = await getOrCreateUser(targetUserId)
+
+        await ctx.api.editMessageReplyMarkup(message.chat.id, message.message_id, {
+          reply_markup: buildAdminKeyboard(updatedUser, targetUserId),
+        })
+
+        await ctx.answerCallbackQuery({ text: 'Отклонено' })
+        return
+      }
+      if (type === 'reject_content') {
+        await UserModel.updateOne(
+          { telegramId: targetUserId },
+          {
+            'subscriptions.content.status': 'none',
+            'subscriptions.content.expiresAt': undefined,
+          }
+        )
+
+        await ctx.api.sendMessage(
+          targetUserId,
+          '❌ Контент не прошёл проверку\nСвяжитесь с админом для уточнения! \n\n Чтобы вернуться в профиль - нажмите /profile'
+        )
+
+        const updatedUser = await getOrCreateUser(targetUserId)
+
+        await ctx.api.editMessageReplyMarkup(message.chat.id, message.message_id, {
+          reply_markup: buildAdminKeyboard(updatedUser, targetUserId),
+        })
+
         await ctx.answerCallbackQuery({ text: 'Отклонено' })
         return
       }
@@ -609,6 +738,62 @@ ${sundayInvite.invite_link}
     if (!userId) return
 
     const profile = await getOrCreateUser(userId)
+
+    if (ctx.session.editingField) {
+      const field = ctx.session.editingField
+      const value = ctx.message.text.trim()
+
+      const update: any = {}
+
+      if (field === 'fio' && value.length >= 3) {
+        update.fio = value
+      }
+
+      if (field === 'city') {
+        update.city = value
+      }
+
+      if (field === 'church') {
+        update.church = value
+      }
+
+      if (field === 'prop_stream_no') {
+        const n = Number(value)
+        if (!Number.isFinite(n)) {
+          return ctx.reply('Введите число')
+        }
+        update['subscriptions.propresenter.flow'] = Math.floor(n)
+      }
+
+      if (field === 'screens_end_date') {
+        const parsed = computeDaysLeft(value)
+        if (!parsed) {
+          return ctx.reply('Неверная дата')
+        }
+
+        update['subscriptions.content.expiresAt'] = parsed.date
+      }
+
+      await UserModel.updateOne({ telegramId: ctx.from.id }, { $set: update })
+
+      ctx.session.editingField = undefined
+
+      await ctx.reply('✅ Данные обновлены')
+
+      const { buildConfirmationText } = await import('./flows/registration.js')
+
+      const kb = new InlineKeyboard()
+        .text('✅ Подтвердить', 'confirm_registration')
+        .row()
+        .text('✏️ Изменить данные', 'edit_registration')
+
+      await ctx.reply(await buildConfirmationText(ctx.from.id), {
+        parse_mode: 'Markdown',
+        reply_markup: kb,
+      })
+
+      return
+    }
 
     if (profile.reg === 'in_progress') {
       await handleRegistrationText(ctx, userId, ctx.message.text)

@@ -23,6 +23,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: 'fio',
     },
+    editingField: {
+      type: String,
+      default: null,
+    },
     reminders: {
       type: [String],
       default: [],
