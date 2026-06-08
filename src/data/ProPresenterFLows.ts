@@ -13,8 +13,8 @@ export const PROP_FLOWS = [
     flow: 2,
     email: 'syroezhkin.egor2@yandex.ru',
     password: 'pE3-mNV-fuh-UJ5',
-    expiresAt: new Date('2026-05-24'),
-    chatFlow: 'ucpfpropres02@gmail.com',
+    expiresAt: new Date('2027-05-24'),
+    chatFlow: 'https://t.me/+8y-tubmWKqY2YTky',
   },
 
   // Поток 3
@@ -22,7 +22,7 @@ export const PROP_FLOWS = [
     flow: 3,
     email: 'proprezentortretijpotok@gmail.com',
     password: 'Tili-Tili-@3',
-    expiresAt: new Date('2026-06-02'),
+    expiresAt: new Date('2027-06-02'),
     chatFlow: 'https://t.me/+DVxjxFjqTlsyZTRi',
   },
 
@@ -85,7 +85,7 @@ export const PROP_FLOWS = [
     flow: 12,
     email: 'unitedchurchproductiontwelve@gmail.com',
     password: 'Trali-Vali-12@',
-    expiresAt: new Date('2026-06-05'),
+    expiresAt: new Date('2027-06-05'),
     chatFlow: 'https://t.me/+_iu0sfLyi4IwNmE6',
   },
 
