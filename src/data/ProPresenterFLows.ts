@@ -149,6 +149,6 @@ export const PROP_FLOWS = [
     email: 'Уточнить у администратора',
     password: 'Уточнить у администратора',
     expiresAt: new Date('2099-12-31'),
-    chatFlow: '',
+    chatFlow: 'https://t.me/+-S6CaJquTFMyZTU6',
   },
 ]
