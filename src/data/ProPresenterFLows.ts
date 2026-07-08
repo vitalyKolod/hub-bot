@@ -142,4 +142,13 @@ export const PROP_FLOWS = [
     expiresAt: new Date('2027-04-22'),
     chatFlow: 'https://t.me/+GsSgWVx6I_ExN2Fi',
   },
+
+  // Поток 19
+  {
+    flow: 19,
+    email: 'Уточнить у администратора',
+    password: 'Уточнить у администратора',
+    expiresAt: new Date('2099-12-31'),
+    chatFlow: '',
+  },
 ]
