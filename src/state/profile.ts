@@ -4,6 +4,7 @@ export type RegStep =
   | 'church'
   | 'has_prop'
   | 'prop_stream_no'
+  | 'confirm_registration'
   | 'prop_end_date'
   | 'has_screens'
   | 'screens_end_date'

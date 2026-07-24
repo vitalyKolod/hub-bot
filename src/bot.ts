@@ -20,7 +20,7 @@ import {
   startRegistration,
   handleRegistrationText,
   finishRegistration,
-} from './flows/registration.js'
+} from './flows/registration/index.js'
 
 import dotenv from 'dotenv'
 import { getOrCreateUser } from './services/user.service.js'
@@ -28,9 +28,9 @@ import { activateVolunteer } from './services/volunteer.service.js'
 import { UserModel } from './models/User.js'
 import { runReminders } from './services/reminder.service.js'
 dotenv.config()
-import { buildAdminKeyboard } from './flows/registration.js'
 import { escapeUnderscore } from './utils/escape.js'
-import { computeDaysLeft } from './flows/registration.js'
+import { isAdmin } from './config/admin.js'
+import { handleSubscribeCheck, showSubscribeScreen } from './flows/subscribe/index.js'
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const CONTENT_GROUP_ID = Number(process.env.CONTENT_GROUP_ID)
@@ -75,6 +75,13 @@ type MyContext = Context &
     volunteerId?: number
     waitingForVolunteer?: boolean
     editingField?: 'fio' | 'city' | 'church' | 'prop_stream_no' | 'screens_end_date'
+
+    adminMode?: 'broadcast' | 'waiting_broadcast'
+    broadcastDraft?: {
+      type: 'text' | 'photo' | 'video' | 'document'
+      text?: string
+      fileId?: string
+    }
     inSupportMode?: boolean
     isExtension: boolean
 
@@ -93,7 +100,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
   )
 
   bot.command('start', async (ctx) => {
-    const kb = new InlineKeyboard().text('СТАРТ', 'ui:onb:start').style('success')
+    const kb = new InlineKeyboard().text('СТАРТ', 'sub:check').style('success')
 
     // Добавляем placeholders для всех emoji в тексте
     const text = 'Привет! 🙂 Добро пожаловать в ХАБ 🟢\n\nНажми “СТАРТ”, чтобы продолжить 🔵'
@@ -141,6 +148,18 @@ export function registerHandlers(bot: Bot<MyContext>) {
     await renderScreen(ctx, ctx.from.id, 'support', undefined, { forceNew: true })
   })
 
+  bot.command('admin', async (ctx) => {
+    if (!isAdmin(ctx.from.id)) {
+      return
+    }
+
+    const kb = new InlineKeyboard().text('📢 Рассылка', 'admin:broadcast')
+
+    await ctx.reply('Панель администратора', {
+      reply_markup: kb,
+    })
+  })
+
   // ====================== CALLBACK QUERY ======================
   bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data
@@ -169,16 +188,17 @@ export function registerHandlers(bot: Bot<MyContext>) {
         .text('Церковь', 'edit_field:church')
         .icon('5370857213533379300')
         .row()
+      // .text('◀️ Назад', packCb({ a: 'back' }))
 
       const user = await getOrCreateUser(userId)
 
-      if (user.subscriptions?.propresenter?.status !== 'none') {
-        kb.text('Поток', 'edit_field:prop_stream_no').icon('5251272469175631339').row()
-      }
+      // if (user.subscriptions?.propresenter?.status !== 'none') {
+      //   kb.text('Поток', 'edit_field:prop_stream_no').icon('5251272469175631339').row()
+      // }
 
-      if (user.subscriptions?.content?.status !== 'none') {
-        kb.text('Дата контента', 'edit_field:screens_end_date').icon('5251299351375937406').row()
-      }
+      // if (user.subscriptions?.content?.status !== 'none') {
+      //   kb.text('Дата контента', 'edit_field:screens_end_date').icon('5251299351375937406').row()
+      // }
 
       await ctx.editMessageText('Что хотите изменить?', {
         reply_markup: kb,
@@ -205,12 +225,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
         case 'church':
           text = 'Введите новую церковь'
           break
-        case 'prop_stream_no':
-          text = 'Введите новый номер потока'
-          break
-        case 'screens_end_date':
-          text = 'Введите новую дату (дд.мм.гггг)'
-          break
       }
 
       await ctx.api.sendMessage(ctx.from.id, text)
@@ -231,6 +245,23 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
       await ctx.answerCallbackQuery()
 
+      return
+    }
+
+    if (data === 'admin:broadcast') {
+      ctx.session.adminMode = 'waiting_broadcast'
+
+      await ctx.reply(
+        `
+📢 **Режим рассылки**
+
+Отправьте в этот чат сообщение, которое нужно разослать пользователям.
+*Поддерживается всё:* текст, фото, видео, документы, альбомы (медиагруппы) и форматирование.
+`,
+        { parse_mode: 'Markdown' }
+      )
+
+      await ctx.answerCallbackQuery()
       return
     }
 
@@ -508,6 +539,17 @@ ${sundayInvite.invite_link}
       }
     }
 
+    if (data === 'sub:check') {
+      await showSubscribeScreen(ctx)
+      await ctx.answerCallbackQuery()
+      return
+    }
+
+    if (data === 'subscribe:check') {
+      await handleSubscribeCheck(ctx)
+      return
+    }
+
     // Онбординг
     if (isOnboardingCallback(data)) {
       const onboardingParsed = parseOnboardingCallback(data)
@@ -780,7 +822,7 @@ ${sundayInvite.invite_link}
 
       await ctx.reply('✅ Данные обновлены')
 
-      const { buildConfirmationText } = await import('./flows/registration.js')
+      const { buildConfirmationText } = await import('./flows/registration/index.js')
 
       const kb = new InlineKeyboard()
         .text('✅ Подтвердить', 'confirm_registration')
@@ -823,6 +865,83 @@ ${sundayInvite.invite_link}
       }
       return
     }
+
+    if (ctx.session.adminMode === 'broadcast') {
+      if (!isAdmin(ctx.from.id)) return
+
+      const text = ctx.message.text
+
+      const users = await UserModel.find({
+        reg: 'done',
+      })
+
+      let success = 0
+      let failed = 0
+
+      for (const user of users) {
+        try {
+          await ctx.api.sendMessage(user.telegramId, text)
+          success++
+        } catch {
+          failed++
+        }
+      }
+
+      ctx.session.adminMode = undefined
+
+      await ctx.reply(`
+✅ Рассылка завершена
+
+Отправлено: ${success}
+Ошибок: ${failed}
+`)
+
+      return
+    }
+  })
+
+  // ====================== РАССЫЛКА ДЛЯ АДМИНА ======================
+  bot.on('message', async (ctx) => {
+    // Проверяем, что сообщение от админа и включен режим рассылки
+    if (!ctx.from || !isAdmin(ctx.from.id)) return
+    if (ctx.session.adminMode !== 'waiting_broadcast') return
+
+    // Игнорируем сообщения из групп поддержки/админки, если они не относятся к рассылке в ЛС
+    // (тут проверяем, что это личка с ботом или админ шлет в ЛС)
+    if (ctx.chat.type !== 'private') return
+
+    ctx.session.adminMode = undefined
+
+    const users = await UserModel.find({ reg: 'done' })
+
+    let success = 0
+    let failed = 0
+
+    await ctx.reply(`⏳ Начинаю рассылку для ${users.length} пользователей...`)
+
+    for (const user of users) {
+      try {
+        // copyMessage идеально копирует текст, фото, видео, документы и подписи к ним в том же виде
+        await ctx.api.copyMessage(user.telegramId, ctx.chat.id, ctx.message.message_id, {
+          reply_markup: ctx.message.reply_markup, // сохраняет инлайн-кнопки, если они были прикреплены
+        })
+        success++
+        // Небольшая задержка, чтобы не упереться в лимиты Telegram API (flood control: ~30 сообщений в секунду)
+        await new Promise((resolve) => setTimeout(resolve, 35))
+      } catch (err) {
+        failed++
+      }
+    }
+
+    await ctx.reply(
+      `
+✅ **Рассылка завершена**
+
+Успешно отправлено: ${success}
+Ошибок (заблокировали бота / удалили аккаунт): ${failed}
+`,
+      { parse_mode: 'Markdown' }
+    )
   })
 
   // ========== ЧЕК (фото / документ) — ВЫСОКИЙ ПРИОРИТЕТ===========

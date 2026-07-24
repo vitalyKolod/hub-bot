@@ -1,6 +1,6 @@
 import { InlineKeyboard, InputFile } from 'grammy'
 
-export type OnboardingStep = 0 | 1 | 2
+export type OnboardingStep = 0 | 1 | 2 | 3
 
 export const ONBOARDING_ASSET = new InputFile('./public/welcome.jpg')
 
@@ -29,6 +29,14 @@ const PAGES = [
       'Оплачивая услуги, вы соглашаетесь с правилами сервиса.',
     ],
   },
+  {
+    title: 'Давайте знакомиться!',
+    text: [
+      'Введите данные последовательно, как от вас это требует бот',
+      'Если на каком то шаше вы допустили ошибку, не переживайте — вы сможете внести правки в конце регистрации',
+      '*Просто продолжайте регистрацию*',
+    ],
+  },
 ] as const
 
 export function clampStep(n: number): OnboardingStep {
@@ -51,21 +59,24 @@ export function getOnboardingCaption(step: OnboardingStep): string {
  * - Кнопка "ПОДТВЕРДИТЬ И НАЧАТЬ" появляется ТОЛЬКО на последней странице
  */
 export function getOnboardingKeyboard(step: OnboardingStep): InlineKeyboard {
-  const total = PAGES.length
-  const last = (total - 1) as OnboardingStep
-
   const kb = new InlineKeyboard()
 
-  // Стрелки умные: показываем только доступные
-  if (step > 0) kb.text('◀️ НАЗАД', `ui:onb:${step - 1}`)
-  if (step < last) kb.text('ВПЕРЕД ▶️', `ui:onb:${step + 1}`)
+  switch (step) {
+    case 0:
+      kb.text('ВПЕРЕД ▶️', 'ui:onb:1')
+      break
 
-  // Чтобы кнопки не “прилипали” в один ряд при одиночной стрелке — ряд завершаем
-  kb.row()
+    case 1:
+      kb.text('◀️ НАЗАД', 'ui:onb:0').text('ВПЕРЕД ▶️', 'ui:onb:2')
+      break
 
-  // Подтверждение — только на последней странице
-  if (step === last) {
-    kb.text('ПОДТВЕРДИТЬ И НАЧАТЬ', 'ui:onb:confirm').style('success')
+    case 2:
+      kb.text('✅ СОГЛАСИТЬСЯ', 'ui:onb:3').style('success')
+      break
+
+    case 3:
+      kb.text('🚀 ЗАРЕГИСТРИРОВАТЬСЯ', 'ui:onb:confirm').style('success')
+      break
   }
 
   return kb

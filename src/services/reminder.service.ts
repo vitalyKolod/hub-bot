@@ -2,27 +2,64 @@ import { Bot } from 'grammy'
 import { UserModel } from '../models/User.js'
 import { PROP_FLOWS } from '../data/ProPresenterFLows.js'
 
-// считаем дни
-function getDaysLeft(date?: Date | string | null) {
-  if (!date) return 0
+// Функция расчета точного времени до истечения
+function getTimeLeft(date?: Date | string | null) {
+  if (!date) return null
 
-  const target = new Date(date)
-  const now = new Date()
+  const target = new Date(date).getTime()
+  const now = Date.now()
+  const diffMs = target - now
 
-  target.setHours(0, 0, 0, 0)
-  now.setHours(0, 0, 0, 0)
+  if (diffMs <= 0) return { expired: true, days: 0, hours: 0, minutes: 0, seconds: 0 }
 
-  return Math.floor((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+  const seconds = Math.floor((diffMs % (1000 * 60)) / 1000)
+
+  return { expired: false, days, hours, minutes, seconds, totalMs: diffMs }
 }
 
-// проверка — надо ли отправлять
-function shouldSend(daysLeft: number) {
-  if (daysLeft > 30 || daysLeft <= 0) return false
-  if (daysLeft % 3 !== 0 && daysLeft !== 1) return false
-  return true
+// Форматируем красивую строку оставшегося времени
+function formatTimeLeft(timeLeft: {
+  days: number
+  hours: number
+  minutes: number
+  seconds: number
+}) {
+  const parts = []
+  if (timeLeft.days > 0) parts.push(`${timeLeft.days} дн.`)
+  parts.push(`${timeLeft.hours} ч.`)
+  parts.push(`${timeLeft.minutes} мин.`)
+  parts.push(`${timeLeft.seconds} сек.`)
+  return parts.join(' ')
 }
 
-// универсальная отправка
+// Проверка — надо ли отправлять напоминание (например, ровно за 3 дня, за 2 дня, за 1 день или за несколько часов)
+// Вместо строгой проверки по дням, проверяем пороги в миллисекундах
+function shouldSendReminder(totalMs: number, sentList: string[], prefix: string) {
+  const ONE_HOUR = 1000 * 60 * 60
+  const ONE_DAY = ONE_HOUR * 24
+
+  // Пороги для отправки: за 3 дня, за 2 дня, за 1 день, за 6 часов
+  const thresholds = [
+    { key: `${prefix}_3d`, ms: 3 * ONE_DAY },
+    { key: `${prefix}_2d`, ms: 2 * ONE_DAY },
+    { key: `${prefix}_1d`, ms: 1 * ONE_DAY },
+    { key: `${prefix}_6h`, ms: 6 * ONE_HOUR },
+  ]
+
+  for (const t of thresholds) {
+    // Если осталось меньше или равно порогу, но еще не отправляли этот ключ
+    if (totalMs <= t.ms && !sentList.includes(t.key)) {
+      return t.key
+    }
+  }
+
+  return null
+}
+
+// Универсальная отправка
 async function sendReminder({
   bot,
   user,
@@ -35,7 +72,6 @@ async function sendReminder({
   text: string
 }) {
   const alreadySent = user.reminders || []
-
   if (alreadySent.includes(key)) return
 
   try {
@@ -58,23 +94,32 @@ export async function runReminders(bot: Bot) {
   const users = await UserModel.find({})
 
   for (const user of users) {
+    const alreadySent = user.reminders || []
+
     // ================= CONTENT =================
     const content = user.subscriptions?.content
 
     if (content?.status === 'active' && content.expiresAt) {
-      const daysLeft = getDaysLeft(content.expiresAt)
+      const time = getTimeLeft(content.expiresAt)
 
-      console.log('CONTENT USER:', user.telegramId, 'DAYS:', daysLeft)
+      if (time) {
+        if (time.expired) {
+          // Действие при истечении (если нужно кикать или менять статус)
+          continue
+        }
 
-      if (shouldSend(daysLeft)) {
-        const key = `content_${daysLeft}`
+        const reminderKey = shouldSendReminder(time.totalMs, alreadySent, 'content')
 
-        const text =
-          daysLeft === 1
-            ? `⚠️ *Подписка заканчивается завтра!*\n\n❗ Если не продлить — вы будете удалены из группы.\n\n👉 Продлите сейчас`
-            : `⏳ *Контент для экранов*\n\nОсталось ${daysLeft} дней\n\n👉Чтобы продлить зайдите в /profile`
+        if (reminderKey) {
+          const timeStr = formatTimeLeft(time)
+          const text =
+            `⏳ *Контент для экранов*\n\n` +
+            `До окончания подписки осталось:\n` +
+            `👉 *${timeStr}*\n\n` +
+            `Чтобы продлить доступ, зайдите в /profile`
 
-        await sendReminder({ bot, user, key, text })
+          await sendReminder({ bot, user, key: reminderKey, text })
+        }
       }
     }
 
@@ -83,35 +128,34 @@ export async function runReminders(bot: Bot) {
 
     if (prop?.status === 'active') {
       const flowData = PROP_FLOWS.find((f) => f.flow === Number(prop.flow))
-
       if (!flowData?.expiresAt) continue
 
-      const daysLeft = getDaysLeft(flowData.expiresAt)
+      const time = getTimeLeft(flowData.expiresAt)
 
-      if (daysLeft <= 0) {
-        await kickUser(bot, user, Number(process.env.CONTENT_GROUP_ID))
+      if (time) {
+        if (time.expired) {
+          await kickUser(bot, user, Number(process.env.CONTENT_GROUP_ID))
+          await UserModel.updateOne(
+            { telegramId: user.telegramId },
+            {
+              'subscriptions.content.status': 'expired',
+            }
+          )
+          continue
+        }
 
-        await UserModel.updateOne(
-          { telegramId: user.telegramId },
-          {
-            'subscriptions.content.status': 'expired',
-          }
-        )
+        const reminderKey = shouldSendReminder(time.totalMs, alreadySent, `prop_${prop.flow}`)
 
-        continue
-      }
+        if (reminderKey) {
+          const timeStr = formatTimeLeft(time)
+          const text =
+            `🎬 *Подписка на ${flowData.flow} поток ProPresenter*\n\n` +
+            `До окончания подписки осталось:\n` +
+            `👉 *${timeStr}*\n\n` +
+            `❗ Обсудите продление в чате потока, чтобы не потерять доступ.`
 
-      console.log('PROP USER:', user.telegramId, 'DAYS:', daysLeft)
-
-      if (shouldSend(daysLeft)) {
-        const key = `prop_${daysLeft}`
-
-        const text =
-          `🎬 *У вас заканчивается подписка на ${flowData.flow} поток ProPresenter *\n\n` +
-          `⏳ Осталось ${daysLeft} дней\n\n` +
-          `❗ Обсудите продление в чате потока, чтобы не потерять доступ\n\n`
-
-        await sendReminder({ bot, user, key, text })
+          await sendReminder({ bot, user, key: reminderKey, text })
+        }
       }
     }
   }
@@ -123,9 +167,8 @@ async function kickUser(bot: Bot, user: any, chatId: number) {
     await bot.api.unbanChatMember(chatId, user.telegramId)
     await bot.api.sendMessage(
       user.telegramId,
-      '❌ Ваша подписка закончилась. Вы были удалены из группы. \n\n👉 Чтобы восстановить доступ, продлите подписку в /profile'
+      '❌ Ваша подписка закончилась. Вы были удалены из группы.\n\n👉 Чтобы восстановить доступ, продлите подписку в /profile'
     )
-
     console.log(`🚫 Кикнут пользователь ${user.telegramId}`)
   } catch (err) {
     console.error('Ошибка кика:', err)

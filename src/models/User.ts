@@ -2,16 +2,19 @@ import mongoose from 'mongoose'
 
 const userSchema = new mongoose.Schema(
   {
-    telegramId: { type: Number, required: true, unique: true },
+    telegramId: {
+      type: Number,
+      required: true,
+      unique: true,
+    },
+
+    username: String,
 
     fio: String,
+
     city: String,
+
     church: String,
-    username: String,
-    isVolunteer: {
-      type: Boolean,
-      default: false,
-    },
 
     reg: {
       type: String,
@@ -21,52 +24,18 @@ const userSchema = new mongoose.Schema(
 
     regStep: {
       type: String,
+      enum: ['fio', 'city', 'church', 'confirm_registration'],
       default: 'fio',
     },
+
     editingField: {
       type: String,
       default: null,
     },
-    reminders: {
-      type: [String],
-      default: [],
-    },
-
-    // Подписки
-    subscriptions: {
-      propresenter: {
-        status: { type: String, default: 'none' },
-        flow: String,
-        email: String,
-        password: String,
-        expiresAt: Date,
-      },
-      content: {
-        status: { type: String, default: 'none' },
-        expiresAt: Date,
-        extraUsers: { type: Number, default: 0 },
-      },
-      sunday: {
-        status: { type: String, default: 'none' },
-        expiresAt: Date,
-      },
-
-      // Волонтеры
-      volunteers: [
-        {
-          telegramId: Number,
-          fio: String,
-        },
-      ],
-    },
-
-    volunteer: {
-      volunteerUserName: String,
-
-      ownerId: Number,
-    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 )
 
 export const UserModel = mongoose.model('User', userSchema)
