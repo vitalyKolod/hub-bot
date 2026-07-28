@@ -116,7 +116,7 @@ export async function runReminders(bot: Bot) {
             `⏳ *Контент для экранов*\n\n` +
             `До окончания подписки осталось:\n` +
             `👉 *${timeStr}*\n\n` +
-            `Чтобы продлить доступ, зайдите в /profile`
+            `Чтобы поддержать проект и продлить доступ, зайдите в /profile`
 
           await sendReminder({ bot, user, key: reminderKey, text })
         }
@@ -167,7 +167,7 @@ async function kickUser(bot: Bot, user: any, chatId: number) {
     await bot.api.unbanChatMember(chatId, user.telegramId)
     await bot.api.sendMessage(
       user.telegramId,
-      '❌ Ваша подписка закончилась. Вы были удалены из группы.\n\n👉 Чтобы восстановить доступ, продлите подписку в /profile'
+      '❌ Ваша подписка закончилась. Вы были удалены из группы.\n\n👉 Чтобы поддержать проект и восстановить доступ, зайдите в /profile'
     )
     console.log(`🚫 Кикнут пользователь ${user.telegramId}`)
   } catch (err) {

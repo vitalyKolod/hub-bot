@@ -34,7 +34,7 @@ export function addSubscriptionScreen(userId: number): ScreenView {
     .icon('5461152608804689572')
     .row()
   kb.text('◀️ НАЗАД', packCb({ a: 'home' }))
-  kb.text('ОБ ОПЛАТЕ', packCb({ a: 'open', s: 'about_payment' })).icon('5282961772972615494')
+  kb.text('О ПОЖЕРТВОВАНИИ', packCb({ a: 'open', s: 'about_payment' })).icon('5282961772972615494')
 
   return {
     photo: './public/add-subscription.png',

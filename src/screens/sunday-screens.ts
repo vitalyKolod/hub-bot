@@ -10,7 +10,7 @@ export function SundayScreensScreen(userId: number): ScreenView {
   kb.text('Чаво по продукту', packCb({ a: 'open', s: 'faq_sunday_screens' }))
     .icon('5436113877181941026')
     .row()
-  kb.text('Оплатить', packCb({ a: 'pay_product', p: 'sunday_screens' }))
+  kb.text('Поддержать проект', packCb({ a: 'pay_product', p: 'sunday_screens' }))
     .icon('5318912792428814144')
     .row()
   kb.row()
@@ -26,7 +26,7 @@ export function SundayScreensScreen(userId: number): ScreenView {
       `• Готовые шаблоны для песен, проповедей и объявлений\n` +
       `• Поддержка различных экранов и программ проекции\n` +
       `• Доступ к библиотеке HD/4K контента без ограничений\n\n` +
-      `Стоимость в ХАБе: *2000 руб/год* (или эквивалент в USDT по курсу).\n` +
+      `Рекомендуемое пожертвование: *2000 руб.* (или эквивалент в USDT по курсу).\n` +
       `Доступ через наш приватный поток — без ограничений и блокировок.\n\n` +
       `Выберите действие ниже:`,
 
