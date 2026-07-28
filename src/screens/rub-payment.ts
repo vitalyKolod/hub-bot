@@ -7,7 +7,7 @@ import { PRODUCT_PRICES } from './payment.js'
 export function rubPaymentScreen(userId: number, params?: any): ScreenView {
   const kb = new InlineKeyboard()
 
-  kb.text('Я ОТПРАВИЛ(А)', packCb({ a: 'paid' }))
+  kb.text('Я ОПЛАТИЛ(А)', packCb({ a: 'paid' }))
     .icon('5317013291602553603')
     .row()
 
@@ -51,7 +51,7 @@ export function rubPaymentScreen(userId: number, params?: any): ScreenView {
   if (!params) {
     return {
       photo: './public/methods-rub.jpg',
-      caption: 'Ошибка: данные перевода не найдены',
+      caption: 'Ошибка: данные оплаты не найдены',
       keyboard: new InlineKeyboard().text('Назад', packCb({ a: 'back' })),
     }
   }
@@ -62,12 +62,12 @@ export function rubPaymentScreen(userId: number, params?: any): ScreenView {
   return {
     photo: './public/methods-rub.jpg',
     caption:
-      `*ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ — РУБЛИ*\n\n` +
+      `*ОПЛАТА — РУБЛИ*\n\n` +
       `Способ: **${methodText}**\n\n` +
-      `Сумма добровольного пожертвования: **${amount}**\n\n` +
+      `Сумма: **${amount}**\n\n` +
       `Реквизиты:\n\`\`\`\n${details}\n\`\`\`\n\n` +
       `Получатель: ${config.PAYMENT_RECEIVER_NAME}\n\n` +
-      `После перевода нажмите «Я ОТПРАВИЛ(А)»`,
+      `После перевода нажмите "Я ОПЛАТИЛ(А)"`,
 
     keyboard: kb,
   }

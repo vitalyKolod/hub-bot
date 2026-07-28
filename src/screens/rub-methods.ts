@@ -20,7 +20,7 @@ export function rubMethodsScreen(userId: number, params: any, ctx: any): ScreenV
 
   return {
     photo: './public/methods-rub.jpg', // тот же зелёный фон
-    caption: `*ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ — РУБЛИ*\n\n` + `Выберите способ перевода:\n\n`,
+    caption: `*ОПЛАТА — РУБЛИ*\n\n` + `Выберите способ перевода:\n\n`,
 
     keyboard: kb,
   }

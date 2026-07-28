@@ -9,7 +9,7 @@ export function cryptoPaymentScreen(
   params?: { network: string; product?: string }
 ): ScreenView {
   const kb = new InlineKeyboard()
-  kb.text('Я ОТПРАВИЛ(А)', packCb({ a: 'paid' }))
+  kb.text('Я ОПЛАТИЛ(А)', packCb({ a: 'paid' }))
     .icon('5317013291602553603')
     .row()
   kb.row()
@@ -34,11 +34,11 @@ export function cryptoPaymentScreen(
   return {
     photo: './public/payment.png',
     caption:
-      `*ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ — КРИПТА (${network.toUpperCase()})*\n\n` +
+      `*ОПЛАТА — КРИПТА (${network.toUpperCase()})*\n\n` +
       `Сеть: **${network.toUpperCase()}**\n` +
-      `Сумма добровольного пожертвования: **${amount}**\n\n` +
+      `Сумма: **${amount}**\n\n` +
       `Адрес кошелька:\n\`\`\`\n${wallet}\n\`\`\`\n\n` +
-      `После перевода нажмите кнопку *Я ОТПРАВИЛ(А)* и пришлите подтверждение (фото или документ).`,
+      `После перевода нажмите кнопку *Я ОПЛАТИЛ(А)* и пришлите чек (фото или документ).`,
     keyboard: kb,
   }
 }

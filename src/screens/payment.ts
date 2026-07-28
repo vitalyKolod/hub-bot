@@ -47,9 +47,7 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
 
   // Цена
   const price = PRODUCT_PRICES[product]
-  const donationText = price
-    ? `Сумма добровольного пожертвования: *${price} ₽/год*`
-    : 'Сумму добровольного пожертвования уточните у администратора'
+  const priceText = price ? `Стоимость: *${price} ₽/год*` : 'Стоимость: по договорённости с админом'
 
   const kb = new InlineKeyboard()
 
@@ -58,7 +56,7 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
     .icon('5460978422111021593')
     .row()
   kb.row()
-  kb.text('О ПОЖЕРТВОВАНИИ', packCb({ a: 'open', s: 'payment_details', p: { page: 1 } }))
+  kb.text('Подробности об оплате', packCb({ a: 'open', s: 'payment_details', p: { page: 1 } }))
     .icon('5787544344906959608')
     .row()
   kb.row()
@@ -69,11 +67,11 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
   return {
     photo: './public/payment.png',
     caption:
-      `*ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ — ${productName.toUpperCase()}*\n\n` +
+      `*${isExtension ? 'ПРОДЛЕНИЕ' : 'ОПЛАТА'} — ${productName.toUpperCase()}*\n\n` +
       `Вы выбрали: ${productName}${extraInfo}\n` +
-      `${donationText}\n` +
+      `${priceText}\n` +
       `${extensionInfo}\n` +
-      `Сделать добровольное пожертвование можно переводом:\n` +
+      `Вы можете оплатить:\n` +
       `• Рублёвый перевод\n` +
       `• Криптовалютный перевод в USDT (предпочтительнее)\n\n` +
       `Выберите способ ниже:`,

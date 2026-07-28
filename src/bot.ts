@@ -493,10 +493,7 @@ ${sundayInvite.invite_link}
 
         if (parsed.a === 'reject') {
           try {
-            await ctx.api.sendMessage(
-              targetUserId,
-              '❌ Добровольное пожертвование не подтверждено. Свяжитесь с поддержкой.'
-            )
+            await ctx.api.sendMessage(targetUserId, '❌ Оплата отклонена. Свяжитесь с поддержкой.')
             await ctx.api.editMessageCaption(String(ADMIN_GROUP_ID), message.message_id, {
               caption: `${caption}\n\n❌ Отклонено`,
             })
@@ -572,7 +569,7 @@ ${sundayInvite.invite_link}
     //   return
     // }
 
-    // Обычная навигация + добровольное пожертвование
+    // Обычная навигация + оплата
     if (parsed.a === 'open' && parsed.s) {
       goTo(userId, parsed.s)
       await renderScreen(ctx, userId, parsed.s, parsed.p)
@@ -650,7 +647,7 @@ ${sundayInvite.invite_link}
       }
 
       if (parsed.m === 'mastercard') {
-        // сразу к добровольному пожертвованию
+        // сразу на оплату
         goTo(userId, 'rub_payment')
         await renderScreen(ctx, userId, 'rub_payment', ctx.session.payment)
       } else {
@@ -697,7 +694,7 @@ ${sundayInvite.invite_link}
     if (parsed.a === 'paid') {
       await ctx.editMessageCaption({
         caption:
-          '📸 Отлично! Теперь пришлите подтверждение перевода (фото или документ) в этот чат.\nЯ сразу передам его администратору.',
+          '📸 Отлично! Теперь пришли фото чека (или документ) в этот чат.\nЯ сразу передам админу.',
         reply_markup: new InlineKeyboard().text('Отмена', packCb({ a: 'back' })),
         parse_mode: 'Markdown',
       })
@@ -828,7 +825,7 @@ ${sundayInvite.invite_link}
     }
   })
 
-  // ========== ПОДТВЕРЖДЕНИЕ ПЕРЕВОДА — ВЫСОКИЙ ПРИОРИТЕТ===========
+  // ========== ЧЕК (фото / документ) — ВЫСОКИЙ ПРИОРИТЕТ===========
   bot.on(['message:photo', 'message:document'], async (ctx) => {
     if (ctx.session.waitingForReceipt) {
       ctx.session.waitingForReceipt = false
@@ -903,7 +900,7 @@ ${sundayInvite.invite_link}
         : 'не указано'
       const adminText = `
 
-💰 *НОВОЕ ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ*
+💰 *НОВАЯ ОПЛАТА*
 ${productText}
 
 👤 ${profile.fio || 'не указано'}
@@ -912,7 +909,7 @@ ${productText}
 
 ${ctx.session.payment?.product === 'volunteer' ? 'TYPE:VOLUNTEER' : 'TYPE:CONTENT'}
 
-💳 Способ перевода: ${methodText}
+💳 Способ оплаты: ${methodText}
 ${volunteerText}
 
 🕒 ${new Date().toLocaleString('ru-RU')}
@@ -922,10 +919,7 @@ ${volunteerText}
 
       let threadId: number | undefined
       try {
-        const topic = await ctx.api.createForumTopic(
-          ADMIN_GROUP_ID,
-          `Новое пожертвование — ${username}`
-        )
+        const topic = await ctx.api.createForumTopic(ADMIN_GROUP_ID, `Новый заказ — ${username}`)
         threadId = topic.message_thread_id
       } catch (err) {
         console.error('Ошибка создания темы:', err)
@@ -955,19 +949,19 @@ ${volunteerText}
         }
 
         await ctx.reply(
-          '✅ Подтверждение перевода отправлено администратору!\nОжидайте проверки.\nЧтобы вернуться в главное меню, нажмите /main',
+          '✅ Чек успешно отправлен администратору!\nОжидай подтверждения \nЧтобы вернуться в главное меню - нажми /main',
           {
             parse_mode: 'Markdown',
           }
         )
       } catch (err) {
-        console.error('Ошибка отправки подтверждения перевода:', err)
-        await ctx.reply('❌ Не удалось отправить подтверждение перевода.')
+        console.error('Ошибка отправки чека:', err)
+        await ctx.reply('❌ Не удалось отправить чек.')
       }
       return
     }
 
-    // Если это не подтверждение перевода — проверяем поддержку
+    // Если не чек — проверяем поддержку
     if (ctx.session.inSupportMode) {
       let threadId = ctx.session.supportThreadId
       if (!threadId) {
@@ -1024,11 +1018,9 @@ ${volunteerText}
       volunteerId: volunteerTelegramId,
     }
 
-    await ctx.reply(
-      `✅ Волонтёр выбран: ${volunteer.fio || 'Без имени'}\n\nПереходим к добровольному пожертвованию...`
-    )
+    await ctx.reply(`✅ Волонтёр выбран: ${volunteer.fio || 'Без имени'}\n\nПереходим к оплате...`)
 
-    // Переход к добровольному пожертвованию
+    // 👉 переход в оплату
     goTo(ctx.from.id, 'payment')
     await renderScreen(ctx, ctx.from.id, 'payment', undefined, { forceNew: true })
   })
