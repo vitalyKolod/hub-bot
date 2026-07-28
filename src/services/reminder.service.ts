@@ -71,8 +71,8 @@ export async function runReminders(bot: Bot) {
 
         const text =
           daysLeft === 1
-            ? `⚠️ *Подписка заканчивается завтра!*\n\n❗ Если не продлить — вы будете удалены из группы.\n\n👉 Продлите сейчас`
-            : `⏳ *Контент для экранов*\n\nОсталось ${daysLeft} дней\n\n👉Чтобы продлить зайдите в /profile`
+            ? `⚠️ *Подписка заканчивается завтра!*\n\n❗ Чтобы поддержать проект и продлить доступ, зайдите в /profile`
+            : `⏳ *Контент для экранов*\n\nОсталось ${daysLeft} дней\n\n👉 Чтобы поддержать проект и продлить доступ, зайдите в /profile`
 
         await sendReminder({ bot, user, key, text })
       }
@@ -123,7 +123,7 @@ async function kickUser(bot: Bot, user: any, chatId: number) {
     await bot.api.unbanChatMember(chatId, user.telegramId)
     await bot.api.sendMessage(
       user.telegramId,
-      '❌ Ваша подписка закончилась. Вы были удалены из группы. \n\n👉 Чтобы восстановить доступ, продлите подписку в /profile'
+      '❌ Ваша подписка закончилась. Вы были удалены из группы.\n\n👉 Чтобы поддержать проект и восстановить доступ, зайдите в /profile'
     )
 
     console.log(`🚫 Кикнут пользователь ${user.telegramId}`)

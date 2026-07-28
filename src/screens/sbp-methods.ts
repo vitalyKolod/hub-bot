@@ -24,8 +24,8 @@ export function sbpMethodsScreen(userId: number, ctx: any): ScreenView {
   return {
     photo: './public/methods-rub.jpg',
     caption:
-      `*💸 Оплата через СБП*\n\n` +
-      `Выберите удобный вариант оплаты:\n\n` +
+      `*💸 Добровольное пожертвование через СБП*\n\n` +
+      `Выберите удобный банк для перевода:\n\n` +
       `Перевод по номеру телефона\n` +
       `Средства зачисляются моментально.`,
     keyboard: kb,

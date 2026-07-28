@@ -21,7 +21,7 @@ export function cardMethods(userId: number, ctx: any): ScreenView {
   return {
     photo: './public/methods-rub.jpg',
     caption:
-      `*💳 Оплата банковской картой*\n\n` +
+      `*💳 Добровольное пожертвование переводом на карту*\n\n` +
       `Пожалуйста, выберите систему карты:\n\n` +
       `MasterCard / МИР\n`,
     keyboard: kb,

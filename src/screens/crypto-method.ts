@@ -27,7 +27,7 @@ export function cryptoMethodScreen(userId: number, ctx: any): ScreenView {
   return {
     photo: './public/payment.png',
     caption:
-      `*ОПЛАТА — КРИПТА*\n\nВыберите сеть для перевода:\n\n` +
+      `*ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ — КРИПТА*\n\nВыберите сеть для перевода:\n\n` +
       `После выбора адрес кошелька появится автоматически с возможностью копирования.`,
     keyboard: kb,
   }

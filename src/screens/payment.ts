@@ -47,7 +47,9 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
 
   // Цена
   const price = PRODUCT_PRICES[product]
-  const priceText = price ? `Стоимость: *${price} ₽/год*` : 'Стоимость: по договорённости с админом'
+  const donationText = price
+    ? `Рекомендуемая сумма пожертвования: *${price} ₽*`
+    : 'Рекомендуемый размер пожертвования уточните у администратора'
 
   const kb = new InlineKeyboard()
 
@@ -56,7 +58,7 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
     .icon('5460978422111021593')
     .row()
   kb.row()
-  kb.text('Подробности об оплате', packCb({ a: 'open', s: 'payment_details', p: { page: 1 } }))
+  kb.text('О ПОЖЕРТВОВАНИИ', packCb({ a: 'open', s: 'payment_details', p: { page: 1 } }))
     .icon('5787544344906959608')
     .row()
   kb.row()
@@ -67,11 +69,11 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
   return {
     photo: './public/payment.png',
     caption:
-      `*${isExtension ? 'ПРОДЛЕНИЕ' : 'ОПЛАТА'} — ${productName.toUpperCase()}*\n\n` +
+      `*ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ — ${productName.toUpperCase()}*\n\n` +
       `Вы выбрали: ${productName}${extraInfo}\n` +
-      `${priceText}\n` +
+      `${donationText}\n` +
       `${extensionInfo}\n` +
-      `Вы можете оплатить:\n` +
+      `Поддержать проект можно переводом:\n` +
       `• Рублёвый перевод\n` +
       `• Криптовалютный перевод в USDT (предпочтительнее)\n\n` +
       `Выберите способ ниже:`,

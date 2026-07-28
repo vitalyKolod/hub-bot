@@ -20,7 +20,7 @@ export function faqHubScreen(userId: number): ScreenView {
   kb.text('ДРУГОЕ', packCb({ a: 'open', s: 'other' }))
     .icon('5215209935188534658')
     .row()
-  kb.text(' ОБ ОПЛАТЕ', packCb({ a: 'open', s: 'about_payment' }))
+  kb.text(' О ПОЖЕРТВОВАНИИ', packCb({ a: 'open', s: 'about_payment' }))
     .icon('5282961772972615494')
     .row()
   kb.row()
@@ -30,7 +30,7 @@ export function faqHubScreen(userId: number): ScreenView {
     photo: './public/help.jpg',
     caption:
       `*ЧАВО ПО ХАБУ (FAQ)*\n\n` +
-      `Здесь собраны самые частые вопросы по работе ХАБа, подпискам и оплате.\n\n` +
+      `Здесь собраны самые частые вопросы по работе ХАБа, подпискам и добровольным пожертвованиям.\n\n` +
       `Выберите тему, чтобы увидеть подробные ответы:`,
 
     keyboard: kb,
