@@ -48,8 +48,8 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
   // Цена
   const price = PRODUCT_PRICES[product]
   const donationText = price
-    ? `Рекомендуемая сумма пожертвования: *${price} ₽*`
-    : 'Рекомендуемый размер пожертвования уточните у администратора'
+    ? `Сумма добровольного пожертвования: *${price} ₽/год*`
+    : 'Сумму добровольного пожертвования уточните у администратора'
 
   const kb = new InlineKeyboard()
 
@@ -73,7 +73,7 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
       `Вы выбрали: ${productName}${extraInfo}\n` +
       `${donationText}\n` +
       `${extensionInfo}\n` +
-      `Поддержать проект можно переводом:\n` +
+      `Сделать добровольное пожертвование можно переводом:\n` +
       `• Рублёвый перевод\n` +
       `• Криптовалютный перевод в USDT (предпочтительнее)\n\n` +
       `Выберите способ ниже:`,

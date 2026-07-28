@@ -6,7 +6,7 @@ import type { ScreenView } from '../core/render.js'
 export function contentScreensScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
-  kb.text('ПОДДЕРЖАТЬ ПРОЕКТ', packCb({ a: 'pay_product', p: 'content_screens' }))
+  kb.text('СДЕЛАТЬ ПОЖЕРТВОВАНИЕ', packCb({ a: 'pay_product', p: 'content_screens' }))
     .icon('5318912792428814144')
     .row()
     .url('ОСТАЛИСЬ ВОПРОСЫ?', 'https://t.me/hubbbhelp_bot')
@@ -34,7 +34,7 @@ Church Motion Graphics (CMG)\n` +
 Весь контент уже доступен в удобном закрытом чате
 и регулярно пополняется 🔄
 \n` +
-      `💰 Рекомендуемое пожертвование: от 10$ / ~1000₽\n` +
+      `💰 Сумма добровольного пожертвования: 10$ / ~1000₽ в год\n` +
       `
 — доступ на 12 месяцев
 — сразу 3 направления

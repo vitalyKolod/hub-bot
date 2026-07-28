@@ -64,7 +64,7 @@ export function rubPaymentScreen(userId: number, params?: any): ScreenView {
     caption:
       `*ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ — РУБЛИ*\n\n` +
       `Способ: **${methodText}**\n\n` +
-      `Рекомендуемая сумма: **${amount}**\n\n` +
+      `Сумма добровольного пожертвования: **${amount}**\n\n` +
       `Реквизиты:\n\`\`\`\n${details}\n\`\`\`\n\n` +
       `Получатель: ${config.PAYMENT_RECEIVER_NAME}\n\n` +
       `После перевода нажмите «Я ОТПРАВИЛ(А)»`,
