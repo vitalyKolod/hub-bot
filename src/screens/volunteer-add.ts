@@ -60,8 +60,18 @@ export function addVolunteerScreen(userId: number, teamId: string): ScreenView {
 
   return {
     photo: './public/add-volunteer.png',
+
     caption: message.caption,
     caption_entities: message.caption_entities,
+
+    caption:
+      `*➕ ДОБАВЛЕНИЕ ВОЛОНТЁРА*\n\n` +
+      `Перед тем как продолжить:\n\n` +
+      `• Волонтёр должен *пройти регистрацию в боте*\n` +
+      `• У него должен быть Telegram-аккаунт\n\n` +
+      `После подтверждения добровольного пожертвования он получит доступ к чату 📺\n\n` +
+      `Нажми кнопку ниже и отправь его контакт 👇`,
+
     keyboard: kb,
   }
 }

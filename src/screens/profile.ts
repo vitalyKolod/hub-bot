@@ -87,7 +87,7 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
     const days = getDaysLeft(content.expiresAt)
 
     if (!isVolunteer && days <= 30) {
-      kb.text('💳 ПРОДЛИТЬ PRO CONTENT', packCb({ a: 'pay_product', p: 'content_screens' })).row()
+      kb.text('ПОДДЕРЖАТЬ И ПРОДЛИТЬ', packCb({ a: 'pay_product', p: 'content_screens' })).row()
     }
 
     kb.url('ЧАТ КОНТЕНТ ДЛЯ ЭКРАНОВ', 'https://t.me/+Pv-uHdH-X7JiMjky')

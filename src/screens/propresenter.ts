@@ -20,7 +20,17 @@ export function propresenterScreen(userId: number, teamId: string): ScreenView {
     .icon('5215209935188534658')
     .row()
 
+
   kb.url('ОСТАЛИСЬ ВОПРОСЫ?', 'https://t.me/hubbbhelp_bot').icon('5436113877181941026').row()
+
+
+    .url('ОСТАЛИСЬ ВОПРОСЫ?', 'https://t.me/hubbbhelp_bot')
+    .icon('5436113877181941026')
+    .row()
+  // kb.text('Поддержать проект', packCb({ a: 'pay_product', p: 'propresenter' }))
+  //   .icon('5318912792428814144')
+  //   .row()
+  kb.row()
 
   kb.text('◀️ НАЗАД', packCb({ a: 'back' }))
 
@@ -58,8 +68,20 @@ export function propresenterScreen(userId: number, teamId: string): ScreenView {
 
   return {
     photo: './public/propres.jpg',
+
     caption: message.caption,
     caption_entities: message.caption_entities,
+
+    caption:
+      `*ProPresenter*— профессиональная программа для управления слайдами, видео, текстом и worship-контентом в церквях.\n\n` +
+      `*Основные возможности описаны на*` +
+      `[ сайте разработчика](https://www.renewedvision.com/propresenter)\n\n` +
+      `💰 *Рекомендуемое пожертвование через ХАБ: 40$/год*\n` +
+      `или от 3750₽/год (в зависимости от курса USDT на P2P)\n\n` +
+      `📡 *Доступ через приватный ПОТОК:*\n\n` +
+      `➕ *Выберите действие ниже:*`,
+
+
     keyboard: kb,
   }
 }

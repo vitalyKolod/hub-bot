@@ -9,6 +9,7 @@ import type { ScreenView } from '../core/render.js'
 export function procontentScreen(userId: number, teamId: string): ScreenView {
   const kb = new InlineKeyboard()
 
+
   kb.text(
     'ОПЛАТИТЬ СРАЗУ',
     packCb({
@@ -16,8 +17,12 @@ export function procontentScreen(userId: number, teamId: string): ScreenView {
       p: `procontent:${teamId}`,
     })
   )
+
+  kb.text('ПОДДЕРЖАТЬ ПРОЕКТ', packCb({ a: 'pay_product', p: 'content_screens' }))
+
     .icon('5318912792428814144')
     .row()
+
 
   kb.text(
     '🛒 В корзину',
@@ -45,6 +50,34 @@ export function procontentScreen(userId: number, teamId: string): ScreenView {
   message = message.emoji('📦', '5251299351375937406').plain(' ').bold('PROCONTENT').plain('\n\n')
 
   message = message.plain('Большая библиотека видеоконтента для церквей:').plain('\n\n')
+
+  return {
+    photo: './public/content.jpg',
+    caption:
+      `📦 Доступ в закрытый чат «Контент для экранов (ХАБ)»\n\n` +
+      `🎬 Sunday Screens
+💎 ProContent
+Church Motion Graphics (CMG)\n` +
+      `
+— это 3 большие библиотеки видеоконтента для церквей:
+
+• видеофоны и лупы
+• motion-фоны
+• сезонные паки
+• шаблоны объявлений и презентаций (PSD)
+• и многое другое
+
+Весь контент уже доступен в удобном закрытом чате
+и регулярно пополняется 🔄
+\n` +
+      `💰 Рекомендуемое пожертвование: от 10$ / ~1000₽\n` +
+      `
+— доступ на 12 месяцев
+— сразу 3 направления
+— можно подключить членов вашей команды
+\n` +
+      `➕Интересно? Подключаем?`,
+
 
   let content = new FormattedString('')
 

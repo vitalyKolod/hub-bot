@@ -19,12 +19,16 @@ export async function cryptoPaymentScreen(
 ): Promise<ScreenView> {
   const kb = new InlineKeyboard()
 
+
   kb.text(
     'Я ОПЛАТИЛ(А)',
     packCb({
       a: 'paid',
     })
   )
+
+  kb.text('Я ОТПРАВИЛ(А)', packCb({ a: 'paid' }))
+
     .icon('5317013291602553603')
     .row()
 
@@ -122,10 +126,20 @@ export async function cryptoPaymentScreen(
   message = message.plain('После перевода нажмите ').bold('«Я ОПЛАТИЛ(А)»').plain('.')
 
   return {
+
     photo: './public/methods-crypto.jpg',
 
     caption: message.caption,
     caption_entities: message.caption_entities,
+
+
+    photo: './public/payment.png',
+    caption:
+      `*ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ — КРИПТА (${network.toUpperCase()})*\n\n` +
+      `Сеть: **${network.toUpperCase()}**\n` +
+      `Рекомендуемая сумма: **${amount}**\n\n` +
+      `Адрес кошелька:\n\`\`\`\n${wallet}\n\`\`\`\n\n` +
+      `После перевода нажмите кнопку *Я ОТПРАВИЛ(А)* и пришлите подтверждение (фото или документ).`,
 
     keyboard: kb,
   }

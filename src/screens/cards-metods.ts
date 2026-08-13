@@ -73,8 +73,15 @@ export function cardMethods(userId: number, ctx: any): ScreenView {
   return {
     photo: './public/methods-rub.jpg',
 
+
     caption: message.caption,
     caption_entities: message.caption_entities,
+
+
+    caption:
+      `*💳 Добровольное пожертвование переводом на карту*\n\n` +
+      `Пожалуйста, выберите систему карты:\n\n` +
+      `MasterCard / МИР\n`,
 
     keyboard: kb,
   }

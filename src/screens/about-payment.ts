@@ -9,6 +9,7 @@ import type { ScreenView } from '../core/render.js'
 export function aboutPaymentScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
 
+
   kb.text(
     'ПРИОБРЕСТИ ПОДПИСКУ',
     packCb({
@@ -27,12 +28,22 @@ export function aboutPaymentScreen(userId: number): ScreenView {
       p: { page: 1 },
     })
   )
+
+  kb.text('ВЫБРАТЬ ПОДПИСКУ', packCb({ a: 'open', s: 'add_subscription' }))
+    .icon('5310257187786878602')
+    .row()
+
+  kb.row()
+
+  kb.text('ПОДРОБНЕЕ', packCb({ a: 'open', s: 'payment_details', p: { page: 1 } }))
+
     .icon('5215209935188534658')
     .row()
 
   kb.text('◀️ НАЗАД', packCb({ a: 'back' }))
     .text('НА ГЛАВНУЮ', packCb({ a: 'home' }))
     .icon('5465226866321268133')
+
 
   let message = new FormattedString('')
 
@@ -42,6 +53,15 @@ export function aboutPaymentScreen(userId: number): ScreenView {
       'Вы можете совершить оплату вашей подписки или любого другого продукта ХАБа несколькими способами.'
     )
     .plain('\n\n')
+
+  return {
+    photo: './public/about-payment.png', // зелёный скрин из твоей папки
+    caption:
+      `Вы можете поддержать работу ХАБа добровольным пожертвованием одним из способов:\n\n` +
+      `• Рублёвый перевод\n` +
+      `• Криптовалютный перевод в USDT (предпочтительнее)\n\n` +
+      `Выберите способ ниже:`,
+
 
   // Способы оплаты
   let paymentMethods = new FormattedString('')

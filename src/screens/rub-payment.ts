@@ -13,12 +13,16 @@ export async function rubPaymentScreen(userId: number, params?: any): Promise<Sc
 
   const kb = new InlineKeyboard()
 
+
   kb.text(
     'Я ОПЛАТИЛ(А)',
     packCb({
       a: 'paid',
     })
   )
+
+  kb.text('Я ОТПРАВИЛ(А)', packCb({ a: 'paid' }))
+
     .icon('5317013291602553603')
     .row()
 
@@ -91,6 +95,7 @@ export async function rubPaymentScreen(userId: number, params?: any): Promise<Sc
     methodText = `СБП · ${bankName}`
   }
 
+
   let productName = ''
   let amount: number | null = null
 
@@ -106,6 +111,14 @@ export async function rubPaymentScreen(userId: number, params?: any): Promise<Sc
 
     productName = productConfig?.name || payment.product
     amount = productConfig?.price ?? null
+
+  if (!params) {
+    return {
+      photo: './public/methods-rub.jpg',
+      caption: 'Ошибка: данные перевода не найдены',
+      keyboard: new InlineKeyboard().text('Назад', packCb({ a: 'back' })),
+    }
+
   }
 
   let message = new FormattedString('')
@@ -153,8 +166,18 @@ export async function rubPaymentScreen(userId: number, params?: any): Promise<Sc
   return {
     photo: './public/methods-rub.jpg',
 
+
     caption: message.caption,
     caption_entities: message.caption_entities,
+
+    caption:
+      `*ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ — РУБЛИ*\n\n` +
+      `Способ: **${methodText}**\n\n` +
+      `Рекомендуемая сумма: **${amount}**\n\n` +
+      `Реквизиты:\n\`\`\`\n${details}\n\`\`\`\n\n` +
+      `Получатель: ${config.PAYMENT_RECEIVER_NAME}\n\n` +
+      `После перевода нажмите «Я ОТПРАВИЛ(А)»`,
+
 
     keyboard: kb,
   }

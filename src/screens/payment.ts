@@ -33,9 +33,21 @@ export async function paymentScreen(userId: number, params: any, ctx: any): Prom
       '• Все оставшиеся дни сохранятся\n'
   }
 
+
   const priceText = amount
     ? `Стоимость: *${amount} ₽/год*`
     : 'Стоимость: по договорённости с админом'
+
+  if (product === 'volunteer' && ctx.session.payment?.volunteerId) {
+    extraInfo = `\n👤 Волонтёр ID: ${ctx.session.payment.volunteerId}`
+  }
+
+  // Цена
+  const price = PRODUCT_PRICES[product]
+  const donationText = price
+    ? `Рекомендуемая сумма пожертвования: *${price} ₽*`
+    : 'Рекомендуемый размер пожертвования уточните у администратора'
+
 
   const kb = new InlineKeyboard()
 
@@ -44,6 +56,13 @@ export async function paymentScreen(userId: number, params: any, ctx: any): Prom
     .icon('5460978422111021593')
     .row()
   kb.row()
+
+
+  kb.text('О ПОЖЕРТВОВАНИИ', packCb({ a: 'open', s: 'payment_details', p: { page: 1 } }))
+    .icon('5787544344906959608')
+    .row()
+  kb.row()
+
   kb.text('◀️ Назад', packCb({ a: 'back' }))
     .text('На главную', packCb({ a: 'home' }))
     .icon('5465226866321268133')
@@ -51,8 +70,18 @@ export async function paymentScreen(userId: number, params: any, ctx: any): Prom
   return {
     photo: './public/payment.png',
     caption:
+
       `*${isExtension ? 'ПРОДЛЕНИЕ' : 'ОПЛАТА'} — ${productName.toUpperCase()}*\n\n` +
       `${priceText}\n${extensionInfo}\n` +
+
+      `*ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ — ${productName.toUpperCase()}*\n\n` +
+      `Вы выбрали: ${productName}${extraInfo}\n` +
+      `${donationText}\n` +
+      `${extensionInfo}\n` +
+      `Поддержать проект можно переводом:\n` +
+      `• Рублёвый перевод\n` +
+      `• Криптовалютный перевод в USDT (предпочтительнее)\n\n` +
+
       `Выберите способ ниже:`,
     keyboard: kb,
   }

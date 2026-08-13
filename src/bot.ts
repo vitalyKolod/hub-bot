@@ -472,6 +472,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
         }
 
         if (parsed.a === 'reject') {
+
           await handleAdminReject(ctx, caption, message.message_id)
           return
         }
@@ -483,6 +484,23 @@ export function registerHandlers(bot: Bot<MyContext>) {
         if (parsed.a === 'prop_verify_reject') {
           await handlePropVerifyReject(ctx, String(parsed.p), caption, message.message_id)
           return
+
+          try {
+            await ctx.api.sendMessage(
+              targetUserId,
+              '❌ Добровольное пожертвование не подтверждено. Свяжитесь с поддержкой.'
+            )
+            await ctx.api.editMessageCaption(String(ADMIN_GROUP_ID), message.message_id, {
+              caption: `${caption}\n\n❌ Отклонено`,
+            })
+            await ctx.answerCallbackQuery({ text: 'Отклонено ✗' })
+            return
+          } catch (err: any) {
+            console.error('Ошибка reject:', err)
+            await ctx.answerCallbackQuery({ text: 'Ошибка' })
+            return
+          }
+
         }
       }
     }
@@ -559,6 +577,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
     //   return
     // }
 
+
     if (parsed.a === 'create_team') {
       await handleCreateTeamStart(ctx, userId)
       await ack()
@@ -604,6 +623,9 @@ export function registerHandlers(bot: Bot<MyContext>) {
     }
 
     // Обычная навигация + оплата
+
+    // Обычная навигация + добровольное пожертвование
+
     if (parsed.a === 'open' && parsed.s) {
       await handleOpen(ctx, userId, parsed)
       await ack()
@@ -663,11 +685,23 @@ export function registerHandlers(bot: Bot<MyContext>) {
       return
     }
 
+
     if (parsed.a === 'rub_type' && parsed.m) {
       await handleRubType(ctx, userId, parsed.m)
       await ack()
       return
     }
+
+      if (parsed.m === 'mastercard') {
+        // сразу к добровольному пожертвованию
+        goTo(userId, 'rub_payment')
+        await renderScreen(ctx, userId, 'rub_payment', ctx.session.payment)
+      } else {
+        // МИР → выбираем банк
+        goTo(userId, 'rub_sbp_methods')
+        await renderScreen(ctx, userId, 'rub_sbp_methods')
+      }
+
 
     if (parsed.a === 'rub_card_type' && parsed.m) {
       await handleRubCardType(ctx, userId, parsed.m)
@@ -694,6 +728,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
     }
 
     if (parsed.a === 'paid') {
+
       await handlePaid(ctx)
       await ack()
       return
@@ -707,6 +742,15 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     if (parsed.a === 'remove_from_cart' && parsed.p) {
       await handleRemoveFromCart(ctx, userId, String(parsed.p))
+
+      await ctx.editMessageCaption({
+        caption:
+          '📸 Отлично! Теперь пришлите подтверждение перевода (фото или документ) в этот чат.\nЯ сразу передам его администратору.',
+        reply_markup: new InlineKeyboard().text('Отмена', packCb({ a: 'back' })),
+        parse_mode: 'Markdown',
+      })
+      ctx.session.waitingForReceipt = true
+
       await ack()
       return
     }
@@ -880,8 +924,9 @@ export function registerHandlers(bot: Bot<MyContext>) {
     )
   })
 
-  // ========== ЧЕК (фото / документ) — ВЫСОКИЙ ПРИОРИТЕТ===========
+  // ========== ПОДТВЕРЖДЕНИЕ ПЕРЕВОДА — ВЫСОКИЙ ПРИОРИТЕТ===========
   bot.on(['message:photo', 'message:document'], async (ctx) => {
+
     console.log(
       '📸 PHOTO/DOCUMENT HANDLER FIRED, waitingForReceipt =',
       ctx.session.waitingForReceipt
@@ -889,10 +934,146 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     if (ctx.session.waitingForReceipt) {
       await handleReceiptUpload(ctx)
+
+    if (ctx.session.waitingForReceipt) {
+      ctx.session.waitingForReceipt = false
+
+      const userId = ctx.from.id
+      const profile = await getOrCreateUser(userId)
+      const username = ctx.from.username ? `@${ctx.from.username}` : `ID:${ctx.from.id}`
+
+      // const userLink = ctx.from.username
+      //   ? `@${ctx.from.username}`
+      //   : `[Открыть профиль](tg://user?id=${userId})`
+
+      let methodText = ''
+
+      if (ctx.session.payment?.method === 'crypto' || ctx.session.payment?.network) {
+        const net = ctx.session.payment?.network || 'TRC20'
+        methodText = `Крипта (${net.toUpperCase()})`
+      } else {
+        const bankMap: any = {
+          tbank: 'Т-Банк',
+          ozon: 'Озон-Банк',
+          alfa: 'Альфа-Банк',
+        }
+
+        const bank = bankMap[ctx.session.payment?.rubBank] || 'Не указан'
+
+        if (ctx.session.payment?.rubType === 'sbp') {
+          methodText = `Рубли — СБП (${bank})`
+        }
+
+        if (ctx.session.payment?.rubType === 'card') {
+          if (ctx.session.payment?.rubCardType === 'mastercard') {
+            methodText = `Рубли — Карта (MasterCard)`
+          } else {
+            methodText = `Рубли — Карта МИР (${bank})`
+          }
+        }
+      }
+
+      let volunteerText = ''
+
+      if (ctx.session.payment?.volunteerId) {
+        try {
+          const volunteer = await getOrCreateUser(ctx.session.payment.volunteerId)
+
+          const volunteerUserName = volunteer.username
+            ? '@' + escapeUnderscore(volunteer.username)
+            : 'не указан'
+
+          volunteerText = `
+🙋 Волонтёр: ${volunteer.fio || 'не указано'}
+😎 Юзернейм: ${volunteerUserName}
+🆔 ID волонтёра: ${ctx.session.payment.volunteerId}
+`
+        } catch {
+          volunteerText = `\n🙋 Волонтёр ID: ${ctx.session.payment.volunteerId}`
+        }
+      }
+
+      let productText = ''
+
+      if (ctx.session.payment?.product === 'volunteer') {
+        productText = '👥 Добавление волонтёра'
+      } else {
+        productText = '📦 Контент для экранов'
+      }
+
+      const isVolunteer = ctx.session.payment?.product === 'volunteer'
+
+      const usernameText = ctx.from.username
+        ? '@' + escapeUnderscore(ctx.from.username)
+        : 'не указано'
+      const adminText = `
+
+💰 *НОВОЕ ДОБРОВОЛЬНОЕ ПОЖЕРТВОВАНИЕ*
+${productText}
+
+👤 ${profile.fio || 'не указано'}
+😎 ЮзерНейм: ${usernameText}
+🆔 ID: ${userId}
+
+${ctx.session.payment?.product === 'volunteer' ? 'TYPE:VOLUNTEER' : 'TYPE:CONTENT'}
+
+💳 Способ перевода: ${methodText}
+${volunteerText}
+
+🕒 ${new Date().toLocaleString('ru-RU')}
+
+Проверь и подтверди вручную!
+`.trim()
+
+      let threadId: number | undefined
+      try {
+        const topic = await ctx.api.createForumTopic(
+          ADMIN_GROUP_ID,
+          `Новое пожертвование — ${username}`
+        )
+        threadId = topic.message_thread_id
+      } catch (err) {
+        console.error('Ошибка создания темы:', err)
+      }
+
+      try {
+        const kb = new InlineKeyboard()
+          .text('✅ Принять', packCb({ a: 'accept' }))
+          .text('❌ Отклонить', packCb({ a: 'reject' }))
+          .row()
+          .url('Написать юзеру', `tg://user?id=${userId}`)
+        if (ctx.message.photo) {
+          const photo = ctx.message.photo.at(-1)!
+          await ctx.api.sendPhoto(ADMIN_GROUP_ID, photo.file_id, {
+            caption: adminText,
+            parse_mode: 'Markdown',
+            message_thread_id: threadId,
+            reply_markup: kb,
+          })
+        } else if (ctx.message.document) {
+          await ctx.api.sendDocument(ADMIN_GROUP_ID, ctx.message.document.file_id, {
+            caption: adminText,
+            parse_mode: 'Markdown',
+            message_thread_id: threadId,
+            reply_markup: kb,
+          })
+        }
+
+        await ctx.reply(
+          '✅ Подтверждение перевода отправлено администратору!\nОжидайте проверки.\nЧтобы вернуться в главное меню, нажмите /main',
+          {
+            parse_mode: 'Markdown',
+          }
+        )
+      } catch (err) {
+        console.error('Ошибка отправки подтверждения перевода:', err)
+        await ctx.reply('❌ Не удалось отправить подтверждение перевода.')
+      }
+
       return
     }
 
-    // Если не чек — проверяем поддержку
+    // Если это не подтверждение перевода — проверяем поддержку
     if (ctx.session.inSupportMode) {
       let threadId = ctx.session.supportThreadId
       if (!threadId) {
@@ -949,9 +1130,11 @@ export function registerHandlers(bot: Bot<MyContext>) {
       volunteerId: volunteerTelegramId,
     }
 
-    await ctx.reply(`✅ Волонтёр выбран: ${volunteer.fio || 'Без имени'}\n\nПереходим к оплате...`)
+    await ctx.reply(
+      `✅ Волонтёр выбран: ${volunteer.fio || 'Без имени'}\n\nПереходим к добровольному пожертвованию...`
+    )
 
-    // 👉 переход в оплату
+    // Переход к добровольному пожертвованию
     goTo(ctx.from.id, 'payment')
     await renderScreen(ctx, ctx.from.id, 'payment', undefined, { forceNew: true })
   })

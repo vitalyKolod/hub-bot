@@ -9,6 +9,7 @@ import type { ScreenView } from '../core/render.js'
 export function SundayScreensScreen(userId: number, teamId: string): ScreenView {
   const kb = new InlineKeyboard()
 
+
   kb.text(
     'ОПЛАТИТЬ СРАЗУ',
     packCb({
@@ -16,8 +17,15 @@ export function SundayScreensScreen(userId: number, teamId: string): ScreenView 
       p: `sunday_screens:${teamId}`,
     })
   )
+
+  kb.text('Чаво по продукту', packCb({ a: 'open', s: 'faq_sunday_screens' }))
+    .icon('5436113877181941026')
+    .row()
+  kb.text('Поддержать проект', packCb({ a: 'pay_product', p: 'sunday_screens' }))
+
     .icon('5318912792428814144')
     .row()
+
 
   kb.text(
     '🛒 В КОРЗИНУ',
@@ -40,15 +48,11 @@ export function SundayScreensScreen(userId: number, teamId: string): ScreenView 
 
   kb.text('◀️ НАЗАД', packCb({ a: 'back' }))
 
-  // ============================================================
-  // ТЕКСТ
-  // ============================================================
+
 
   let message = new FormattedString('')
 
-  // ============================================================
-  // ЗАГОЛОВОК
-  // ============================================================
+  
 
   message = message
     .emoji('☀️', '5291749654017381020')
@@ -56,9 +60,7 @@ export function SundayScreensScreen(userId: number, teamId: string): ScreenView 
     .bold('SUNDAY SCREENS')
     .plain('\n\n')
 
-  // ============================================================
-  // ОПИСАНИЕ
-  // ============================================================
+
 
   message = message
     .plain(
@@ -66,9 +68,22 @@ export function SundayScreensScreen(userId: number, teamId: string): ScreenView 
     )
     .plain('\n\n')
 
-  // ============================================================
-  // ПРЕИМУЩЕСТВА
-  // ============================================================
+  return {
+    photo: './public/propresenter.png',
+    caption:
+      `*Sunday Screens*\n\n` +
+      `Sunday Screens — профессиональная платформа с визуальными фонами, анимациями и графикой для экранов во время богослужений и презентаций в церквях.\n\n` +
+      `*Основные возможности:*\n` +
+      `• Красивые движущиеся фоны и анимированные слайды\n` +
+      `• Готовые шаблоны для песен, проповедей и объявлений\n` +
+      `• Поддержка различных экранов и программ проекции\n` +
+      `• Доступ к библиотеке HD/4K контента без ограничений\n\n` +
+      `Рекомендуемое пожертвование: *2000 руб.* (или эквивалент в USDT по курсу).\n` +
+      `Доступ через наш приватный поток — без ограничений и блокировок.\n\n` +
+      `Выберите действие ниже:`,
+
+
+
 
   let benefits = new FormattedString('')
 
@@ -87,21 +102,15 @@ export function SundayScreensScreen(userId: number, teamId: string): ScreenView 
 
   message = message.blockquote(benefits, true).plain('\n\n')
 
-  // ============================================================
-  // СТОИМОСТЬ
-  // ============================================================
+
 
   message = message.plain('💰 ').bold('Стоимость: 2000 ₽/год').plain('\n\n')
 
-  // ============================================================
-  // ДОСТУП
-  // ============================================================
+  
 
   message = message.plain('Доступ через приватный поток — без ограничений и блокировок.')
 
-  // ============================================================
-  // RETURN
-  // ============================================================
+
 
   return {
     photo: './public/propres.jpg',

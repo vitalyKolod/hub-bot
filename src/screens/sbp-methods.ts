@@ -85,8 +85,16 @@ export function sbpMethodsScreen(userId: number, ctx: any): ScreenView {
   return {
     photo: './public/methods-rub.jpg',
 
+
     caption: message.caption,
     caption_entities: message.caption_entities,
+
+
+    caption:
+      `*💸 Добровольное пожертвование через СБП*\n\n` +
+      `Выберите удобный банк для перевода:\n\n` +
+      `Перевод по номеру телефона\n` +
+      `Средства зачисляются моментально.`,
 
     keyboard: kb,
   }
