@@ -27,8 +27,20 @@ const userSchema = new mongoose.Schema(
       enum: ['fio', 'city', 'church', 'confirm_registration'],
       default: 'fio',
     },
+    inputMode: {
+      type: String,
+      default: null,
+    },
+    inputData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
 
     editingField: {
+      type: String,
+      default: null,
+    },
+    pendingInviteCode: {
       type: String,
       default: null,
     },

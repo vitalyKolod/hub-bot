@@ -1,63 +1,47 @@
-// src/screens/payment.ts
 import { InlineKeyboard } from 'grammy'
 import { packCb } from '../core/callback.js'
-
+import { getProduct } from '../config/products.js'
+import { getOrCreateCart, getPendingItems, getCartTotal } from '../services/cart.service.js'
 import type { ScreenView } from '../core/render.js'
 
-// Цены по продуктам (можно вынести в отдельный файл потом)
-export const PRODUCT_PRICES = {
-  propresenter: 2000,
-  content_screens: 1000,
-  other: null, // по договорённости
-  volunteer: 250,
-} as const
+export async function paymentScreen(userId: number, params: any, ctx: any): Promise<ScreenView> {
+  const payment = ctx?.session?.payment
+  const product = payment?.product || 'unknown'
+  const teamId = payment?.teamId
+  const isExtension = payment?.isExtension
 
-export function paymentScreen(userId: number, params: any, ctx: any): ScreenView {
-  // Читаем продукт из сессии
-  const session = ctx.session
-  const product = session?.payment?.product || 'unknown'
+  let productName = 'подписка'
+  let amount: number | null = null
 
-  // Название продукта для текста
-  const productNames = {
-    propresenter: 'ProPresenter',
-    content_screens: 'Контент для экранов',
-    sunday_screens: 'Sunday Screens',
-    other: 'ДРУГОЕ',
-    volunteer: 'Добавление волонтёра',
+  if (product === 'cart' && teamId) {
+    const cart = await getOrCreateCart(teamId)
+    const items = getPendingItems(cart)
+    productName =
+      items.map((i: any) => getProduct(i.product)?.name || i.product).join(', ') || 'корзина'
+    amount = getCartTotal(cart)
+  } else {
+    const productConfig = getProduct(product)
+    productName = productConfig?.name || 'подписка'
+    amount = productConfig?.price ?? null
   }
 
-  const productName = productNames[product] || 'подписка'
-  const isExtension = session?.payment?.isExtension
-
-  let extraInfo = ''
-
   let extensionInfo = ''
-
   if (isExtension) {
     extensionInfo =
       '\n\n🔄 *Продление подписки*\n' +
       '• К текущему сроку добавится +1 год\n' +
-      '• Все оставшиеся дни сохранятся\n' +
-      '• Доступ у волонтёров также продлится\n'
+      '• Все оставшиеся дни сохранятся\n'
   }
 
-  if (product === 'volunteer' && ctx.session.payment?.volunteerId) {
-    extraInfo = `\n👤 Волонтёр ID: ${ctx.session.payment.volunteerId}`
-  }
-
-  // Цена
-  const price = PRODUCT_PRICES[product]
-  const priceText = price ? `Стоимость: *${price} ₽/год*` : 'Стоимость: по договорённости с админом'
+  const priceText = amount
+    ? `Стоимость: *${amount} ₽/год*`
+    : 'Стоимость: по договорённости с админом'
 
   const kb = new InlineKeyboard()
 
   kb.text('Рубли', packCb({ a: 'open', s: 'rub_methods' })).icon('5213291343232645210')
   kb.text('Крипта (usdt)', packCb({ a: 'open', s: 'crypto_method' }))
     .icon('5460978422111021593')
-    .row()
-  kb.row()
-  kb.text('Подробности об оплате', packCb({ a: 'open', s: 'payment_details', p: { page: 1 } }))
-    .icon('5787544344906959608')
     .row()
   kb.row()
   kb.text('◀️ Назад', packCb({ a: 'back' }))
@@ -68,14 +52,8 @@ export function paymentScreen(userId: number, params: any, ctx: any): ScreenView
     photo: './public/payment.png',
     caption:
       `*${isExtension ? 'ПРОДЛЕНИЕ' : 'ОПЛАТА'} — ${productName.toUpperCase()}*\n\n` +
-      `Вы выбрали: ${productName}${extraInfo}\n` +
-      `${priceText}\n` +
-      `${extensionInfo}\n` +
-      `Вы можете оплатить:\n` +
-      `• Рублёвый перевод\n` +
-      `• Криптовалютный перевод в USDT (предпочтительнее)\n\n` +
+      `${priceText}\n${extensionInfo}\n` +
       `Выберите способ ниже:`,
-
     keyboard: kb,
   }
 }
