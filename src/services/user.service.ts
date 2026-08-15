@@ -59,3 +59,27 @@ export async function activateOrExtendContentSubscription(userId: number) {
 
   return { type: 'extended', expiresAt: newExpire }
 }
+
+export async function setInputMode(telegramId: number, inputMode: string, inputData?: any) {
+  return UserModel.updateOne(
+    { telegramId },
+    {
+      $set: {
+        inputMode,
+        inputData: inputData ?? null,
+      },
+    }
+  )
+}
+
+export async function clearInputMode(telegramId: number) {
+  return UserModel.updateOne(
+    { telegramId },
+    {
+      $set: {
+        inputMode: null,
+        inputData: null,
+      },
+    }
+  )
+}

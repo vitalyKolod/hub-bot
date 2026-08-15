@@ -71,11 +71,11 @@ export function getOnboardingKeyboard(step: OnboardingStep): InlineKeyboard {
       break
 
     case 2:
-      kb.text('✅ СОГЛАСИТЬСЯ', 'ui:onb:3').style('success')
+      kb.text('СОГЛАСИТЬСЯ', 'ui:onb:3').style('success').icon('5237794483843655211')
       break
 
     case 3:
-      kb.text('🚀 ЗАРЕГИСТРИРОВАТЬСЯ', 'ui:onb:confirm').style('success')
+      kb.text('ЗАРЕГИСТРИРОВАТЬСЯ', 'ui:onb:confirm').style('success').icon('5188481279963715781')
       break
   }
 

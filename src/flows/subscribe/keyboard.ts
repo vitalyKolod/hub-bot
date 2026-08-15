@@ -6,5 +6,6 @@ export function subscribeKeyboard() {
   return new InlineKeyboard()
     .url('📢 Подписаться', CHANNEL_URL)
     .row()
-    .text('✅ Я подписался', 'subscribe:check')
+    .text('Я подписался', 'subscribe:check')
+    .icon('5237794483843655211')
 }

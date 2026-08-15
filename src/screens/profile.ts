@@ -105,8 +105,7 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
       lines.push(`
 *Роль: Волонтёр*`)
 
-      lines.push(`
-*Владелец*:
+      lines.push(`*Владелец*:
 • ${owner?.fio || 'Не найден'}
 • Username: ${owner?.username ? '@' + escapeUnderscore(owner.username) : '-'}
 • ID: ${user.volunteer?.ownerId || '-'}`)

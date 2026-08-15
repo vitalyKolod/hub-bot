@@ -1,0 +1,3433 @@
+[
+  {
+    "_id": "6a7d95eea14b45494fcf36a1",
+    "name": "Церковь Божья",
+    "ownerId": 641626047,
+    "members": [
+      {
+        "telegramId": 641626047,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 477857537,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-25T14:35:37.127Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-01-30T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 10,
+          "email": "ten10potok@gmail.com",
+          "password": "T10potok!",
+          "chatLink": "https://t.me/+7GBpPvSI9O4zMDk6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.398Z",
+    "updatedAt": "2026-08-13T10:01:18.413Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36a2",
+    "name": "FourEvery-Церковь для каждого",
+    "ownerId": 818301762,
+    "members": [
+      {
+        "telegramId": 818301762,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 324377605,
+        "role": "member",
+        "status": "active"
+      },
+      {
+        "telegramId": 339476369,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-04-26T00:00:00.000Z",
+        "meta": {
+          "extraUsers": 2
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-05-12T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 6,
+          "email": "ucpfpropres6@gmail.com",
+          "password": "hCoMmUnity@6pP!)",
+          "chatLink": "https://t.me/+O8tOxhUHBwM0N2M6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.422Z",
+    "updatedAt": "2026-08-13T10:01:18.429Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36a3",
+    "name": "Ковчег",
+    "ownerId": 6733974282,
+    "members": [
+      {
+        "telegramId": 6733974282,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 7990965730,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-10-20T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 14,
+          "email": "ucppropres14@gmail.com",
+          "password": "pp-Ucp@14!",
+          "chatLink": "https://t.me/+Y2eDnbZbMoMxOGUy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.434Z",
+    "updatedAt": "2026-08-13T10:01:18.442Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36a4",
+    "name": "Ковчег",
+    "ownerId": 7990965730,
+    "members": [
+      {
+        "telegramId": 7990965730,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.447Z",
+    "updatedAt": "2026-08-13T10:01:18.449Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36a5",
+    "name": "Церковь Божия г. Калининград",
+    "ownerId": 477857537,
+    "members": [
+      {
+        "telegramId": 477857537,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-25T14:35:37.127Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.456Z",
+    "updatedAt": "2026-08-13T10:01:18.458Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36a6",
+    "name": "FourEvery-Церковь для каждого",
+    "ownerId": 324377605,
+    "members": [
+      {
+        "telegramId": 324377605,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2028-04-26T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "pending",
+        "expiresAt": null,
+        "meta": {
+          "flowNumber": 6,
+          "email": null,
+          "password": null,
+          "chatLink": "https://t.me/+O8tOxhUHBwM0N2M6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.462Z",
+    "updatedAt": "2026-08-13T10:01:18.467Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36a7",
+    "name": "Вифания",
+    "ownerId": 946678799,
+    "members": [
+      {
+        "telegramId": 946678799,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 1230343713,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-04-25T16:07:05.056Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-07-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 7,
+          "email": "7potokpp@gmail.com",
+          "password": "2g528HyucuXCK4N@",
+          "chatLink": "https://t.me/+uEVDe5PtWCphMzEy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.474Z",
+    "updatedAt": "2026-08-13T10:01:18.478Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36a8",
+    "name": "Вифания Краснодар",
+    "ownerId": 1230343713,
+    "members": [
+      {
+        "telegramId": 1230343713,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-25T16:07:05.056Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.483Z",
+    "updatedAt": "2026-08-13T10:01:18.485Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36a9",
+    "name": "Церковь Евангелие Христа",
+    "ownerId": 8017133642,
+    "members": [
+      {
+        "telegramId": 8017133642,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 355522953,
+        "role": "member",
+        "status": "active"
+      },
+      {
+        "telegramId": 554957407,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-04-05T00:00:00.000Z",
+        "meta": {
+          "extraUsers": 3
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-07-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 7,
+          "email": "7potokpp@gmail.com",
+          "password": "2g528HyucuXCK4N@",
+          "chatLink": "https://t.me/+uEVDe5PtWCphMzEy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.491Z",
+    "updatedAt": "2026-08-13T10:01:18.496Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36aa",
+    "name": "Жатва Любинский",
+    "ownerId": 2067453976,
+    "members": [
+      {
+        "telegramId": 2067453976,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-04-24T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-05-12T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 6,
+          "email": "ucpfpropres6@gmail.com",
+          "password": "hCoMmUnity@6pP!)",
+          "chatLink": "https://t.me/+O8tOxhUHBwM0N2M6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.499Z",
+    "updatedAt": "2026-08-13T10:01:18.506Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ab",
+    "name": "Примирение",
+    "ownerId": 443507591,
+    "members": [
+      {
+        "telegramId": 443507591,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.509Z",
+    "updatedAt": "2026-08-13T10:01:18.511Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ac",
+    "name": "Жизнь",
+    "ownerId": 5638171910,
+    "members": [
+      {
+        "telegramId": 5638171910,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "propresenter": {
+        "status": "pending",
+        "expiresAt": null,
+        "meta": {
+          "flowNumber": 13,
+          "email": null,
+          "password": null,
+          "chatLink": "https://t.me/+5bURbAX8mMk5Yzgy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.515Z",
+    "updatedAt": "2026-08-13T10:01:18.518Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ad",
+    "name": "Вифания Москва",
+    "ownerId": 1664645284,
+    "members": [
+      {
+        "telegramId": 1664645284,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 7277942410,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-03-19T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 11,
+          "email": "propres2025@gmail.com",
+          "password": "Rty54cd81@12",
+          "chatLink": "https://t.me/+bbJPSNwulkM2ZjA6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.524Z",
+    "updatedAt": "2026-08-13T10:01:18.528Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ae",
+    "name": "Вифания Москва",
+    "ownerId": 7277942410,
+    "members": [
+      {
+        "telegramId": 7277942410,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.531Z",
+    "updatedAt": "2026-08-13T10:01:18.533Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36af",
+    "name": "Слово Веры",
+    "ownerId": 5189264064,
+    "members": [
+      {
+        "telegramId": 5189264064,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 6974032032,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2300-12-31T00:00:00.000Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-10-20T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 14,
+          "email": "ucppropres14@gmail.com",
+          "password": "pp-Ucp@14!",
+          "chatLink": "https://t.me/+Y2eDnbZbMoMxOGUy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.539Z",
+    "updatedAt": "2026-08-13T10:01:18.543Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36b0",
+    "name": "Дом молитвы",
+    "ownerId": 5234947353,
+    "members": [
+      {
+        "telegramId": 5234947353,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-10T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.546Z",
+    "updatedAt": "2026-08-13T10:01:18.548Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36b1",
+    "name": "Дерево Жизни",
+    "ownerId": 493801355,
+    "members": [
+      {
+        "telegramId": 493801355,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "pending",
+        "expiresAt": "2027-03-31T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "pending",
+        "expiresAt": null,
+        "meta": {
+          "flowNumber": 1,
+          "email": null,
+          "password": null,
+          "chatLink": "https://t.me/timsanxyz"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.551Z",
+    "updatedAt": "2026-08-13T10:01:18.557Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36b2",
+    "name": "Надежда",
+    "ownerId": 582117336,
+    "members": [
+      {
+        "telegramId": 582117336,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-24T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.561Z",
+    "updatedAt": "2026-08-13T10:01:18.562Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36b3",
+    "name": "Церковь Божия в Царицыно",
+    "ownerId": 707825108,
+    "members": [
+      {
+        "telegramId": 707825108,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.565Z",
+    "updatedAt": "2026-08-13T10:01:18.566Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36b4",
+    "name": "Слово жизни",
+    "ownerId": 5168645448,
+    "members": [
+      {
+        "telegramId": 5168645448,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.573Z",
+    "updatedAt": "2026-08-13T10:01:18.574Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36b5",
+    "name": "Церковь Евангелие Христа",
+    "ownerId": 355522953,
+    "members": [
+      {
+        "telegramId": 355522953,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.578Z",
+    "updatedAt": "2026-08-13T10:01:18.580Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36b6",
+    "name": "Евангелие Христа",
+    "ownerId": 554957407,
+    "members": [
+      {
+        "telegramId": 554957407,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.582Z",
+    "updatedAt": "2026-08-13T10:01:18.583Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36b7",
+    "name": "Святая Троица",
+    "ownerId": 5885333290,
+    "members": [
+      {
+        "telegramId": 5885333290,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2029-06-22T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-10-18T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 8,
+          "email": "streameight08@gmail.com",
+          "password": "Community#08PP",
+          "chatLink": "https://t.me/+7oBVPwFg0IkyZTgy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.590Z",
+    "updatedAt": "2026-08-13T10:01:18.593Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36b8",
+    "name": "Красноярская библейская церковь",
+    "ownerId": 344052535,
+    "members": [
+      {
+        "telegramId": 344052535,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-12-20T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 15,
+          "email": "ucpfpropres15@yahoo.com",
+          "password": "Community#15PP!",
+          "chatLink": "https://t.me/+j87u3w2-1_xjYTdi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.597Z",
+    "updatedAt": "2026-08-13T10:01:18.600Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36b9",
+    "name": "Дом Божий",
+    "ownerId": 2110722496,
+    "members": [
+      {
+        "telegramId": 2110722496,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "pending",
+        "expiresAt": "2027-06-28T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "pending",
+        "expiresAt": null,
+        "meta": {
+          "flowNumber": 17,
+          "email": null,
+          "password": null,
+          "chatLink": "https://t.me/+GsSgWVx6I_ExN2Fi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.607Z",
+    "updatedAt": "2026-08-13T10:01:18.610Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ba",
+    "name": "ХВЕ г. Иваново",
+    "ownerId": 384937875,
+    "members": [
+      {
+        "telegramId": 384937875,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-04-22T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 18,
+          "email": "ucpfpropres18@yahoo.com",
+          "password": "HcoMmUnity@18PP!",
+          "chatLink": "https://t.me/+GsSgWVx6I_ExN2Fi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.613Z",
+    "updatedAt": "2026-08-13T10:01:18.616Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36bb",
+    "name": "Спасение",
+    "ownerId": 1364109602,
+    "members": [
+      {
+        "telegramId": 1364109602,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 7985658733,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2026-08-27T21:00:00.000Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-01-30T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 10,
+          "email": "ten10potok@gmail.com",
+          "password": "T10potok!",
+          "chatLink": "https://t.me/+7GBpPvSI9O4zMDk6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.622Z",
+    "updatedAt": "2026-08-13T10:01:18.626Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36bc",
+    "name": "Спасение",
+    "ownerId": 7985658733,
+    "members": [
+      {
+        "telegramId": 7985658733,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2026-08-27T21:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.629Z",
+    "updatedAt": "2026-08-13T10:01:18.631Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36bd",
+    "name": "«Церковь Святой Троицы»",
+    "ownerId": 620176092,
+    "members": [
+      {
+        "telegramId": 620176092,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-12T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-05-12T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 6,
+          "email": "ucpfpropres6@gmail.com",
+          "password": "hCoMmUnity@6pP!)",
+          "chatLink": "https://t.me/+O8tOxhUHBwM0N2M6"
+        }
+      },
+      "sunday_screens": {
+        "status": "active",
+        "expiresAt": null
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.634Z",
+    "updatedAt": "2026-08-13T10:01:18.640Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36be",
+    "name": "ЦХМ",
+    "ownerId": 1414824689,
+    "members": [
+      {
+        "telegramId": 1414824689,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-02-06T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-02-06T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 16,
+          "email": "ucpfpropres16@yahoo.com",
+          "password": "commUnity@16PP",
+          "chatLink": "https://t.me/+6Q-Os2Fbok5mOTli"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.643Z",
+    "updatedAt": "2026-08-13T10:01:18.646Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36bf",
+    "name": "ЕХБ \"Возрождение\"",
+    "ownerId": 719487443,
+    "members": [
+      {
+        "telegramId": 719487443,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2026-04-22T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.649Z",
+    "updatedAt": "2026-08-13T10:01:18.651Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36c0",
+    "name": "ц. Благодать",
+    "ownerId": 322595406,
+    "members": [
+      {
+        "telegramId": 322595406,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.657Z",
+    "updatedAt": "2026-08-13T10:01:18.659Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36c1",
+    "name": "Тушинская Евангельская Церковь",
+    "ownerId": 213984392,
+    "members": [
+      {
+        "telegramId": 213984392,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "propresenter": {
+        "status": "pending",
+        "expiresAt": null,
+        "meta": {
+          "flowNumber": 14,
+          "email": null,
+          "password": null,
+          "chatLink": "https://t.me/+Y2eDnbZbMoMxOGUy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.662Z",
+    "updatedAt": "2026-08-13T10:01:18.665Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36c2",
+    "name": "Коннект",
+    "ownerId": 830796471,
+    "members": [
+      {
+        "telegramId": 830796471,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-04T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-02-06T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 16,
+          "email": "ucpfpropres16@yahoo.com",
+          "password": "commUnity@16PP",
+          "chatLink": "https://t.me/+6Q-Os2Fbok5mOTli"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.669Z",
+    "updatedAt": "2026-08-13T10:01:18.675Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36c3",
+    "name": "Церковь Иисуса Христа",
+    "ownerId": 611090557,
+    "members": [
+      {
+        "telegramId": 611090557,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-12-17T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 9,
+          "email": "009potok@gmail.com",
+          "password": "MaV-3NV-3kJ-e3x",
+          "chatLink": "https://t.me/+I5n0O7OhBMYzNWVi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.679Z",
+    "updatedAt": "2026-08-13T10:01:18.682Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36c4",
+    "name": "Третья Ангарская Церковь ЕХБ",
+    "ownerId": 254629034,
+    "members": [
+      {
+        "telegramId": 254629034,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-06-05T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 12,
+          "email": "unitedchurchproductiontwelve@gmail.com",
+          "password": "Trali-Vali-12@",
+          "chatLink": "https://t.me/+_iu0sfLyi4IwNmE6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.686Z",
+    "updatedAt": "2026-08-13T10:01:18.695Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36c5",
+    "name": "Дом Евангелия",
+    "ownerId": 895138385,
+    "members": [
+      {
+        "telegramId": 895138385,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-06-02T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 3,
+          "email": "proprezentortretijpotok@gmail.com",
+          "password": "Tili-Tili-@3",
+          "chatLink": "https://t.me/+DVxjxFjqTlsyZTRi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.699Z",
+    "updatedAt": "2026-08-13T10:01:18.703Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36c6",
+    "name": "Завет",
+    "ownerId": 6974032032,
+    "members": [
+      {
+        "telegramId": 6974032032,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2300-12-31T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.710Z",
+    "updatedAt": "2026-08-13T10:01:18.712Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36c7",
+    "name": "Дом любви и надежды",
+    "ownerId": 637279743,
+    "members": [
+      {
+        "telegramId": 637279743,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-26T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-04-22T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 18,
+          "email": "ucpfpropres18@yahoo.com",
+          "password": "HcoMmUnity@18PP!",
+          "chatLink": "https://t.me/+GsSgWVx6I_ExN2Fi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.714Z",
+    "updatedAt": "2026-08-13T10:01:18.717Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36c8",
+    "name": "Лучезарная",
+    "ownerId": 196012263,
+    "members": [
+      {
+        "telegramId": 196012263,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-04-01T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-07-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 7,
+          "email": "7potokpp@gmail.com",
+          "password": "2g528HyucuXCK4N@",
+          "chatLink": "https://t.me/+uEVDe5PtWCphMzEy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.719Z",
+    "updatedAt": "2026-08-13T10:01:18.725Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36c9",
+    "name": "Преображение",
+    "ownerId": 498876018,
+    "members": [
+      {
+        "telegramId": 498876018,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-03-07T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 17,
+          "email": "ucpfpropres17@yahoo.com",
+          "password": "coMmUnity@17PP!",
+          "chatLink": "https://t.me/+GsSgWVx6I_ExN2Fi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.727Z",
+    "updatedAt": "2026-08-13T10:01:18.730Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ca",
+    "name": "Церковь Жатвы",
+    "ownerId": 694403684,
+    "members": [
+      {
+        "telegramId": 694403684,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2026-05-01T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.732Z",
+    "updatedAt": "2026-08-13T10:01:18.733Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36cb",
+    "name": "Слово жизни",
+    "ownerId": 2088028158,
+    "members": [
+      {
+        "telegramId": 2088028158,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-06-01T18:41:45.442Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-04-22T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 18,
+          "email": "ucpfpropres18@yahoo.com",
+          "password": "HcoMmUnity@18PP!",
+          "chatLink": "https://t.me/+GsSgWVx6I_ExN2Fi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.736Z",
+    "updatedAt": "2026-08-13T10:01:18.741Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36cc",
+    "name": "ЕХБ Анапа",
+    "ownerId": 1150452334,
+    "members": [
+      {
+        "telegramId": 1150452334,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-07-16T12:48:31.071Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-12-20T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 15,
+          "email": "ucpfpropres15@yahoo.com",
+          "password": "Community#15PP!",
+          "chatLink": "https://t.me/+j87u3w2-1_xjYTdi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.744Z",
+    "updatedAt": "2026-08-13T10:01:18.746Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36cd",
+    "name": "\"Свет миру\"",
+    "ownerId": 5958776838,
+    "members": [
+      {
+        "telegramId": 5958776838,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-02-06T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 16,
+          "email": "ucpfpropres16@yahoo.com",
+          "password": "commUnity@16PP",
+          "chatLink": "https://t.me/+6Q-Os2Fbok5mOTli"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.749Z",
+    "updatedAt": "2026-08-13T10:01:18.751Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ce",
+    "name": "Дело Веры",
+    "ownerId": 8424419624,
+    "members": [
+      {
+        "telegramId": 8424419624,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-02T12:10:17.749Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-12-20T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 15,
+          "email": "ucpfpropres15@yahoo.com",
+          "password": "Community#15PP!",
+          "chatLink": "https://t.me/+j87u3w2-1_xjYTdi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.757Z",
+    "updatedAt": "2026-08-13T10:01:18.760Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36cf",
+    "name": "Вознесение",
+    "ownerId": 7454800019,
+    "members": [
+      {
+        "telegramId": 7454800019,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2028-06-02T10:39:38.532Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.763Z",
+    "updatedAt": "2026-08-13T10:01:18.764Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36d0",
+    "name": "Церковь Воскресшего Христа Спасителя",
+    "ownerId": 5298404823,
+    "members": [
+      {
+        "telegramId": 5298404823,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 6973360737,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-08T06:57:09.164Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-12-17T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 9,
+          "email": "009potok@gmail.com",
+          "password": "MaV-3NV-3kJ-e3x",
+          "chatLink": "https://t.me/+I5n0O7OhBMYzNWVi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.766Z",
+    "updatedAt": "2026-08-13T10:01:18.769Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36d1",
+    "name": "Церковь Воскресшего Христа Спасителя",
+    "ownerId": 313021403,
+    "members": [
+      {
+        "telegramId": 313021403,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "pending",
+        "expiresAt": "2026-05-16T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "pending",
+        "expiresAt": null,
+        "meta": {
+          "flowNumber": 9,
+          "email": null,
+          "password": null,
+          "chatLink": "https://t.me/+I5n0O7OhBMYzNWVi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.775Z",
+    "updatedAt": "2026-08-13T10:01:18.779Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36d2",
+    "name": "Сызранский Христианский Центр",
+    "ownerId": 56885879,
+    "members": [
+      {
+        "telegramId": 56885879,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-05-03T08:52:55.696Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-07-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 7,
+          "email": "7potokpp@gmail.com",
+          "password": "2g528HyucuXCK4N@",
+          "chatLink": "https://t.me/+uEVDe5PtWCphMzEy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.781Z",
+    "updatedAt": "2026-08-13T10:01:18.784Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36d3",
+    "name": "Церковь Воскресшего Христа Спасителя",
+    "ownerId": 6973360737,
+    "members": [
+      {
+        "telegramId": 6973360737,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-08T06:57:09.164Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.787Z",
+    "updatedAt": "2026-08-13T10:01:18.791Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36d4",
+    "name": "схц",
+    "ownerId": 479037362,
+    "members": [
+      {
+        "telegramId": 479037362,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-03T10:27:39.247Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-12-17T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 9,
+          "email": "009potok@gmail.com",
+          "password": "MaV-3NV-3kJ-e3x",
+          "chatLink": "https://t.me/+I5n0O7OhBMYzNWVi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.793Z",
+    "updatedAt": "2026-08-13T10:01:18.796Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36d5",
+    "name": "ХЕХПЦ(синяя крыша)",
+    "ownerId": 1274160945,
+    "members": [
+      {
+        "telegramId": 1274160945,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-04T20:51:31.185Z"
+      },
+      "propresenter": {
+        "status": "pending",
+        "expiresAt": null,
+        "meta": {
+          "flowNumber": 8,
+          "email": null,
+          "password": null,
+          "chatLink": "https://t.me/+7oBVPwFg0IkyZTgy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.798Z",
+    "updatedAt": "2026-08-13T10:01:18.800Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36d6",
+    "name": "ХЕХПЦ",
+    "ownerId": 953364429,
+    "members": [
+      {
+        "telegramId": 953364429,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 1274160945,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-04T20:51:31.185Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-10-18T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 8,
+          "email": "streameight08@gmail.com",
+          "password": "Community#08PP",
+          "chatLink": "https://t.me/+7oBVPwFg0IkyZTgy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.802Z",
+    "updatedAt": "2026-08-13T10:01:18.808Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36d7",
+    "name": "Heavenlike",
+    "ownerId": 339476369,
+    "members": [
+      {
+        "telegramId": 339476369,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-26T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "pending",
+        "expiresAt": null,
+        "meta": {
+          "flowNumber": 6,
+          "email": null,
+          "password": null,
+          "chatLink": "https://t.me/+O8tOxhUHBwM0N2M6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.810Z",
+    "updatedAt": "2026-08-13T10:01:18.813Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36d8",
+    "name": "Church4u",
+    "ownerId": 897513930,
+    "members": [
+      {
+        "telegramId": 897513930,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 591883337,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-05-12T00:00:00.000Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-05-24T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 2,
+          "email": "ucpfpropres02@gmail.com",
+          "password": "pE3-mNV-fuh-UJ5",
+          "chatLink": "https://t.me/+8y-tubmWKqY2YTky"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.815Z",
+    "updatedAt": "2026-08-13T10:01:18.818Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36d9",
+    "name": "Жатва Веры",
+    "ownerId": 361724654,
+    "members": [
+      {
+        "telegramId": 361724654,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-13T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-03-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 1,
+          "email": "timsanxyz@mail.ru",
+          "password": "Уточните (нажмите на чат потока)",
+          "chatLink": "https://t.me/timsanxyz"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.824Z",
+    "updatedAt": "2026-08-13T10:01:18.826Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36da",
+    "name": "НТЦХВЕ",
+    "ownerId": 968952237,
+    "members": [
+      {
+        "telegramId": 968952237,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 1456456507,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-12T17:10:17.913Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-05-12T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 6,
+          "email": "ucpfpropres6@gmail.com",
+          "password": "hCoMmUnity@6pP!)",
+          "chatLink": "https://t.me/+O8tOxhUHBwM0N2M6"
+        }
+      },
+      "sunday_screens": {
+        "status": "active",
+        "expiresAt": null
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.829Z",
+    "updatedAt": "2026-08-13T10:01:18.833Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36db",
+    "name": "ХВЕ",
+    "ownerId": 591883337,
+    "members": [
+      {
+        "telegramId": 591883337,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-12T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.836Z",
+    "updatedAt": "2026-08-13T10:01:18.841Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36dc",
+    "name": "Вефиль",
+    "ownerId": 968843222,
+    "members": [
+      {
+        "telegramId": 968843222,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": null
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-05-24T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 2,
+          "email": "ucpfpropres02@gmail.com",
+          "password": "pE3-mNV-fuh-UJ5",
+          "chatLink": "https://t.me/+8y-tubmWKqY2YTky"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.844Z",
+    "updatedAt": "2026-08-13T10:01:18.848Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36dd",
+    "name": "Филадельфия",
+    "ownerId": 752561588,
+    "members": [
+      {
+        "telegramId": 752561588,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-06-30T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-05-24T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 2,
+          "email": "ucpfpropres02@gmail.com",
+          "password": "pE3-mNV-fuh-UJ5",
+          "chatLink": "https://t.me/+8y-tubmWKqY2YTky"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.851Z",
+    "updatedAt": "2026-08-13T10:01:18.858Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36de",
+    "name": "\"Благая Весть\"",
+    "ownerId": 1069680933,
+    "members": [
+      {
+        "telegramId": 1069680933,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-12T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-12-17T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 9,
+          "email": "009potok@gmail.com",
+          "password": "MaV-3NV-3kJ-e3x",
+          "chatLink": "https://t.me/+I5n0O7OhBMYzNWVi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.861Z",
+    "updatedAt": "2026-08-13T10:01:18.865Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36df",
+    "name": "Свет миру",
+    "ownerId": 262718948,
+    "members": [
+      {
+        "telegramId": 262718948,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-06-20T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-07-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 7,
+          "email": "7potokpp@gmail.com",
+          "password": "2g528HyucuXCK4N@",
+          "chatLink": "https://t.me/+uEVDe5PtWCphMzEy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.868Z",
+    "updatedAt": "2026-08-13T10:01:18.875Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36e0",
+    "name": "Братская христианская община (БХО)",
+    "ownerId": 647433532,
+    "members": [
+      {
+        "telegramId": 647433532,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 232315085,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-14T00:00:00.000Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-02-06T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 16,
+          "email": "ucpfpropres16@yahoo.com",
+          "password": "commUnity@16PP",
+          "chatLink": "https://t.me/+6Q-Os2Fbok5mOTli"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.880Z",
+    "updatedAt": "2026-08-13T10:01:18.884Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36e1",
+    "name": "Христиане Санкт-Петербурга",
+    "ownerId": 984817061,
+    "members": [
+      {
+        "telegramId": 984817061,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-08-14T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 13,
+          "email": "unitedchurchproduction13@gmail.com",
+          "password": "UCProPres13@",
+          "chatLink": "https://t.me/+5bURbAX8mMk5Yzgy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.890Z",
+    "updatedAt": "2026-08-13T10:01:18.894Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36e2",
+    "name": "Еммануил",
+    "ownerId": 5139184464,
+    "members": [
+      {
+        "telegramId": 5139184464,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 225394385,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-14T16:02:21.601Z",
+        "meta": {
+          "extraUsers": 1
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-10-18T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 8,
+          "email": "streameight08@gmail.com",
+          "password": "Community#08PP",
+          "chatLink": "https://t.me/+7oBVPwFg0IkyZTgy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.897Z",
+    "updatedAt": "2026-08-13T10:01:18.901Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36e3",
+    "name": "Новый завет",
+    "ownerId": 933675702,
+    "members": [
+      {
+        "telegramId": 933675702,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-07-11T13:05:21.159Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.907Z",
+    "updatedAt": "2026-08-13T10:01:18.908Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36e4",
+    "name": "Краеугольный камень",
+    "ownerId": 1574073026,
+    "members": [
+      {
+        "telegramId": 1574073026,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2026-12-12T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-07-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 7,
+          "email": "7potokpp@gmail.com",
+          "password": "2g528HyucuXCK4N@",
+          "chatLink": "https://t.me/+uEVDe5PtWCphMzEy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.910Z",
+    "updatedAt": "2026-08-13T10:01:18.913Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36e5",
+    "name": "Небесные врата",
+    "ownerId": 681329385,
+    "members": [
+      {
+        "telegramId": 681329385,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 1458146012,
+        "role": "member",
+        "status": "active"
+      },
+      {
+        "telegramId": 1022711668,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2027-06-05T00:00:00.000Z",
+        "meta": {
+          "extraUsers": 2
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-06-05T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 12,
+          "email": "unitedchurchproductiontwelve@gmail.com",
+          "password": "Trali-Vali-12@",
+          "chatLink": "https://t.me/+_iu0sfLyi4IwNmE6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.915Z",
+    "updatedAt": "2026-08-13T10:01:18.920Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36e6",
+    "name": "Добрая весть",
+    "ownerId": 7695205865,
+    "members": [
+      {
+        "telegramId": 7695205865,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-10-18T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 8,
+          "email": "streameight08@gmail.com",
+          "password": "Community#08PP",
+          "chatLink": "https://t.me/+7oBVPwFg0IkyZTgy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.925Z",
+    "updatedAt": "2026-08-13T10:01:18.929Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36e7",
+    "name": "Церковь Открытая Дверь",
+    "ownerId": 1743582283,
+    "members": [
+      {
+        "telegramId": 1743582283,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-10T17:00:33.075Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.931Z",
+    "updatedAt": "2026-08-13T10:01:18.933Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36e8",
+    "name": "ОХЦ \"ВОСКРЕСЕНИЕ\"",
+    "ownerId": 5610125208,
+    "members": [
+      {
+        "telegramId": 5610125208,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-10T19:04:46.914Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.935Z",
+    "updatedAt": "2026-08-13T10:01:18.936Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36e9",
+    "name": "НТЦХВЕ",
+    "ownerId": 1456456507,
+    "members": [
+      {
+        "telegramId": 1456456507,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-12T17:10:17.913Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.940Z",
+    "updatedAt": "2026-08-13T10:01:18.942Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ea",
+    "name": "Ответ в Иисусе",
+    "ownerId": 690596429,
+    "members": [
+      {
+        "telegramId": 690596429,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-12-20T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 15,
+          "email": "ucpfpropres15@yahoo.com",
+          "password": "Community#15PP!",
+          "chatLink": "https://t.me/+j87u3w2-1_xjYTdi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.944Z",
+    "updatedAt": "2026-08-13T10:01:18.948Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36eb",
+    "name": "Еммануил",
+    "ownerId": 225394385,
+    "members": [
+      {
+        "telegramId": 225394385,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-14T16:02:21.601Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.952Z",
+    "updatedAt": "2026-08-13T10:01:18.957Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ec",
+    "name": "Город Убежище",
+    "ownerId": 442516549,
+    "members": [
+      {
+        "telegramId": 442516549,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": null
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-07-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 7,
+          "email": "7potokpp@gmail.com",
+          "password": "2g528HyucuXCK4N@",
+          "chatLink": "https://t.me/+uEVDe5PtWCphMzEy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.960Z",
+    "updatedAt": "2026-08-13T10:01:18.962Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ed",
+    "name": "БХО",
+    "ownerId": 232315085,
+    "members": [
+      {
+        "telegramId": 232315085,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-14T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.965Z",
+    "updatedAt": "2026-08-13T10:01:18.966Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ee",
+    "name": "Верные в Малом",
+    "ownerId": 7738953250,
+    "members": [
+      {
+        "telegramId": 7738953250,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "propresenter": {
+        "status": "pending",
+        "expiresAt": null,
+        "meta": {
+          "flowNumber": 16,
+          "email": null,
+          "password": null,
+          "chatLink": "https://t.me/+6Q-Os2Fbok5mOTli"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.969Z",
+    "updatedAt": "2026-08-13T10:01:18.974Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36ef",
+    "name": "Церковь на Камне",
+    "ownerId": 444461997,
+    "members": [
+      {
+        "telegramId": 444461997,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-17T07:21:19.371Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-10-20T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 14,
+          "email": "ucppropres14@gmail.com",
+          "password": "pp-Ucp@14!",
+          "chatLink": "https://t.me/+Y2eDnbZbMoMxOGUy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.977Z",
+    "updatedAt": "2026-08-13T10:01:18.979Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36f0",
+    "name": "Церковь Кропоткина",
+    "ownerId": 1068164724,
+    "members": [
+      {
+        "telegramId": 1068164724,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2028-05-17T13:39:38.383Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-05-24T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 2,
+          "email": "ucpfpropres02@gmail.com",
+          "password": "pE3-mNV-fuh-UJ5",
+          "chatLink": "https://t.me/+8y-tubmWKqY2YTky"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.982Z",
+    "updatedAt": "2026-08-13T10:01:18.985Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36f1",
+    "name": "Свет Миру",
+    "ownerId": 1093405816,
+    "members": [
+      {
+        "telegramId": 1093405816,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2004-09-06T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-08-14T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 13,
+          "email": "unitedchurchproduction13@gmail.com",
+          "password": "UCProPres13@",
+          "chatLink": "https://t.me/+5bURbAX8mMk5Yzgy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.989Z",
+    "updatedAt": "2026-08-13T10:01:18.993Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95eea14b45494fcf36f2",
+    "name": "Благодать москва-центр",
+    "ownerId": 6536661372,
+    "members": [
+      {
+        "telegramId": 6536661372,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-06-17T04:55:29.196Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-06-05T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 12,
+          "email": "unitedchurchproductiontwelve@gmail.com",
+          "password": "Trali-Vali-12@",
+          "chatLink": "https://t.me/+_iu0sfLyi4IwNmE6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:18.997Z",
+    "updatedAt": "2026-08-13T10:01:19.000Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36f3",
+    "name": "Жатвы",
+    "ownerId": 218634055,
+    "members": [
+      {
+        "telegramId": 218634055,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2026-06-01T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-06-05T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 12,
+          "email": "unitedchurchproductiontwelve@gmail.com",
+          "password": "Trali-Vali-12@",
+          "chatLink": "https://t.me/+_iu0sfLyi4IwNmE6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.008Z",
+    "updatedAt": "2026-08-13T10:01:19.012Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36f4",
+    "name": "Небесные врата",
+    "ownerId": 1022711668,
+    "members": [
+      {
+        "telegramId": 1022711668,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-06-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.015Z",
+    "updatedAt": "2026-08-13T10:01:19.016Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36f5",
+    "name": "Благодать",
+    "ownerId": 804037616,
+    "members": [
+      {
+        "telegramId": 804037616,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.021Z",
+    "updatedAt": "2026-08-13T10:01:19.023Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36f6",
+    "name": "Небесные врата",
+    "ownerId": 1458146012,
+    "members": [
+      {
+        "telegramId": 1458146012,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-06-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.025Z",
+    "updatedAt": "2026-08-13T10:01:19.026Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36f7",
+    "name": "Дерево Жизни",
+    "ownerId": 1388852332,
+    "members": [
+      {
+        "telegramId": 1388852332,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-03-31T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-03-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 1,
+          "email": "timsanxyz@mail.ru",
+          "password": "Уточните (нажмите на чат потока)",
+          "chatLink": "https://t.me/timsanxyz"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.029Z",
+    "updatedAt": "2026-08-13T10:01:19.031Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36f8",
+    "name": "\"Исход\"",
+    "ownerId": 6878996978,
+    "members": [
+      {
+        "telegramId": 6878996978,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2028-05-27T11:19:24.017Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.037Z",
+    "updatedAt": "2026-08-13T10:01:19.039Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36f9",
+    "name": "Преображение",
+    "ownerId": 1782252318,
+    "members": [
+      {
+        "telegramId": 1782252318,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2026-05-31T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-06-05T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 12,
+          "email": "unitedchurchproductiontwelve@gmail.com",
+          "password": "Trali-Vali-12@",
+          "chatLink": "https://t.me/+_iu0sfLyi4IwNmE6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.042Z",
+    "updatedAt": "2026-08-13T10:01:19.045Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36fa",
+    "name": "Церковь прославления",
+    "ownerId": 267516149,
+    "members": [
+      {
+        "telegramId": 267516149,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "pending",
+        "expiresAt": "2026-05-27T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.048Z",
+    "updatedAt": "2026-08-13T10:01:19.050Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36fb",
+    "name": "Славы Божьей",
+    "ownerId": 266254704,
+    "members": [
+      {
+        "telegramId": 266254704,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-31T16:59:30.738Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.062Z",
+    "updatedAt": "2026-08-13T10:01:19.063Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36fc",
+    "name": "Церковь Вознесение (ул.Прямая 150)",
+    "ownerId": 1042221058,
+    "members": [
+      {
+        "telegramId": 1042221058,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2028-06-02T11:41:14.757Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.066Z",
+    "updatedAt": "2026-08-13T10:01:19.067Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36fd",
+    "name": "Дивный Спаситель",
+    "ownerId": 376153905,
+    "members": [
+      {
+        "telegramId": 376153905,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 1339725270,
+        "role": "member",
+        "status": "active"
+      },
+      {
+        "telegramId": 1179051730,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2029-06-04T09:00:07.706Z",
+        "meta": {
+          "extraUsers": 3
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-06-05T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 12,
+          "email": "unitedchurchproductiontwelve@gmail.com",
+          "password": "Trali-Vali-12@",
+          "chatLink": "https://t.me/+_iu0sfLyi4IwNmE6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.073Z",
+    "updatedAt": "2026-08-13T10:01:19.076Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36fe",
+    "name": "Слово жизни",
+    "ownerId": 251463877,
+    "members": [
+      {
+        "telegramId": 251463877,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-06-30T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.080Z",
+    "updatedAt": "2026-08-13T10:01:19.081Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf36ff",
+    "name": "Дивный спаситель",
+    "ownerId": 1339725270,
+    "members": [
+      {
+        "telegramId": 1339725270,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2028-06-04T09:00:07.706Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.085Z",
+    "updatedAt": "2026-08-13T10:01:19.089Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3700",
+    "name": "Христа Спасител",
+    "ownerId": 713312357,
+    "members": [
+      {
+        "telegramId": 713312357,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.093Z",
+    "updatedAt": "2026-08-13T10:01:19.095Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3701",
+    "name": "Дивный Спаситель",
+    "ownerId": 1179051730,
+    "members": [
+      {
+        "telegramId": 1179051730,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2029-06-04T09:00:07.706Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.097Z",
+    "updatedAt": "2026-08-13T10:01:19.098Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3702",
+    "name": "Команда 527490149",
+    "ownerId": 527490149,
+    "members": [
+      {
+        "telegramId": 527490149,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-06-13T18:29:21.473Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.101Z",
+    "updatedAt": "2026-08-13T10:01:19.102Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3703",
+    "name": "Новый Завет",
+    "ownerId": 840188471,
+    "members": [
+      {
+        "telegramId": 840188471,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-06-14T13:49:44.758Z"
+      },
+      "propresenter": {
+        "status": "pending",
+        "expiresAt": null,
+        "meta": {
+          "flowNumber": 4,
+          "email": null,
+          "password": null,
+          "chatLink": null
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.107Z",
+    "updatedAt": "2026-08-13T10:01:19.110Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3704",
+    "name": "РЦХВЕ «Голос Истины»",
+    "ownerId": 1202484050,
+    "members": [
+      {
+        "telegramId": 1202484050,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2028-02-06T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-02-06T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 16,
+          "email": "ucpfpropres16@yahoo.com",
+          "password": "commUnity@16PP",
+          "chatLink": "https://t.me/+6Q-Os2Fbok5mOTli"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.113Z",
+    "updatedAt": "2026-08-13T10:01:19.116Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3705",
+    "name": "Слово Божие",
+    "ownerId": 8148983091,
+    "members": [
+      {
+        "telegramId": 8148983091,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-06-28T04:11:35.621Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.125Z",
+    "updatedAt": "2026-08-13T10:01:19.127Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3706",
+    "name": "Церковь Божья",
+    "ownerId": 408135250,
+    "members": [
+      {
+        "telegramId": 408135250,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-06-28T17:49:32.502Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.130Z",
+    "updatedAt": "2026-08-13T10:01:19.131Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3707",
+    "name": "Команда 5346858636",
+    "ownerId": 5346858636,
+    "members": [
+      {
+        "telegramId": 5346858636,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-06-30T17:25:13.915Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.133Z",
+    "updatedAt": "2026-08-13T10:01:19.135Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3708",
+    "name": "Любовь Господа",
+    "ownerId": 712382586,
+    "members": [
+      {
+        "telegramId": 712382586,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-07-08T21:56:38.051Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.138Z",
+    "updatedAt": "2026-08-13T10:01:19.139Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3709",
+    "name": "-",
+    "ownerId": 17617578,
+    "members": [
+      {
+        "telegramId": 17617578,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2099-12-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 19,
+          "email": "Уточнить у администратора",
+          "password": "Уточнить у администратора",
+          "chatLink": "https://t.me/+-S6CaJquTFMyZTU6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.144Z",
+    "updatedAt": "2026-08-13T10:01:19.146Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf370a",
+    "name": "FAITH CHURCH",
+    "ownerId": 1810152018,
+    "members": [
+      {
+        "telegramId": 1810152018,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-07-14T05:08:45.093Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-02-06T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 16,
+          "email": "ucpfpropres16@yahoo.com",
+          "password": "commUnity@16PP",
+          "chatLink": "https://t.me/+6Q-Os2Fbok5mOTli"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.148Z",
+    "updatedAt": "2026-08-13T10:01:19.150Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf370b",
+    "name": "Ковчег Дагомыс",
+    "ownerId": 1116811083,
+    "members": [
+      {
+        "telegramId": 1116811083,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-07-19T06:33:06.845Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.153Z",
+    "updatedAt": "2026-08-13T10:01:19.154Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf370c",
+    "name": "Мировая Жатва",
+    "ownerId": 763615086,
+    "members": [
+      {
+        "telegramId": 763615086,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-04-05T00:00:00.000Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.159Z",
+    "updatedAt": "2026-08-13T10:01:19.161Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf370d",
+    "name": "ЦХМ",
+    "ownerId": 1062105175,
+    "members": [
+      {
+        "telegramId": 1062105175,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-07-17T18:50:39.041Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.163Z",
+    "updatedAt": "2026-08-13T10:01:19.164Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf370e",
+    "name": "Источники жизни",
+    "ownerId": 7377695875,
+    "members": [
+      {
+        "telegramId": 7377695875,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-05-12T20:40:47.116Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-06-02T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 3,
+          "email": "proprezentortretijpotok@gmail.com",
+          "password": "Tili-Tili-@3",
+          "chatLink": "https://t.me/+DVxjxFjqTlsyZTRi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.166Z",
+    "updatedAt": "2026-08-13T10:01:19.168Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf370f",
+    "name": "ЦХМ Калининград",
+    "ownerId": 1607492156,
+    "members": [
+      {
+        "telegramId": 1607492156,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 850495866,
+        "role": "member",
+        "status": "active"
+      },
+      {
+        "telegramId": 1062105175,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-07-17T18:50:39.041Z",
+        "meta": {
+          "extraUsers": 2
+        }
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2099-12-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 19,
+          "email": "Уточнить у администратора",
+          "password": "Уточнить у администратора",
+          "chatLink": "https://t.me/+-S6CaJquTFMyZTU6"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.170Z",
+    "updatedAt": "2026-08-13T10:01:19.175Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3710",
+    "name": "Цхм Калининград",
+    "ownerId": 850495866,
+    "members": [
+      {
+        "telegramId": 850495866,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-07-17T18:50:39.041Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.179Z",
+    "updatedAt": "2026-08-13T10:01:19.180Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3711",
+    "name": "Восвете",
+    "ownerId": 1004842970,
+    "members": [
+      {
+        "telegramId": 1004842970,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-07-18T15:21:11.652Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.182Z",
+    "updatedAt": "2026-08-13T10:01:19.183Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3712",
+    "name": "ЕХБ, ул. Титова 53",
+    "ownerId": 290973843,
+    "members": [
+      {
+        "telegramId": 290973843,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-07-21T08:52:01.307Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-03-07T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 17,
+          "email": "ucpfpropres17@yahoo.com",
+          "password": "coMmUnity@17PP!",
+          "chatLink": "https://t.me/+GsSgWVx6I_ExN2Fi"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.186Z",
+    "updatedAt": "2026-08-13T10:01:19.188Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3713",
+    "name": "Бог усмотрит",
+    "ownerId": 1913821933,
+    "members": [
+      {
+        "telegramId": 1913821933,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-07-26T07:18:05.151Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.192Z",
+    "updatedAt": "2026-08-13T10:01:19.193Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3714",
+    "name": "Голос Божий",
+    "ownerId": 482909276,
+    "members": [
+      {
+        "telegramId": 482909276,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-06-03T12:01:50.011Z"
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.195Z",
+    "updatedAt": "2026-08-13T10:01:19.197Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3715",
+    "name": "Ответ в Иисусе",
+    "ownerId": 1517126103,
+    "members": [
+      {
+        "telegramId": 1517126103,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-08-14T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 13,
+          "email": "unitedchurchproduction13@gmail.com",
+          "password": "UCProPres13@",
+          "chatLink": "https://t.me/+5bURbAX8mMk5Yzgy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.200Z",
+    "updatedAt": "2026-08-13T10:01:19.202Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3716",
+    "name": "Сила духа",
+    "ownerId": 7692930032,
+    "members": [
+      {
+        "telegramId": 7692930032,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-08-14T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 13,
+          "email": "unitedchurchproduction13@gmail.com",
+          "password": "UCProPres13@",
+          "chatLink": "https://t.me/+5bURbAX8mMk5Yzgy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.205Z",
+    "updatedAt": "2026-08-13T10:01:19.213Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3717",
+    "name": "Краеугольный камень",
+    "ownerId": 8000199933,
+    "members": [
+      {
+        "telegramId": 8000199933,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "expired",
+        "expiresAt": "2000-12-12T00:00:00.000Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-07-31T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 7,
+          "email": "7potokpp@gmail.com",
+          "password": "2g528HyucuXCK4N@",
+          "chatLink": "https://t.me/+uEVDe5PtWCphMzEy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.216Z",
+    "updatedAt": "2026-08-13T10:01:19.219Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3718",
+    "name": "Краеугольный камень",
+    "ownerId": 6243776627,
+    "members": [
+      {
+        "telegramId": 6243776627,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2028-08-12T08:15:21.084Z"
+      },
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-02-06T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 16,
+          "email": "ucpfpropres16@yahoo.com",
+          "password": "commUnity@16PP",
+          "chatLink": "https://t.me/+6Q-Os2Fbok5mOTli"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.222Z",
+    "updatedAt": "2026-08-13T10:01:19.227Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf3719",
+    "name": "Баптиская церковь \"Дом молитвы\" ст. Кавказская",
+    "ownerId": 1628723580,
+    "members": [
+      {
+        "telegramId": 1628723580,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-05-24T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 2,
+          "email": "syroezhkin.egor2@yandex.ru",
+          "password": "pE3-mNV-fuh-UJ5",
+          "chatLink": "https://t.me/+8y-tubmWKqY2YTky"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.229Z",
+    "updatedAt": "2026-08-13T10:01:19.231Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7d95efa14b45494fcf371a",
+    "name": "НП",
+    "ownerId": 886348581,
+    "members": [
+      {
+        "telegramId": 886348581,
+        "role": "owner",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2026-10-18T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 8,
+          "email": "streameight08@gmail.com",
+          "password": "Community#08PP",
+          "chatLink": "https://t.me/+7oBVPwFg0IkyZTgy"
+        }
+      }
+    },
+    "createdAt": "2026-08-13T10:01:19.233Z",
+    "updatedAt": "2026-08-13T10:01:19.235Z",
+    "__v": 0
+  }
+]

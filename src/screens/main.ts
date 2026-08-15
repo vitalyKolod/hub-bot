@@ -5,12 +5,12 @@ import type { ScreenView } from '../core/render.js'
 
 export function mainScreen(userId: number): ScreenView {
   const keyboard = new InlineKeyboard()
-    .text('МОИ ПОДПИСКИ', packCb({ a: 'open', s: 'profile' }))
+    .text('МОИ КОМАНДЫ', packCb({ a: 'open', s: 'team_list' }))
     .icon('5258513401784573443')
     .row()
-    .text('ДОБАВИТЬ ПОДПИСКУ', packCb({ a: 'open', s: 'add_subscription' }))
-    .icon('5397916757333654639')
-    .row()
+    // .text('ДОБАВИТЬ ПОДПИСКУ', packCb({ a: 'open', s: 'add_subscription' }))
+    // .icon('5397916757333654639')
+    // .row()
     .url('ХАБ КОМЬЮНИТИ', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
     .icon('5465300082628763143')
     .row()
@@ -18,7 +18,7 @@ export function mainScreen(userId: number): ScreenView {
     .icon('5238025132177369293')
 
   return {
-    photo: './public/profile.png',
+    photo: './public/main.png',
     caption: 'Выберите раздел:',
     keyboard,
   }

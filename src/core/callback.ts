@@ -8,8 +8,13 @@ export type ActionId =
   | 'noop' // ничего (заглушка)
   | 'pay_product'
   | 'crypto_selected'
+  | 'prop_no_stream_confirm'
+  | 'prop_confirm_stream'
+  | 'prop_verify_accept'
+  | 'prop_verify_reject'
   | 'rub_method'
   | 'add_volunteer_contact'
+  | 'prop_select_stream'
   | 'rub_payment'
   | 'paid'
   | 'accept'
@@ -20,6 +25,14 @@ export type ActionId =
   | 'reject'
   | 'crypto_network'
   | 'crypto_payment'
+  | 'create_team'
+  | 'add_to_cart'
+  | 'remove_from_cart'
+  | 'checkout_cart'
+  | 'cart_accept'
+  | 'cart_reject'
+  | 'accept_team_invite'
+  | 'decline_team_invite'
 
 export type CbData = {
   a: ActionId

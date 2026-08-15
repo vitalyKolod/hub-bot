@@ -1,0 +1,49 @@
+[
+  {
+    "_id": "6a7c66d666369e7c0e22bb8e",
+    "name": "Спасение worship",
+    "ownerId": 8009257607,
+    "members": [
+      {
+        "telegramId": 8009257607,
+        "role": "owner",
+        "status": "active"
+      },
+      {
+        "telegramId": 7985658733,
+        "role": "member",
+        "status": "active"
+      }
+    ],
+    "subscriptions": {
+      "propresenter": {
+        "status": "active",
+        "expiresAt": "2027-01-30T00:00:00.000Z",
+        "meta": {
+          "flowNumber": 10,
+          "email": "ten10potok@gmail.com",
+          "password": "T10potok!",
+          "chatLink": "https://t.me/+7GBpPvSI9O4zMDk6"
+        }
+      },
+      "procontent": {
+        "status": "active",
+        "expiresAt": "2027-08-12T12:35:15.624Z"
+      },
+      "cgs": {
+        "status": "active",
+        "expiresAt": "2027-08-12T12:35:26.987Z"
+      },
+      "sunday_screens": {
+        "status": "rejected"
+      },
+      "cmg": {
+        "status": "active",
+        "expiresAt": "2027-08-12T12:36:36.101Z"
+      }
+    },
+    "createdAt": "2026-08-12T12:28:06.977Z",
+    "updatedAt": "2026-08-12T12:40:30.634Z",
+    "__v": 1
+  }
+]

@@ -15,6 +15,8 @@ import { goTo, goBack, goHome } from './state/ui.js'
 import {
   // activateContentSubscription,
   activateOrExtendContentSubscription,
+  clearInputMode,
+  setInputMode,
 } from './services/user.service.js'
 import {
   startRegistration,
@@ -31,11 +33,89 @@ dotenv.config()
 import { escapeUnderscore } from './utils/escape.js'
 import { isAdmin } from './config/admin.js'
 import { handleSubscribeCheck, showSubscribeScreen } from './flows/subscribe/index.js'
+import { INPUT_MODES } from './constants/input-modes.js'
+import { createTeam } from './services/team.service.js'
+
+import {
+  addToCart,
+  removeFromCart,
+  getOrCreateCart,
+  getPendingItems,
+  getCartTotal,
+  markCartInReview,
+  setCartItemStatus,
+  findCartItemByItemId,
+  removeFromCartByItemId,
+} from './services/cart.service.js'
+import { getProduct } from './config/products.js'
+import {
+  activateTeamSubscription,
+  rejectTeamSubscription,
+  getTeamById,
+  isOwner,
+} from './services/team.service.js'
+import { createTeamInvite } from './services/teamInvite.service.js'
+import { addToWaitlist, getPendingWaitlist } from './services/proPresenterWaitlist.service.js'
+import { getStreamByNumber } from './services/proPresenterStream.service.js'
+import { handleBack, handleHome, handleOpen } from './handlers/navigation.hadlers.js'
+import {
+  handleConfirmRegistration,
+  handleEditField,
+  handleEditingFieldText,
+  handleEditRegistration,
+} from './handlers/registration.handlers.js'
+import {
+  handleAcceptTeamInvite,
+  handleCreateTeamStart,
+  handleCreateTeamText,
+  handleDeclineTeamInvite,
+} from './handlers/team.hadler.js'
+import {
+  handleAddToCart,
+  handleCartAccept,
+  handleCartReject,
+  handleCheckoutCart,
+  handleRemoveFromCart,
+} from './handlers/cart.handlers.js'
+import {
+  handlePropConfirmStream,
+  handlePropHasStream,
+  handlePropNoStream,
+  handlePropNoStreamConfirm,
+  handlePropSelectStream,
+  handlePropVerifyAccept,
+  handlePropVerifyReject,
+} from './handlers/propresenter.handlers.js'
+import {
+  handleAdminAccept,
+  handleAdminReject,
+  handleCryptoNetwork,
+  handleCryptoSelected,
+  handlePaid,
+  handlePayMethod,
+  handlePayProduct,
+  handleReceiptUpload,
+  handleRubBank,
+  handleRubCardType,
+  handleRubType,
+} from './handlers/payment.handlers.js'
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const CONTENT_GROUP_ID = Number(process.env.CONTENT_GROUP_ID)
 const SUPPORT_GROUP_ID = Number(process.env.SUPPORT_GROUP_ID)
 const SUNDAY_SCREENS_GROUP_ID = Number(process.env.SUNDAY_SCREENS_GROUP_ID)
+const PROP_WAITLIST_THREAD_ID = Number(process.env.PROP_WAITLIST_THREAD_ID)
+const PROP_STREAM_VERIFY_THREAD_ID = Number(process.env.PROP_STREAM_VERIFY_THREAD_ID)
+
+if (!PROP_STREAM_VERIFY_THREAD_ID) {
+  console.error('PROP_STREAM_VERIFY_THREAD_ID не задан в .env')
+  process.exit(1)
+}
+
+if (!PROP_WAITLIST_THREAD_ID) {
+  console.error('PROP_WAITLIST_THREAD_ID не задан в .env')
+  process.exit(1)
+}
 
 if (!SUNDAY_SCREENS_GROUP_ID) {
   console.error('SUNDAY_SCREENS_GROUP_ID не задан')
@@ -100,10 +180,47 @@ export function registerHandlers(bot: Bot<MyContext>) {
   )
 
   bot.command('start', async (ctx) => {
-    const kb = new InlineKeyboard().text('СТАРТ', 'sub:check').style('success')
+    const payload = ctx.match
+    const userId = ctx.from.id
 
-    // Добавляем placeholders для всех emoji в тексте
-    const text = 'Привет! 🙂 Добро пожаловать в ХАБ 🟢\n\nНажми “СТАРТ”, чтобы продолжить 🔵'
+    if (payload && typeof payload === 'string' && payload.startsWith('join_')) {
+      const code = payload.replace('join_', '')
+
+      const { validateInvite } = await import('./services/teamInvite.service.js')
+      const check = await validateInvite(code)
+
+      if (!check.ok) {
+        const reasonText: Record<string, string> = {
+          not_found: '❌ Приглашение не найдено.',
+          used: '❌ Эта ссылка уже была использована.',
+          expired: '❌ Срок действия ссылки истёк (24 часа).',
+          team_not_found: '❌ Команда не найдена.',
+          team_full: '❌ Команда уже заполнена (максимум 5 участников).',
+        }
+
+        await ctx.reply(reasonText[check.reason] || '❌ Приглашение недействительно.')
+        // не return — продолжаем обычный /start ниже
+      } else {
+        await UserModel.updateOne(
+          { telegramId: userId },
+          { pendingInviteCode: code },
+          { upsert: true }
+        )
+
+        // 👇 НОВОЕ: если человек уже зарегистрирован — сразу показываем приглашение
+        const profile = await getOrCreateUser(userId)
+        if (profile.reg === 'done') {
+          goTo(userId, 'team_invite')
+          await renderScreen(ctx, userId, 'team_invite', code, { forceNew: true })
+          return
+        }
+        // если ещё не зарегистрирован — падаем ниже, в обычный онбординг,
+        // код уже сохранён и всплывёт после завершения регистрации
+      }
+    }
+
+    const kb = new InlineKeyboard().text('СТАРТ', 'sub:check').style('success')
+    const text = 'Привет! 🙂 Добро пожаловать в ХАБ 🟢\n\nНажми "СТАРТ", чтобы продолжить 🔵'
 
     await ctx.replyWithPhoto(ONBOARDING_ASSET, {
       caption: text,
@@ -112,23 +229,28 @@ export function registerHandlers(bot: Bot<MyContext>) {
           offset: text.indexOf('🙂'),
           length: 2,
           type: 'custom_emoji',
-          custom_emoji_id: '5463249828450424568', // первая иконка
+          custom_emoji_id: '5463249828450424568',
         },
         {
           offset: text.indexOf('🟢'),
           length: 2,
           type: 'custom_emoji',
-          custom_emoji_id: '5379559474405092361', // вторая иконка после "ХАБ"
+          custom_emoji_id: '5379559474405092361',
         },
         {
           offset: text.indexOf('🔵'),
           length: 2,
           type: 'custom_emoji',
-          custom_emoji_id: '5470177992950946662', // третья иконка после "продолжить"
+          custom_emoji_id: '5470177992950946662',
         },
       ],
       reply_markup: kb,
     })
+  })
+
+  bot.command('threadid', async (ctx) => {
+    if (!isAdmin(ctx.from.id)) return
+    await ctx.reply(`Thread ID: ${ctx.message.message_thread_id || 'нет (это не топик)'}`)
   })
 
   bot.command('main', async (ctx) => {
@@ -139,6 +261,11 @@ export function registerHandlers(bot: Bot<MyContext>) {
   bot.command('profile', async (ctx) => {
     goTo(ctx.from.id, 'profile')
     await renderScreen(ctx, ctx.from.id, 'profile', undefined, { forceNew: true })
+  })
+
+  bot.command('team_list', async (ctx) => {
+    goTo(ctx.from.id, 'team_list')
+    await renderScreen(ctx, ctx.from.id, 'team_list', undefined, { forceNew: true })
   })
 
   bot.command('support', async (ctx) => {
@@ -178,73 +305,21 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     //Редактирование поля
     if (data === 'edit_registration') {
-      const kb = new InlineKeyboard()
-        .text('ФИО', 'edit_field:fio')
-        .icon('5258011929993026890')
-        .row()
-        .text('Город', 'edit_field:city')
-        .icon('5453906530824903181')
-        .row()
-        .text('Церковь', 'edit_field:church')
-        .icon('5370857213533379300')
-        .row()
-      // .text('◀️ Назад', packCb({ a: 'back' }))
-
-      const user = await getOrCreateUser(userId)
-
-      // if (user.subscriptions?.propresenter?.status !== 'none') {
-      //   kb.text('Поток', 'edit_field:prop_stream_no').icon('5251272469175631339').row()
-      // }
-
-      // if (user.subscriptions?.content?.status !== 'none') {
-      //   kb.text('Дата контента', 'edit_field:screens_end_date').icon('5251299351375937406').row()
-      // }
-
-      await ctx.editMessageText('Что хотите изменить?', {
-        reply_markup: kb,
-      })
-
+      await handleEditRegistration(ctx)
       await ctx.answerCallbackQuery()
       return
     }
 
     if (data.startsWith('edit_field:')) {
       const field = data.split(':')[1]
-
-      ctx.session.editingField = field as any
-
-      let text = ''
-
-      switch (field) {
-        case 'fio':
-          text = 'Введите новое ФИО'
-          break
-        case 'city':
-          text = 'Введите новый город'
-          break
-        case 'church':
-          text = 'Введите новую церковь'
-          break
-      }
-
-      await ctx.api.sendMessage(ctx.from.id, text)
+      await handleEditField(ctx, field)
       await ctx.answerCallbackQuery()
       return
     }
 
     if (data === 'confirm_registration') {
-      await UserModel.updateOne(
-        { telegramId: userId },
-        {
-          reg: 'done',
-          regStep: 'done',
-        }
-      )
-
-      await finishRegistration(ctx, userId)
-
+      await handleConfirmRegistration(ctx, userId)
       await ctx.answerCallbackQuery()
-
       return
     }
 
@@ -381,9 +456,9 @@ export function registerHandlers(bot: Bot<MyContext>) {
     if (message && message.message_thread_id) {
       const parsed = parseCb(data)
       if (parsed) {
-        const caption = message.caption || ''
+        const caption = message.caption || message.text || ''
 
-        const userIdMatch = caption.match(/ID:\s*(\d+)/i) || caption.match(/\(ID:\s*(\d+)\)/i)
+        const userIdMatch = caption.match(/ID:\s*`?(\d+)`?/i) || caption.match(/\(ID:\s*(\d+)\)/i)
         if (!userIdMatch) {
           await ctx.answerCallbackQuery({ text: 'ID не найден' })
           return
@@ -392,149 +467,22 @@ export function registerHandlers(bot: Bot<MyContext>) {
         const targetUserId = Number(userIdMatch[1])
 
         if (parsed.a === 'accept') {
-          try {
-            const volunteerMatch = caption.match(/ID волонт[её]ра:\s*(\d+)/i)
-            const volunteerId = volunteerMatch ? Number(volunteerMatch[1]) : null
-
-            if (volunteerId) {
-              // 1. активируем волонтёра
-              const { activateVolunteer } = await import('./services/volunteer.service.js')
-
-              await activateVolunteer(targetUserId, volunteerId)
-
-              // 2. создаем ссылку
-              const inviteContent = await ctx.api.createChatInviteLink(CONTENT_GROUP_ID, {
-                member_limit: 1,
-                name: `Ссылка для волонтёра ${volunteerId}`,
-                expire_date: Math.floor(Date.now() / 1000) + 1800,
-              })
-
-              const sundayInvite = await ctx.api.createChatInviteLink(SUNDAY_SCREENS_GROUP_ID, {
-                member_limit: 1,
-                expire_date: Math.floor(Date.now() / 1000) + 1800,
-              })
-
-              // 3. отправляем ВОЛОНТЁРУ
-              await ctx.api.sendMessage(
-                volunteerId,
-                `
-🎉 *Вам выдан доступ!*
-
-Вы добавлены как волонтёр. Вот Ваши ссылки для
-
-📦 Контент для экранов:
-${inviteContent.invite_link}
-
-Ссылка одноразовая.
-
-Нажмите /profile, чтобы вернуться в профиль.
-`.trim(),
-                { parse_mode: 'Markdown' }
-              )
-
-              // 4. уведомляем владельца
-              await ctx.api.sendMessage(
-                targetUserId,
-                `
-✅ Волонтёр успешно добавлен!
-
-Теперь он имеет доступ к контенту.
-
-Нажмите /profile, чтобы вернуться в профиль.
-`.trim(),
-                { parse_mode: 'Markdown' }
-              )
-
-              // 5. обновляем сообщение админу
-              await ctx.api.editMessageCaption(String(ADMIN_GROUP_ID), message.message_id, {
-                caption: `${caption}\n\n✅ Волонтёр добавлен`,
-              })
-
-              await ctx.answerCallbackQuery({ text: 'Волонтёр добавлен ✓' })
-              return
-            }
-
-            const result = await activateOrExtendContentSubscription(targetUserId)
-
-            // если новая подписка → даём ссылку
-            // создаём ссылку Sunday Screens ВСЕГДА
-            const sundayInvite = await ctx.api.createChatInviteLink(SUNDAY_SCREENS_GROUP_ID, {
-              member_limit: 1,
-              expire_date: Math.floor(Date.now() / 1000) + 1800,
-            })
-
-            // если новая подписка → даём ОБЕ ссылки
-            if (result.type === 'activated') {
-              const contentInvite = await ctx.api.createChatInviteLink(CONTENT_GROUP_ID, {
-                member_limit: 1,
-                expire_date: Math.floor(Date.now() / 1000) + 1800,
-              })
-
-              await ctx.api.sendMessage(
-                targetUserId,
-                `
-✅ *Подписка активирована!*
-
-Вот Ваши ссылки для:
-
-📦 Контент для экранов:
-${contentInvite.invite_link}
-
-🎬 Sunday Screens:
-${sundayInvite.invite_link}
-`,
-                { parse_mode: 'Markdown' }
-              )
-            } else {
-              // продление → только Sunday Screens
-              await ctx.api.sendMessage(
-                targetUserId,
-                `
-🔄 Подписка на ProContent продлена!
-
-🎬 Вам доступна подписка Sunday Screens:
-
-Вот ссылка 👇
-${sundayInvite.invite_link}
-
-
-Чтобы посмотреть Ваши подписки - нажмите /profile
-`,
-                { parse_mode: 'Markdown' }
-              )
-            }
-
-            const safeCaption = escapeUnderscore(
-              `${caption}\n\n✅ Принято! Ссылка отправлена. Подписка активирована на 1 год.`
-            )
-
-            await ctx.api.editMessageCaption(String(ADMIN_GROUP_ID), message.message_id, {
-              caption: safeCaption,
-              parse_mode: 'Markdown',
-            })
-
-            await ctx.answerCallbackQuery({ text: 'Принято ✓' })
-            return
-          } catch (err: any) {
-            console.error('Ошибка accept:', err)
-            await ctx.answerCallbackQuery({ text: 'Ошибка' })
-            return
-          }
+          await handleAdminAccept(ctx, parsed.p as string, caption, message.message_id)
+          return
         }
 
         if (parsed.a === 'reject') {
-          try {
-            await ctx.api.sendMessage(targetUserId, '❌ Оплата отклонена. Свяжитесь с поддержкой.')
-            await ctx.api.editMessageCaption(String(ADMIN_GROUP_ID), message.message_id, {
-              caption: `${caption}\n\n❌ Отклонено`,
-            })
-            await ctx.answerCallbackQuery({ text: 'Отклонено ✗' })
-            return
-          } catch (err: any) {
-            console.error('Ошибка reject:', err)
-            await ctx.answerCallbackQuery({ text: 'Ошибка' })
-            return
-          }
+          await handleAdminReject(ctx, caption, message.message_id)
+          return
+        }
+        if (parsed.a === 'prop_verify_accept') {
+          await handlePropVerifyAccept(ctx, String(parsed.p), caption, message.message_id)
+          return
+        }
+
+        if (parsed.a === 'prop_verify_reject') {
+          await handlePropVerifyReject(ctx, String(parsed.p), caption, message.message_id)
+          return
         }
       }
     }
@@ -611,38 +559,76 @@ ${sundayInvite.invite_link}
     //   return
     // }
 
+    if (parsed.a === 'create_team') {
+      await handleCreateTeamStart(ctx, userId)
+      await ack()
+      return
+    }
+
+    if (parsed.a === 'accept_team_invite' && parsed.p) {
+      await handleAcceptTeamInvite(ctx, userId, String(parsed.p))
+      return
+    }
+
+    if (parsed.a === 'decline_team_invite' && parsed.p) {
+      await handleDeclineTeamInvite(ctx, userId)
+      return
+    }
+
+    if (parsed.a === 'prop_no_stream' && parsed.p) {
+      await handlePropNoStream(ctx, userId, String(parsed.p))
+      await ack()
+      return
+    }
+
+    if (parsed.a === 'prop_has_stream' && parsed.p) {
+      await handlePropHasStream(ctx, userId, String(parsed.p))
+      await ack()
+      return
+    }
+
+    if (parsed.a === 'prop_select_stream' && parsed.p) {
+      await handlePropSelectStream(ctx, userId, String(parsed.p))
+      await ack()
+      return
+    }
+
+    if (parsed.a === 'prop_confirm_stream' && parsed.p) {
+      await handlePropConfirmStream(ctx, userId, String(parsed.p))
+      return
+    }
+
+    if (parsed.a === 'prop_no_stream_confirm' && parsed.p) {
+      await handlePropNoStreamConfirm(ctx, userId, String(parsed.p))
+      return
+    }
+
     // Обычная навигация + оплата
     if (parsed.a === 'open' && parsed.s) {
-      goTo(userId, parsed.s)
-      await renderScreen(ctx, userId, parsed.s, parsed.p)
+      await handleOpen(ctx, userId, parsed)
       await ack()
       return
     }
 
     if (parsed.a === 'back') {
-      const prev = goBack(userId)
-      await renderScreen(ctx, userId, prev)
+      await handleBack(ctx, userId)
       await ack()
       return
     }
 
     if (parsed.a === 'home') {
-      goHome(userId)
-      await renderScreen(ctx, userId, 'main')
+      await handleHome(ctx, userId)
       await ack()
       return
     }
 
     if (parsed.a === 'pay_product' && parsed.p) {
-      const user = await getOrCreateUser(userId)
-
-      const isExtension =
-        parsed.p === 'content_screens' && user.subscriptions?.content?.status === 'active'
+      const [productId, teamId] = String(parsed.p).split(':')
 
       ctx.session.payment = {
-        product: parsed.p,
+        product: productId,
+        teamId,
         method: null,
-        isExtension,
       }
       goTo(userId, 'payment')
       await renderScreen(ctx, userId, 'payment')
@@ -664,84 +650,80 @@ ${sundayInvite.invite_link}
       return
     }
 
-    if (parsed.a === 'rub_type' && parsed.m) {
-      ctx.session.payment = {
-        ...ctx.session.payment,
-        method: 'rub',
-        rubType: parsed.m,
-      }
-
-      if (parsed.m === 'card') {
-        goTo(userId, 'rub_card_methods')
-        await renderScreen(ctx, userId, 'rub_card_methods')
-      } else {
-        goTo(userId, 'rub_sbp_methods')
-        await renderScreen(ctx, userId, 'rub_sbp_methods')
-      }
-
+    if (parsed.a === 'pay_product' && parsed.p) {
+      const [productId, teamId] = String(parsed.p).split(':')
+      await handlePayProduct(ctx, userId, productId, teamId)
       await ack()
       return
     }
+
+    if (parsed.a === 'pay_method' && parsed.m) {
+      await handlePayMethod(ctx, userId, parsed.m)
+      await ack()
+      return
+    }
+
+    if (parsed.a === 'rub_type' && parsed.m) {
+      await handleRubType(ctx, userId, parsed.m)
+      await ack()
+      return
+    }
+
     if (parsed.a === 'rub_card_type' && parsed.m) {
-      ctx.session.payment = {
-        ...ctx.session.payment,
-        rubCardType: parsed.m,
-      }
-
-      if (parsed.m === 'mastercard') {
-        // сразу на оплату
-        goTo(userId, 'rub_payment')
-        await renderScreen(ctx, userId, 'rub_payment', ctx.session.payment)
-      } else {
-        // МИР → выбираем банк
-        goTo(userId, 'rub_sbp_methods')
-        await renderScreen(ctx, userId, 'rub_sbp_methods')
-      }
-
+      await handleRubCardType(ctx, userId, parsed.m)
       await ack()
       return
     }
 
     if (parsed.a === 'rub_bank' && parsed.m) {
-      ctx.session.payment = {
-        ...ctx.session.payment,
-        rubBank: parsed.m,
-      }
-
-      goTo(userId, 'rub_payment')
-      await renderScreen(ctx, userId, 'rub_payment', ctx.session.payment)
-
+      await handleRubBank(ctx, userId, parsed.m)
       await ack()
       return
     }
 
     if (parsed.a === 'crypto_network' && parsed.m) {
-      ctx.session.payment = { ...ctx.session.payment, network: parsed.m }
-      goTo(userId, 'crypto_method')
-      await renderScreen(ctx, userId, 'crypto_method')
+      await handleCryptoNetwork(ctx, userId, parsed.m)
       await ack()
       return
     }
+
     if (parsed.a === 'crypto_selected' && parsed.m) {
-      ctx.session.payment = { ...ctx.session.payment, network: parsed.m }
-      goTo(userId, 'crypto_payment')
-      await renderScreen(ctx, userId, 'crypto_payment', {
-        network: parsed.m,
-        product: ctx.session.payment?.product,
-      })
+      await handleCryptoSelected(ctx, userId, parsed.m)
       await ack()
       return
     }
 
     if (parsed.a === 'paid') {
-      await ctx.editMessageCaption({
-        caption:
-          '📸 Отлично! Теперь пришли фото чека (или документ) в этот чат.\nЯ сразу передам админу.',
-        reply_markup: new InlineKeyboard().text('Отмена', packCb({ a: 'back' })),
-        parse_mode: 'Markdown',
-      })
-      ctx.session.waitingForReceipt = true
+      await handlePaid(ctx)
       await ack()
+      return
+    }
+
+    if (parsed.a === 'add_to_cart' && parsed.p) {
+      const [productId, teamId] = String(parsed.p).split(':')
+      await handleAddToCart(ctx, userId, productId, teamId)
+      return
+    }
+
+    if (parsed.a === 'remove_from_cart' && parsed.p) {
+      await handleRemoveFromCart(ctx, userId, String(parsed.p))
+      await ack()
+      return
+    }
+
+    if (parsed.a === 'checkout_cart' && parsed.p) {
+      await handleCheckoutCart(ctx, userId, String(parsed.p))
+      await ack()
+      return
+    }
+
+    if (parsed.a === 'cart_accept' && parsed.p) {
+      await handleCartAccept(ctx, String(parsed.p))
+      return
+    }
+
+    if (parsed.a === 'cart_reject' && parsed.p) {
+      await handleCartReject(ctx, String(parsed.p))
       return
     }
 
@@ -782,63 +764,17 @@ ${sundayInvite.invite_link}
     const profile = await getOrCreateUser(userId)
 
     if (ctx.session.editingField) {
-      const field = ctx.session.editingField
-      const value = ctx.message.text.trim()
-
-      const update: any = {}
-
-      if (field === 'fio' && value.length >= 3) {
-        update.fio = value
-      }
-
-      if (field === 'city') {
-        update.city = value
-      }
-
-      if (field === 'church') {
-        update.church = value
-      }
-
-      if (field === 'prop_stream_no') {
-        const n = Number(value)
-        if (!Number.isFinite(n)) {
-          return ctx.reply('Введите число')
-        }
-        update['subscriptions.propresenter.flow'] = Math.floor(n)
-      }
-
-      if (field === 'screens_end_date') {
-        const parsed = computeDaysLeft(value)
-        if (!parsed) {
-          return ctx.reply('Неверная дата')
-        }
-
-        update['subscriptions.content.expiresAt'] = parsed.date
-      }
-
-      await UserModel.updateOne({ telegramId: ctx.from.id }, { $set: update })
-
-      ctx.session.editingField = undefined
-
-      await ctx.reply('✅ Данные обновлены')
-
-      const { buildConfirmationText } = await import('./flows/registration/index.js')
-
-      const kb = new InlineKeyboard()
-        .text('✅ Подтвердить', 'confirm_registration')
-        .row()
-        .text('✏️ Изменить данные', 'edit_registration')
-
-      await ctx.reply(await buildConfirmationText(ctx.from.id), {
-        parse_mode: 'Markdown',
-        reply_markup: kb,
-      })
-
+      await handleEditingFieldText(ctx, userId)
       return
     }
 
     if (profile.reg === 'in_progress') {
       await handleRegistrationText(ctx, userId, ctx.message.text)
+      return
+    }
+
+    if (profile.inputMode === INPUT_MODES.CREATE_TEAM) {
+      await handleCreateTeamText(ctx, userId)
       return
     }
 
@@ -901,14 +837,14 @@ ${sundayInvite.invite_link}
   })
 
   // ====================== РАССЫЛКА ДЛЯ АДМИНА ======================
-  bot.on('message', async (ctx) => {
+  bot.on('message', async (ctx, next) => {
     // Проверяем, что сообщение от админа и включен режим рассылки
-    if (!ctx.from || !isAdmin(ctx.from.id)) return
-    if (ctx.session.adminMode !== 'waiting_broadcast') return
+    if (!ctx.from || !isAdmin(ctx.from.id)) return next()
+    if (ctx.session.adminMode !== 'waiting_broadcast') return next()
 
     // Игнорируем сообщения из групп поддержки/админки, если они не относятся к рассылке в ЛС
     // (тут проверяем, что это личка с ботом или админ шлет в ЛС)
-    if (ctx.chat.type !== 'private') return
+    if (ctx.chat.type !== 'private') return next()
 
     ctx.session.adminMode = undefined
 
@@ -946,137 +882,13 @@ ${sundayInvite.invite_link}
 
   // ========== ЧЕК (фото / документ) — ВЫСОКИЙ ПРИОРИТЕТ===========
   bot.on(['message:photo', 'message:document'], async (ctx) => {
+    console.log(
+      '📸 PHOTO/DOCUMENT HANDLER FIRED, waitingForReceipt =',
+      ctx.session.waitingForReceipt
+    )
+
     if (ctx.session.waitingForReceipt) {
-      ctx.session.waitingForReceipt = false
-
-      const userId = ctx.from.id
-      const profile = await getOrCreateUser(userId)
-      const username = ctx.from.username ? `@${ctx.from.username}` : `ID:${ctx.from.id}`
-
-      // const userLink = ctx.from.username
-      //   ? `@${ctx.from.username}`
-      //   : `[Открыть профиль](tg://user?id=${userId})`
-
-      let methodText = ''
-
-      if (ctx.session.payment?.method === 'crypto' || ctx.session.payment?.network) {
-        const net = ctx.session.payment?.network || 'TRC20'
-        methodText = `Крипта (${net.toUpperCase()})`
-      } else {
-        const bankMap: any = {
-          tbank: 'Т-Банк',
-          ozon: 'Озон-Банк',
-          alfa: 'Альфа-Банк',
-        }
-
-        const bank = bankMap[ctx.session.payment?.rubBank] || 'Не указан'
-
-        if (ctx.session.payment?.rubType === 'sbp') {
-          methodText = `Рубли — СБП (${bank})`
-        }
-
-        if (ctx.session.payment?.rubType === 'card') {
-          if (ctx.session.payment?.rubCardType === 'mastercard') {
-            methodText = `Рубли — Карта (MasterCard)`
-          } else {
-            methodText = `Рубли — Карта МИР (${bank})`
-          }
-        }
-      }
-
-      let volunteerText = ''
-
-      if (ctx.session.payment?.volunteerId) {
-        try {
-          const volunteer = await getOrCreateUser(ctx.session.payment.volunteerId)
-
-          const volunteerUserName = volunteer.username
-            ? '@' + escapeUnderscore(volunteer.username)
-            : 'не указан'
-
-          volunteerText = `
-🙋 Волонтёр: ${volunteer.fio || 'не указано'}
-😎 Юзернейм: ${volunteerUserName}
-🆔 ID волонтёра: ${ctx.session.payment.volunteerId}
-`
-        } catch {
-          volunteerText = `\n🙋 Волонтёр ID: ${ctx.session.payment.volunteerId}`
-        }
-      }
-
-      let productText = ''
-
-      if (ctx.session.payment?.product === 'volunteer') {
-        productText = '👥 Добавление волонтёра'
-      } else {
-        productText = '📦 Контент для экранов'
-      }
-
-      const isVolunteer = ctx.session.payment?.product === 'volunteer'
-
-      const usernameText = ctx.from.username
-        ? '@' + escapeUnderscore(ctx.from.username)
-        : 'не указано'
-      const adminText = `
-
-💰 *НОВАЯ ОПЛАТА*
-${productText}
-
-👤 ${profile.fio || 'не указано'}
-😎 ЮзерНейм: ${usernameText}
-🆔 ID: ${userId}
-
-${ctx.session.payment?.product === 'volunteer' ? 'TYPE:VOLUNTEER' : 'TYPE:CONTENT'}
-
-💳 Способ оплаты: ${methodText}
-${volunteerText}
-
-🕒 ${new Date().toLocaleString('ru-RU')}
-
-Проверь и подтверди вручную!
-`.trim()
-
-      let threadId: number | undefined
-      try {
-        const topic = await ctx.api.createForumTopic(ADMIN_GROUP_ID, `Новый заказ — ${username}`)
-        threadId = topic.message_thread_id
-      } catch (err) {
-        console.error('Ошибка создания темы:', err)
-      }
-
-      try {
-        const kb = new InlineKeyboard()
-          .text('✅ Принять', packCb({ a: 'accept' }))
-          .text('❌ Отклонить', packCb({ a: 'reject' }))
-          .row()
-          .url('Написать юзеру', `tg://user?id=${userId}`)
-        if (ctx.message.photo) {
-          const photo = ctx.message.photo.at(-1)!
-          await ctx.api.sendPhoto(ADMIN_GROUP_ID, photo.file_id, {
-            caption: adminText,
-            parse_mode: 'Markdown',
-            message_thread_id: threadId,
-            reply_markup: kb,
-          })
-        } else if (ctx.message.document) {
-          await ctx.api.sendDocument(ADMIN_GROUP_ID, ctx.message.document.file_id, {
-            caption: adminText,
-            parse_mode: 'Markdown',
-            message_thread_id: threadId,
-            reply_markup: kb,
-          })
-        }
-
-        await ctx.reply(
-          '✅ Чек успешно отправлен администратору!\nОжидай подтверждения \nЧтобы вернуться в главное меню - нажми /main',
-          {
-            parse_mode: 'Markdown',
-          }
-        )
-      } catch (err) {
-        console.error('Ошибка отправки чека:', err)
-        await ctx.reply('❌ Не удалось отправить чек.')
-      }
+      await handleReceiptUpload(ctx)
       return
     }
 

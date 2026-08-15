@@ -14,11 +14,6 @@ export function getUserSubscriptions(userId: number): UserSubscription[] {
   return store.get(userId) ?? []
 }
 
-/**
- * Временный хелпер для теста.
- * Чтобы прямо сейчас проверить "как на картинке 1" — добавим демо-подписки пользователю.
- * Потом это уберём и подключим Mongo.
- */
 export function seedDemoSubscriptions(userId: number) {
   if (store.has(userId)) return
 

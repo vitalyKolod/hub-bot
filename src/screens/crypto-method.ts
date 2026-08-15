@@ -25,7 +25,7 @@ export function cryptoMethodScreen(userId: number, ctx: any): ScreenView {
     .icon('5312361253610475399')
 
   return {
-    photo: './public/payment.png',
+    photo: './public/methods-crypto.jpg',
     caption:
       `*ОПЛАТА — КРИПТА*\n\nВыберите сеть для перевода:\n\n` +
       `После выбора адрес кошелька появится автоматически с возможностью копирования.`,
