@@ -97,7 +97,7 @@ export async function profileScreen(userId: number): Promise<ScreenView> {
     lines.push(
       `*Контент для экранов*`,
       `Дата окончания: ${content.expiresAt?.toLocaleDateString('ru-RU')}`,
-      `Осталось дней: ${days}`
+      `Осталось дней: ${days},`
     )
 
     // 👇 ВОЛОНТЁР

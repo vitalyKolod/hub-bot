@@ -1,0 +1,264 @@
+// services/adminPanel.service.ts
+// Сервисный слой админ-панели. Переиспользует существующие модели напрямую,
+// существующие team.service.ts / user.service.ts не трогает и не ломает.
+
+import { UserModel } from '../models/User.js'
+import { TeamModel } from '../models/Team.js'
+import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
+import { PAGE_SIZE } from '../constants/admin-panel.js'
+
+function escapeRegex(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// ==================== СПИСКИ / ПАГИНАЦИЯ ====================
+
+export async function adminListUsers(page: number) {
+  const skip = page * PAGE_SIZE
+  const [users, total] = await Promise.all([
+    UserModel.find().sort({ createdAt: -1 }).skip(skip).limit(PAGE_SIZE),
+    UserModel.countDocuments(),
+  ])
+  return { users, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) }
+}
+
+export async function adminListTeams(page: number) {
+  const skip = page * PAGE_SIZE
+  const [teams, total] = await Promise.all([
+    TeamModel.find().sort({ createdAt: -1 }).skip(skip).limit(PAGE_SIZE),
+    TeamModel.countDocuments(),
+  ])
+  return { teams, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) }
+}
+
+export async function adminSearchUsers(query: string) {
+  const trimmed = query.trim()
+  const isNumeric = /^\d+$/.test(trimmed)
+  const or: any[] = [
+    { username: new RegExp(escapeRegex(trimmed), 'i') },
+    { fio: new RegExp(escapeRegex(trimmed), 'i') },
+  ]
+  if (isNumeric) or.push({ telegramId: Number(trimmed) })
+  return UserModel.find({ $or: or }).limit(20)
+}
+
+export async function adminSearchTeams(query: string) {
+  const trimmed = query.trim()
+  const isNumeric = /^\d+$/.test(trimmed)
+  const or: any[] = [{ name: new RegExp(escapeRegex(trimmed), 'i') }]
+  if (isNumeric) or.push({ ownerId: Number(trimmed) })
+  return TeamModel.find({ $or: or }).limit(20)
+}
+
+// ==================== ЮЗЕР: базовые поля ====================
+
+export async function adminGetUser(telegramId: number) {
+  return UserModel.findOne({ telegramId })
+}
+
+export async function adminUpdateUserField(
+  telegramId: number,
+  field: 'fio' | 'city' | 'church' | 'username',
+  value: string
+) {
+  return UserModel.updateOne({ telegramId }, { $set: { [field]: value } })
+}
+
+export async function adminGetTeamsForUser(telegramId: number) {
+  return TeamModel.find({
+    $or: [{ ownerId: telegramId }, { 'members.telegramId': telegramId }],
+  })
+}
+
+// ==================== КОМАНДА: базовые поля ====================
+
+export async function adminGetTeam(teamId: string) {
+  return TeamModel.findById(teamId)
+}
+
+export async function adminUpdateTeamName(teamId: string, name: string) {
+  return TeamModel.updateOne({ _id: teamId }, { $set: { name: name.trim() } })
+}
+
+// ---- владелец ----
+
+export async function adminTransferOwnership(teamId: string, newOwnerTelegramId: number) {
+  const team = await TeamModel.findById(teamId)
+  if (!team) throw new Error('Команда не найдена')
+
+  const isMember = team.members.some((m: any) => m.telegramId === newOwnerTelegramId)
+  if (!isMember) {
+    team.members.push({ telegramId: newOwnerTelegramId, role: 'owner', status: 'active' } as any)
+  }
+
+  team.members = team.members.map((m: any) => {
+    const obj = m.toObject ? m.toObject() : m
+    if (obj.telegramId === team.ownerId) return { ...obj, role: 'member' }
+    if (obj.telegramId === newOwnerTelegramId) return { ...obj, role: 'owner' }
+    return obj
+  }) as any
+
+  team.ownerId = newOwnerTelegramId
+  await team.save()
+  return team
+}
+
+// ---- участники ----
+
+export async function adminAddTeamMember(teamId: string, telegramId: number) {
+  const team = await TeamModel.findById(teamId)
+  if (!team) throw new Error('Команда не найдена')
+
+  const already = team.members.some((m: any) => m.telegramId === telegramId)
+  if (already) return team
+
+  team.members.push({ telegramId, role: 'member', status: 'active' } as any)
+  await team.save()
+  return team
+}
+
+export async function adminRemoveTeamMember(teamId: string, telegramId: number) {
+  const team = await TeamModel.findById(teamId)
+  if (!team) throw new Error('Команда не найдена')
+
+  if (team.ownerId === telegramId) {
+    throw new Error('Нельзя удалить владельца — сначала передай владение другому участнику')
+  }
+
+  team.members = team.members.filter((m: any) => m.telegramId !== telegramId) as any
+  await team.save()
+  return team
+}
+
+// ---- подписки команды: subscriptions — Map<productId, {status, expiresAt, meta}> ----
+
+export async function adminSetTeamSubStatus(teamId: string, product: string, status: string) {
+  const team = await TeamModel.findById(teamId)
+  if (!team) throw new Error('Команда не найдена')
+  const current: any = team.subscriptions.get(product) || { meta: {} }
+  team.subscriptions.set(product, { ...current, status } as any)
+  await team.save()
+  return team
+}
+
+export async function adminSetTeamSubExpiry(
+  teamId: string,
+  product: string,
+  expiresAt: Date | null
+) {
+  const team = await TeamModel.findById(teamId)
+  if (!team) throw new Error('Команда не найдена')
+  const current: any = team.subscriptions.get(product) || { status: 'none', meta: {} }
+  team.subscriptions.set(product, { ...current, expiresAt } as any)
+  await team.save()
+  return team
+}
+
+export async function adminExtendTeamSub(teamId: string, product: string, years = 1) {
+  const team = await TeamModel.findById(teamId)
+  if (!team) throw new Error('Команда не найдена')
+
+  const current: any = team.subscriptions.get(product)
+  const now = new Date()
+  const wasActive =
+    !!current && current.status === 'active' && current.expiresAt && current.expiresAt > now
+
+  const base = wasActive ? current.expiresAt : now
+  const expiresAt = new Date(base)
+  expiresAt.setFullYear(expiresAt.getFullYear() + years)
+
+  team.subscriptions.set(product, {
+    status: 'active',
+    expiresAt,
+    meta: current?.meta || {},
+  } as any)
+
+  await team.save()
+  return expiresAt
+}
+
+export async function adminResetTeamSub(teamId: string, product: string) {
+  const team = await TeamModel.findById(teamId)
+  if (!team) throw new Error('Команда не найдена')
+  team.subscriptions.set(product, { status: 'none', expiresAt: null, meta: {} } as any)
+  await team.save()
+  return team
+}
+
+/** Правка произвольного поля внутри meta продукта (для propresenter: flowNumber/email/password/chatLink) */
+export async function adminSetTeamSubMetaField(
+  teamId: string,
+  product: string,
+  field: string,
+  value: string | number
+) {
+  const team = await TeamModel.findById(teamId)
+  if (!team) throw new Error('Команда не найдена')
+  const current: any = team.subscriptions.get(product) || { status: 'none' }
+  team.subscriptions.set(product, {
+    ...current,
+    meta: { ...(current.meta || {}), [field]: value },
+  } as any)
+  await team.save()
+  return team
+}
+
+// ==================== ПОТОКИ PROPRESENTER (справочник) ====================
+
+export async function adminGetAllStreams() {
+  return ProPresenterStreamModel.find().sort({ flowNumber: 1 })
+}
+
+export async function adminGetStream(flowNumber: number) {
+  return ProPresenterStreamModel.findOne({ flowNumber })
+}
+
+export async function adminUpdateStream(
+  flowNumber: number,
+  updates: Partial<{
+    email: string
+    password: string
+    chatLink: string
+    capacity: number
+    status: 'active' | 'closed'
+  }>
+) {
+  return ProPresenterStreamModel.findOneAndUpdate({ flowNumber }, { $set: updates }, { new: true })
+}
+
+export async function adminCreateStream(data: {
+  email: string
+  password: string
+  chatLink?: string
+  capacity?: number
+}) {
+  const last = await ProPresenterStreamModel.findOne().sort({ flowNumber: -1 })
+  const flowNumber = (last?.flowNumber || 0) + 1
+  return ProPresenterStreamModel.create({
+    flowNumber,
+    email: data.email,
+    password: data.password,
+    chatLink: data.chatLink || '',
+    capacity: data.capacity || 30,
+    status: 'active',
+  })
+}
+
+// ==================== ВСПОМОГАТЕЛЬНОЕ ====================
+
+/** "31.12.2026" -> Date | null (кидает Error если формат не распознан) */
+export function parseDateInput(text: string): Date | null {
+  const t = text.trim().toLowerCase()
+  if (t === '-' || t === 'нет' || t === 'none') return null
+
+  const m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)
+  if (!m) {
+    throw new Error('Формат даты: ДД.ММ.ГГГГ (например 31.12.2026), либо "-" чтобы очистить')
+  }
+  const [, dd, mm, yyyy] = m
+  const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd), 12, 0, 0)
+  if (isNaN(date.getTime())) {
+    throw new Error('Некорректная дата')
+  }
+  return date
+}

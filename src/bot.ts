@@ -100,6 +100,13 @@ import {
   handleRubType,
 } from './handlers/payment.handlers.js'
 
+import {
+  showAdminPanelMenu,
+  handleAdminPanelCallback,
+  handleAdminPanelText,
+} from './handlers/adminPanel.handlers.js'
+import { apCb } from './constants/admin-panel.js'
+
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const CONTENT_GROUP_ID = Number(process.env.CONTENT_GROUP_ID)
 const SUPPORT_GROUP_ID = Number(process.env.SUPPORT_GROUP_ID)
@@ -166,6 +173,8 @@ type MyContext = Context &
     isExtension: boolean
 
     supportThreadId?: number
+
+    adminPanelInput?: any
   }>
 
 export function registerHandlers(bot: Bot<MyContext>) {
@@ -276,20 +285,21 @@ export function registerHandlers(bot: Bot<MyContext>) {
   })
 
   bot.command('admin', async (ctx) => {
-    if (!isAdmin(ctx.from.id)) {
-      return
-    }
+    if (!isAdmin(ctx.from.id)) return
 
-    const kb = new InlineKeyboard().text('📢 Рассылка', 'admin:broadcast')
+    const kb = new InlineKeyboard()
+      .text('📢 Рассылка', 'admin:broadcast')
+      .row()
+      .text('✏️ Управление', apCb('menu'))
 
-    await ctx.reply('Панель администратора', {
-      reply_markup: kb,
-    })
+    await ctx.reply('Панель администратора', { reply_markup: kb })
   })
 
   // ====================== CALLBACK QUERY ======================
   bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data
+    if (await handleAdminPanelCallback(ctx, data)) return
+
     const userId = ctx.from?.id
     if (!userId) return
 
@@ -762,6 +772,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
     if (!userId) return
 
     const profile = await getOrCreateUser(userId)
+    if (await handleAdminPanelText(ctx)) return
 
     if (ctx.session.editingField) {
       await handleEditingFieldText(ctx, userId)
