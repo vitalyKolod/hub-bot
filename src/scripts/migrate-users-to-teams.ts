@@ -91,6 +91,40 @@ async function migrate() {
   const byTelegramId = new Map<number, RawUser>()
   for (const u of allUsers) byTelegramId.set(u.telegramId, u)
 
+  const linkedVolunteerIds = new Set<number>()
+  const volunteersByOwnerId = new Map<number, Map<number, RawVolunteer>>()
+
+  function linkVolunteer(ownerId: number, volunteer: RawVolunteer) {
+    if (!ownerId || !volunteer.telegramId || ownerId === volunteer.telegramId) return
+
+    linkedVolunteerIds.add(volunteer.telegramId)
+
+    let ownerVolunteers = volunteersByOwnerId.get(ownerId)
+    if (!ownerVolunteers) {
+      ownerVolunteers = new Map<number, RawVolunteer>()
+      volunteersByOwnerId.set(ownerId, ownerVolunteers)
+    }
+
+    const linkedUser = byTelegramId.get(volunteer.telegramId)
+    ownerVolunteers.set(volunteer.telegramId, {
+      telegramId: volunteer.telegramId,
+      fio: volunteer.fio || linkedUser?.fio,
+    })
+  }
+
+  for (const owner of allUsers) {
+    for (const volunteer of owner.subscriptions?.volunteers || []) {
+      linkVolunteer(owner.telegramId, volunteer)
+    }
+  }
+
+  for (const volunteer of allUsers) {
+    const ownerId = volunteer.volunteer?.ownerId
+    if (ownerId) {
+      linkVolunteer(ownerId, { telegramId: volunteer.telegramId, fio: volunteer.fio })
+    }
+  }
+
   // ============================================================
   // 2. Определяем кандидатов-владельцев:
   //    - есть хотя бы одна своя подписка в статусе active/pending/expired
@@ -108,6 +142,7 @@ async function migrate() {
   }
 
   const candidateOwners = allUsers.filter((u) => {
+    if (linkedVolunteerIds.has(u.telegramId)) return false
     const volunteers = u.subscriptions?.volunteers || []
     return hasOwnSubscription(u) || volunteers.length > 0
   })
@@ -177,7 +212,7 @@ async function migrate() {
       // Считаем текущий состав команды независимо от DRY_RUN: если team ещё
       // не создана физически (dry-run для новой команды), эффективный состав —
       // это просто [owner]. Это даёт dry-run отчёту верно предсказывать реальный запуск.
-      const volunteers = owner.subscriptions?.volunteers || []
+      const volunteers = Array.from(volunteersByOwnerId.get(owner.telegramId)?.values() || [])
       const currentMemberIds = new Set<number>(
         team ? team.members.map((m: any) => m.telegramId) : [owner.telegramId]
       )
