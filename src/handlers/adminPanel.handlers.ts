@@ -13,7 +13,6 @@ import {
   statusDot,
   formatDate,
   getDaysLeft,
-  SUB_STATUSES,
   TEAM_PRODUCT_IDS,
   PRODUCT_EMOJI,
   PAGE_SIZE,
@@ -363,11 +362,12 @@ async function showTeamProductCard(ctx: Context, teamId: string, product: string
   }
 
   const kb = new InlineKeyboard()
-  for (const st of SUB_STATUSES) {
-    kb.text(statusLabel(st), apCb('t', teamId, product, 'st', st)).row()
-  }
-  kb.text('📅 Дата окончания', apCb('t', teamId, product, 'dt')).row()
-  kb.text('➕ Продлить на 1 год', apCb('t', teamId, product, 'ex')).row()
+
+  kb.text(
+    sub?.status === 'active' ? '🔁 Продлить ещё на 1 год' : '➕ Добавить подписку (на 1 год)',
+    apCb('t', teamId, product, 'ex')
+  ).row()
+  kb.text('📅 Изменить дату окончания', apCb('t', teamId, product, 'dt')).row()
 
   if (product === 'propresenter') {
     kb.text('✏️ Поток', apCb('t', teamId, product, 'f', 'flowNumber'))
@@ -378,6 +378,9 @@ async function showTeamProductCard(ctx: Context, teamId: string, product: string
     kb.row()
   }
 
+  kb.text('⏳ Отметить "на проверке"', apCb('t', teamId, product, 'st', 'pending'))
+  kb.text('🚫 Отклонить', apCb('t', teamId, product, 'st', 'rejected'))
+  kb.row()
   kb.text('♻️ Сбросить (нет подписки)', apCb('t', teamId, product, 'rs')).row()
   kb.text('‹ К команде', apCb('t', teamId))
 

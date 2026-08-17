@@ -5,10 +5,41 @@
 import { UserModel } from '../models/User.js'
 import { TeamModel } from '../models/Team.js'
 import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
-import { PAGE_SIZE } from '../constants/admin-panel.js'
+import { PAGE_SIZE, SUB_STATUSES } from '../constants/admin-panel.js'
 
 function escapeRegex(str: string) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// ==================== САНАЦИЯ БИТЫХ ДАННЫХ ====================
+// В "боевой" базе иногда встречаются подписки с некорректным значением status
+// (лишние пробелы, старые/удалённые значения и т.п.). Mongoose валидирует ВЕСЬ
+// документ команды при save(), поэтому одна битая запись в любом продукте
+// блокирует сохранение чего угодно у этой команды. Чиним автоматически перед
+// каждым save(), а не только у конкретного продукта, который редактируем.
+const VALID_STATUSES = new Set<string>(SUB_STATUSES as unknown as string[])
+
+function sanitizeTeamSubscriptions(team: any): boolean {
+  let changed = false
+  for (const [key, sub] of team.subscriptions.entries()) {
+    if (!sub) continue
+    const raw = sub.status
+    const trimmed = typeof raw === 'string' ? raw.trim() : raw
+    const fixedStatus = VALID_STATUSES.has(trimmed) ? trimmed : 'none'
+
+    if (fixedStatus !== raw) {
+      const plain = sub.toObject ? sub.toObject() : sub
+      team.subscriptions.set(key, { ...plain, status: fixedStatus })
+      changed = true
+    }
+  }
+  return changed
+}
+
+/** save() с автопочинкой битых enum-значений в остальных продуктах команды */
+async function saveTeam(team: any) {
+  sanitizeTeamSubscriptions(team)
+  return team.save()
 }
 
 // ==================== СПИСКИ / ПАГИНАЦИЯ ====================
@@ -99,7 +130,7 @@ export async function adminTransferOwnership(teamId: string, newOwnerTelegramId:
   }) as any
 
   team.ownerId = newOwnerTelegramId
-  await team.save()
+  await saveTeam(team)
   return team
 }
 
@@ -113,7 +144,7 @@ export async function adminAddTeamMember(teamId: string, telegramId: number) {
   if (already) return team
 
   team.members.push({ telegramId, role: 'member', status: 'active' } as any)
-  await team.save()
+  await saveTeam(team)
   return team
 }
 
@@ -126,7 +157,7 @@ export async function adminRemoveTeamMember(teamId: string, telegramId: number) 
   }
 
   team.members = team.members.filter((m: any) => m.telegramId !== telegramId) as any
-  await team.save()
+  await saveTeam(team)
   return team
 }
 
@@ -137,7 +168,7 @@ export async function adminSetTeamSubStatus(teamId: string, product: string, sta
   if (!team) throw new Error('Команда не найдена')
   const current: any = team.subscriptions.get(product) || { meta: {} }
   team.subscriptions.set(product, { ...current, status } as any)
-  await team.save()
+  await saveTeam(team)
   return team
 }
 
@@ -150,7 +181,7 @@ export async function adminSetTeamSubExpiry(
   if (!team) throw new Error('Команда не найдена')
   const current: any = team.subscriptions.get(product) || { status: 'none', meta: {} }
   team.subscriptions.set(product, { ...current, expiresAt } as any)
-  await team.save()
+  await saveTeam(team)
   return team
 }
 
@@ -173,7 +204,7 @@ export async function adminExtendTeamSub(teamId: string, product: string, years 
     meta: current?.meta || {},
   } as any)
 
-  await team.save()
+  await saveTeam(team)
   return expiresAt
 }
 
@@ -181,7 +212,7 @@ export async function adminResetTeamSub(teamId: string, product: string) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
   team.subscriptions.set(product, { status: 'none', expiresAt: null, meta: {} } as any)
-  await team.save()
+  await saveTeam(team)
   return team
 }
 
@@ -199,7 +230,7 @@ export async function adminSetTeamSubMetaField(
     ...current,
     meta: { ...(current.meta || {}), [field]: value },
   } as any)
-  await team.save()
+  await saveTeam(team)
   return team
 }
 
