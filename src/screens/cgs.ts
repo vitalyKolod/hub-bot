@@ -5,8 +5,13 @@ import { FormattedString } from '@grammyjs/parse-mode'
 
 import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
+import { getProduct } from '../config/products.js'
 
 export function cgsScreen(userId: number, teamId: string): ScreenView {
+  const product = getProduct('cgs')
+  if (!product) {
+    throw new Error('Product "cgs" not found')
+  }
   const kb = new InlineKeyboard()
 
   kb.text(
@@ -68,7 +73,7 @@ export function cgsScreen(userId: number, teamId: string): ScreenView {
 
   message = message.blockquote(benefits, true).plain('\n\n')
 
-  message = message.plain('💰 ').bold('Стоимость: 2000 ₽/год')
+  message = message.plain('💰 ').bold(`Стоимость: ${product.price} ₽/год`)
 
   return {
     photo: './public/content.jpg',

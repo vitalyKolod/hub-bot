@@ -5,8 +5,14 @@ import { FormattedString } from '@grammyjs/parse-mode'
 
 import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
+import { getProduct } from '../config/products.js'
 
 export function SundayScreensScreen(userId: number, teamId: string): ScreenView {
+  const product = getProduct('sunday_screens')
+
+  if (!product) {
+    throw new Error('Product "sunday_screens" not found')
+  }
   const kb = new InlineKeyboard()
 
   kb.text(
@@ -87,21 +93,9 @@ export function SundayScreensScreen(userId: number, teamId: string): ScreenView 
 
   message = message.blockquote(benefits, true).plain('\n\n')
 
-  // ============================================================
-  // СТОИМОСТЬ
-  // ============================================================
-
-  message = message.plain('💰 ').bold('Стоимость: 2000 ₽/год').plain('\n\n')
-
-  // ============================================================
-  // ДОСТУП
-  // ============================================================
+  message = message.plain('💰 ').bold(`Стоимость: ${product.price} ₽/год`).plain('\n\n')
 
   message = message.plain('Доступ через приватный поток — без ограничений и блокировок.')
-
-  // ============================================================
-  // RETURN
-  // ============================================================
 
   return {
     photo: './public/propres.jpg',

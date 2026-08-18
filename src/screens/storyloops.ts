@@ -5,8 +5,14 @@ import { FormattedString } from '@grammyjs/parse-mode'
 
 import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
+import { getProduct } from '../config/products.js'
 
 export function storyloopsScreen(userId: number, teamId: string): ScreenView {
+  const product = getProduct('storyloops')
+
+  if (!product) {
+    throw new Error('Product "storyloops" not found')
+  }
   const kb = new InlineKeyboard()
 
   kb.text(
@@ -86,15 +92,7 @@ export function storyloopsScreen(userId: number, teamId: string): ScreenView {
 
   message = message.blockquote(benefits, true).plain('\n\n')
 
-  // ============================================================
-  // СТОИМОСТЬ
-  // ============================================================
-
-  message = message.plain('💰 ').bold('Стоимость: 2000 ₽/год')
-
-  // ============================================================
-  // RETURN
-  // ============================================================
+  message = message.plain('💰 ').bold(`Стоимость: ${product.price} ₽/год`).plain('\n\n')
 
   return {
     photo: './public/content.jpg',

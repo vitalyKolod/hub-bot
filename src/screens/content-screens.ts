@@ -1,12 +1,17 @@
-// src/screens/procontent.ts
-
 import { InlineKeyboard } from 'grammy'
 import { FormattedString } from '@grammyjs/parse-mode'
 
 import { packCb } from '../core/callback.js'
+import { getProduct } from '../config/products.js'
 import type { ScreenView } from '../core/render.js'
 
 export function procontentScreen(userId: number, teamId: string): ScreenView {
+  const product = getProduct('procontent')
+
+  if (!product) {
+    throw new Error('Product "procontent" not found')
+  }
+
   const kb = new InlineKeyboard()
 
   kb.text(
@@ -72,7 +77,7 @@ export function procontentScreen(userId: number, teamId: string): ScreenView {
 
   message = message.blockquote(content, true).plain('\n\n')
 
-  message = message.plain('💰 ').bold('Стоимость: 1000 ₽/год')
+  message = message.plain('💰 ').bold(`Стоимость: ${product.price} ₽/год`)
 
   return {
     photo: './public/procontent.png',
