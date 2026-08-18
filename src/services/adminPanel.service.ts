@@ -11,6 +11,14 @@ function escapeRegex(str: string) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** Mongoose-сабдокумент -> обычный plain-объект. Без этого спред {...sub}
+ * теряет поля (status/expiresAt/meta), т.к. спред берёт только "свои"
+ * enumerable-свойства, а не то, что отдают геттеры сабдокумента. */
+function toPlainSub(sub: any): any {
+  if (!sub) return sub
+  return sub.toObject ? sub.toObject() : sub
+}
+
 // ==================== САНАЦИЯ БИТЫХ ДАННЫХ ====================
 // В "боевой" базе иногда встречаются подписки с некорректным значением status
 // (лишние пробелы, старые/удалённые значения и т.п.). Mongoose валидирует ВЕСЬ
@@ -28,7 +36,7 @@ function sanitizeTeamSubscriptions(team: any): boolean {
     const fixedStatus = VALID_STATUSES.has(trimmed) ? trimmed : 'none'
 
     if (fixedStatus !== raw) {
-      const plain = sub.toObject ? sub.toObject() : sub
+      const plain = toPlainSub(sub)
       team.subscriptions.set(key, { ...plain, status: fixedStatus })
       changed = true
     }
@@ -166,7 +174,7 @@ export async function adminRemoveTeamMember(teamId: string, telegramId: number) 
 export async function adminSetTeamSubStatus(teamId: string, product: string, status: string) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
-  const current: any = team.subscriptions.get(product) || { meta: {} }
+  const current = toPlainSub(team.subscriptions.get(product)) || { meta: {} }
   team.subscriptions.set(product, { ...current, status } as any)
   await saveTeam(team)
   return team
@@ -179,7 +187,7 @@ export async function adminSetTeamSubExpiry(
 ) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
-  const current: any = team.subscriptions.get(product) || { status: 'none', meta: {} }
+  const current = toPlainSub(team.subscriptions.get(product)) || { status: 'none', meta: {} }
   team.subscriptions.set(product, { ...current, expiresAt } as any)
   await saveTeam(team)
   return team
@@ -189,7 +197,7 @@ export async function adminExtendTeamSub(teamId: string, product: string, years 
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
 
-  const current: any = team.subscriptions.get(product)
+  const current = toPlainSub(team.subscriptions.get(product))
   const now = new Date()
   const wasActive =
     !!current && current.status === 'active' && current.expiresAt && current.expiresAt > now
@@ -225,7 +233,7 @@ export async function adminSetTeamSubMetaField(
 ) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
-  const current: any = team.subscriptions.get(product) || { status: 'none' }
+  const current = toPlainSub(team.subscriptions.get(product)) || { status: 'none' }
   team.subscriptions.set(product, {
     ...current,
     meta: { ...(current.meta || {}), [field]: value },
@@ -234,7 +242,7 @@ export async function adminSetTeamSubMetaField(
   return team
 }
 
-// ==================== ПОТОКИ PROPRESENTER (справочник) ====================
+// ==================== ПОТОКИ PROPRESENTER (справочник — всё из БД) ====================
 
 export async function adminGetAllStreams() {
   return ProPresenterStreamModel.find().sort({ flowNumber: 1 })
@@ -257,6 +265,14 @@ export async function adminUpdateStream(
   return ProPresenterStreamModel.findOneAndUpdate({ flowNumber }, { $set: updates }, { new: true })
 }
 
+export async function adminSetStreamExpiry(flowNumber: number, expiresAt: Date | null) {
+  return ProPresenterStreamModel.findOneAndUpdate(
+    { flowNumber },
+    { $set: { expiresAt } },
+    { new: true }
+  )
+}
+
 export async function adminCreateStream(data: {
   email: string
   password: string
@@ -273,6 +289,76 @@ export async function adminCreateStream(data: {
     capacity: data.capacity || 30,
     status: 'active',
   })
+}
+
+export async function adminDeleteStream(flowNumber: number) {
+  const res = await ProPresenterStreamModel.deleteOne({ flowNumber })
+  if (!res.deletedCount) throw new Error('Поток не найден')
+  return true
+}
+
+// ---- команды внутри потока (доступ к ProPresenter выдаётся команде целиком) ----
+
+/** Команды, у которых прямо сейчас активна подписка propresenter именно на этот поток */
+export async function adminGetTeamsInStream(flowNumber: number) {
+  return TeamModel.find({
+    'subscriptions.propresenter.status': 'active',
+    'subscriptions.propresenter.meta.flowNumber': flowNumber,
+  })
+}
+
+/** Сколько команд уже сидит в потоке (источник правды — сами команды, а не отдельный счётчик) */
+export async function adminGetStreamOccupancy(flowNumber: number): Promise<number> {
+  return TeamModel.countDocuments({
+    'subscriptions.propresenter.status': 'active',
+    'subscriptions.propresenter.meta.flowNumber': flowNumber,
+  })
+}
+
+/** Посадить команду в поток: копирует email/password/chatLink/дату из справочника потоков */
+export async function adminAddTeamToStream(teamId: string, flowNumber: number) {
+  const stream = await ProPresenterStreamModel.findOne({ flowNumber })
+  if (!stream) throw new Error('Поток не найден')
+
+  const team = await TeamModel.findById(teamId)
+  if (!team) throw new Error('Команда не найдена')
+
+  const already = toPlainSub(team.subscriptions.get('propresenter'))
+  const alreadyInThisStream =
+    already?.status === 'active' && already?.meta?.flowNumber === flowNumber
+  if (alreadyInThisStream) return team
+
+  if (stream.status !== 'active') {
+    throw new Error('Поток закрыт — сначала открой его ("🟢 Открыть поток")')
+  }
+
+  const occupancy = await adminGetStreamOccupancy(flowNumber)
+  if (occupancy >= (stream.capacity || 30)) {
+    throw new Error(`В потоке уже максимум команд (${stream.capacity})`)
+  }
+
+  team.subscriptions.set('propresenter', {
+    status: 'active',
+    expiresAt: stream.expiresAt || null,
+    meta: {
+      flowNumber: stream.flowNumber,
+      email: stream.email,
+      password: stream.password,
+      chatLink: stream.chatLink,
+    },
+  } as any)
+
+  await saveTeam(team)
+  return team
+}
+
+/** Убрать команду из потока (сбрасывает её подписку propresenter в "нет подписки") */
+export async function adminRemoveTeamFromStream(teamId: string) {
+  const team = await TeamModel.findById(teamId)
+  if (!team) throw new Error('Команда не найдена')
+  team.subscriptions.set('propresenter', { status: 'none', expiresAt: null, meta: {} } as any)
+  await saveTeam(team)
+  return team
 }
 
 // ==================== ВСПОМОГАТЕЛЬНОЕ ====================
