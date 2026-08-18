@@ -102,10 +102,18 @@ import {
 
 import {
   showAdminPanelMenu,
+  showAdminTeamCard,
+  showAdminUserCard,
   handleAdminPanelCallback,
   handleAdminPanelText,
 } from './handlers/adminPanel.handlers.js'
 import { apCb } from './constants/admin-panel.js'
+import {
+  closeOpenTicketForUser,
+  closeSupportTicket,
+  relayAdminMessage,
+  sendUserMessageToSupport,
+} from './services/support.service.js'
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const CONTENT_GROUP_ID = Number(process.env.CONTENT_GROUP_ID)
@@ -141,6 +149,7 @@ if (!SUPPORT_GROUP_ID) {
   console.error('SUPPORT_GROUP_ID не задан в .env')
   process.exit(1)
 }
+console.log(`🆘 Группа поддержки: ${SUPPORT_GROUP_ID}`)
 
 type MyContext = Context &
   SessionFlavor<{
@@ -173,6 +182,7 @@ type MyContext = Context &
     isExtension: boolean
 
     supportThreadId?: number
+    supportPanelMessageId?: number
 
     adminPanelInput?: any
   }>
@@ -181,10 +191,15 @@ export function registerHandlers(bot: Bot<MyContext>) {
   initScreens()
 
   bot.use(
-    session({
+    session<MyContext['session'], Context>({
       initial: () => ({
         payment: null,
+        isExtension: false,
       }),
+      // В группах состояние должно быть отдельным для каждого администратора.
+      // Иначе ввод одного сотрудника в админ-панели перехватит сообщение другого.
+      getSessionKey: (ctx) =>
+        ctx.chat?.id && ctx.from?.id ? `${ctx.chat.id}:${ctx.from.id}` : undefined,
     })
   )
 
@@ -278,8 +293,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
   })
 
   bot.command('support', async (ctx) => {
-    ctx.session.inSupportMode = true
-    ctx.session.supportThreadId = undefined
     goTo(ctx.from.id, 'support')
     await renderScreen(ctx, ctx.from.id, 'support', undefined, { forceNew: true })
   })
@@ -312,6 +325,77 @@ export function registerHandlers(bot: Bot<MyContext>) {
     console.log('callback data:', data)
 
     const message = ctx.callbackQuery.message
+
+    if (data.startsWith('support:profile:')) {
+      if (ctx.chat?.id !== SUPPORT_GROUP_ID || !isAdmin(userId)) {
+        await ctx.answerCallbackQuery({ text: 'Недостаточно прав', show_alert: true })
+        return
+      }
+      const targetUserId = Number(data.slice('support:profile:'.length))
+      await showAdminUserCard(ctx, targetUserId)
+      await ctx.answerCallbackQuery()
+      return
+    }
+
+    if (data.startsWith('support:team:')) {
+      if (ctx.chat?.id !== SUPPORT_GROUP_ID || !isAdmin(userId)) {
+        await ctx.answerCallbackQuery({ text: 'Недостаточно прав', show_alert: true })
+        return
+      }
+      const teamId = data.slice('support:team:'.length)
+      await showAdminTeamCard(ctx, teamId)
+      await ctx.answerCallbackQuery()
+      return
+    }
+
+    if (data === 'support:start') {
+      ctx.session.inSupportMode = true
+      await ctx.answerCallbackQuery({ text: 'Чат с поддержкой открыт' })
+      await ctx.reply(
+        '💬 Опишите вопрос одним или несколькими сообщениями. Можно отправлять фото, видео, документы и голосовые.\n\n👍 — сообщение доставлено поддержке\n👎 — отправка отменена из-за ошибки',
+        {
+          reply_markup: new InlineKeyboard().text('✅ Завершить диалог', 'support:close:user'),
+        }
+      )
+      return
+    }
+
+    if (data === 'support:close:user') {
+      const ticket = await closeOpenTicketForUser(ctx.api, userId)
+      ctx.session.inSupportMode = false
+      ctx.session.supportThreadId = undefined
+      await ctx.answerCallbackQuery({
+        text: ticket ? 'Обращение завершено' : 'Активных обращений нет',
+      })
+      await ctx.reply(
+        ticket
+          ? '✅ Диалог завершён. Спасибо за обращение! Если понадобится помощь — откройте новое обращение.'
+          : 'У вас сейчас нет активного обращения.'
+      )
+      return
+    }
+
+    if (data.startsWith('support:close:')) {
+      if (ctx.chat?.id !== SUPPORT_GROUP_ID) {
+        await ctx.answerCallbackQuery({ text: 'Недостаточно прав', show_alert: true })
+        return
+      }
+      const ticketId = data.slice('support:close:'.length)
+      const ticket = await closeSupportTicket(ctx.api, ticketId, 'admin')
+      await ctx.answerCallbackQuery({ text: ticket ? 'Обращение завершено' : 'Уже завершено' })
+      if (ticket && ctx.session.supportPanelMessageId) {
+        await ctx.api
+          .deleteMessage(SUPPORT_GROUP_ID, ctx.session.supportPanelMessageId)
+          .catch(() => {})
+        ctx.session.supportPanelMessageId = undefined
+      }
+      if (ticket && message) {
+        try {
+          await ctx.editMessageReplyMarkup({ reply_markup: undefined })
+        } catch {}
+      }
+      return
+    }
 
     //Редактирование поля
     if (data === 'edit_registration') {
@@ -547,8 +631,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     // Поддержка
     if (parsed.a === 'open' && parsed.s === 'support') {
-      ctx.session.inSupportMode = true
-      ctx.session.supportThreadId = undefined
       goTo(userId, 'support')
       await renderScreen(ctx, userId, 'support')
       await ack()
@@ -771,8 +853,12 @@ export function registerHandlers(bot: Bot<MyContext>) {
     const userId = ctx.from?.id
     if (!userId) return
 
-    const profile = await getOrCreateUser(userId)
+    // В топике поддержки ввод из админ-панели (дата, имя, статус и т.д.)
+    // должен обрабатываться раньше, чем обычный ответ пользователю.
     if (await handleAdminPanelText(ctx)) return
+    if (await relayAdminMessage(ctx)) return
+
+    const profile = await getOrCreateUser(userId)
 
     if (ctx.session.editingField) {
       await handleEditingFieldText(ctx, userId)
@@ -790,25 +876,17 @@ export function registerHandlers(bot: Bot<MyContext>) {
     }
 
     if (ctx.session.inSupportMode) {
-      let threadId = ctx.session.supportThreadId
-      if (!threadId) {
-        const username = ctx.from.username ? `@${ctx.from.username}` : `ID:${userId}`
-        const profile = await getOrCreateUser(userId)
-        const userInfo = `🆘 Новое обращение\n👤 ${profile.fio || 'не указано'}\nID: ${userId}`
-
-        try {
-          const topic = await ctx.api.createForumTopic(SUPPORT_GROUP_ID, `Поддержка — ${username}`)
-          threadId = topic.message_thread_id
-          ctx.session.supportThreadId = threadId
-          await ctx.api.sendMessage(SUPPORT_GROUP_ID, userInfo, { message_thread_id: threadId })
-        } catch (err) {
-          console.error('Ошибка создания темы поддержки:', err)
-        }
-      }
       try {
-        await ctx.copyMessage(SUPPORT_GROUP_ID, { message_thread_id: threadId })
+        await sendUserMessageToSupport(ctx, userId)
+        try {
+          await ctx.react('👍')
+        } catch {}
       } catch (err) {
-        console.error('Ошибка копирования текста:', err)
+        console.error('Ошибка отправки в поддержку:', err)
+        try {
+          await ctx.react('👎')
+        } catch {}
+        await ctx.reply('⚠️ Не получилось отправить сообщение. Попробуйте ещё раз чуть позже.')
       }
       return
     }
@@ -903,24 +981,23 @@ export function registerHandlers(bot: Bot<MyContext>) {
       return
     }
 
+    if (await relayAdminMessage(ctx)) return
+
     // Если не чек — проверяем поддержку
     if (ctx.session.inSupportMode) {
-      let threadId = ctx.session.supportThreadId
-      if (!threadId) {
-        const username = ctx.from.username ? `@${ctx.from.username}` : `ID:${ctx.from.id}`
-        try {
-          const topic = await ctx.api.createForumTopic(SUPPORT_GROUP_ID, `Поддержка — ${username}`)
-          threadId = topic.message_thread_id
-          ctx.session.supportThreadId = threadId
-        } catch (err) {
-          console.error('Ошибка создания темы:', err)
-        }
-      }
       try {
-        await ctx.copyMessage(SUPPORT_GROUP_ID, { message_thread_id: threadId })
+        await sendUserMessageToSupport(ctx, ctx.from.id)
+        try {
+          await ctx.react('👍')
+        } catch {}
       } catch (err) {
-        console.error('Ошибка копирования медиа:', err)
+        console.error('Ошибка отправки медиа:', err)
+        try {
+          await ctx.react('👎')
+        } catch {}
+        await ctx.reply('⚠️ Не получилось отправить файл. Попробуйте ещё раз чуть позже.')
       }
+      return
     }
   })
   bot.on('message:users_shared', async (ctx) => {
@@ -967,28 +1044,22 @@ export function registerHandlers(bot: Bot<MyContext>) {
     await renderScreen(ctx, ctx.from.id, 'payment', undefined, { forceNew: true })
   })
 
-  // Пересылка от админа к юзеру
+  // Остальные типы сообщений поддержки: видео, голосовые, кружки, стикеры и т.д.
   bot.on('message', async (ctx) => {
-    if (ctx.chat?.id !== SUPPORT_GROUP_ID) return
-    if (!ctx.from || ctx.from.is_bot) return
+    if (await relayAdminMessage(ctx)) return
+    if (ctx.chat.type !== 'private' || !ctx.from || !ctx.session.inSupportMode) return
 
-    const threadId = ctx.message.message_thread_id
-    if (!threadId) return
-
-    // Ищем ID пользователя по первому сообщению темы
-    const firstMsg = ctx.message.reply_to_message
-    if (firstMsg) {
-      const textOrCaption = firstMsg.text || firstMsg.caption || ''
-      const match = textOrCaption.match(/ID:\s*(\d+)/i)
-      if (match) {
-        const userId = Number(match[1])
-        try {
-          await ctx.forwardMessage(userId)
-          console.log(`Сообщение от админа переслано юзеру ${userId}`)
-        } catch (err) {
-          console.error('Не удалось переслать юзеру:', err)
-        }
-      }
+    try {
+      await sendUserMessageToSupport(ctx, ctx.from.id)
+      try {
+        await ctx.react('👍')
+      } catch {}
+    } catch (error) {
+      console.error('Ошибка отправки сообщения поддержки:', error)
+      try {
+        await ctx.react('👎')
+      } catch {}
+      await ctx.reply('⚠️ Этот тип сообщения не удалось отправить. Попробуйте текст или файл.')
     }
   })
   setInterval(

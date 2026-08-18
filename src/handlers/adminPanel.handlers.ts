@@ -18,6 +18,7 @@ import {
   PAGE_SIZE,
 } from '../constants/admin-panel.js'
 import * as ap from '../services/adminPanel.service.js'
+import { SUPPORT_GROUP_ID } from '../config/env.js'
 
 // ---------- session helpers ----------
 
@@ -49,6 +50,21 @@ type ApInput = {
 
 function getSession(ctx: Context): any {
   return (ctx as any).session
+}
+
+function isSupportTopic(ctx: Context): boolean {
+  return ctx.chat?.id === SUPPORT_GROUP_ID && Boolean(ctx.message?.message_thread_id)
+}
+
+/** В поддержке не создаём отдельное сообщение «готово»: ставим реакцию и
+ * удаляем служебный ввод администратора. В личной админке сохраняем старое поведение. */
+async function confirmAdminInput(ctx: Context, text: string) {
+  if (!isSupportTopic(ctx)) {
+    await ctx.reply(text)
+    return
+  }
+  await ctx.react('👍').catch(() => {})
+  await ctx.deleteMessage().catch(() => {})
 }
 
 async function guard(ctx: Context): Promise<boolean> {
@@ -186,6 +202,11 @@ async function showUserCard(ctx: Context, telegramId: number) {
   await render(ctx, text, kb)
 }
 
+/** Открывает карточку пользователя новым сообщением — используется из топика поддержки. */
+export async function showAdminUserCard(ctx: Context, telegramId: number) {
+  await showUserCard(replyOnlyCtx(ctx), telegramId)
+}
+
 async function promptEditUserField(ctx: Context, telegramId: number, field: string) {
   getSession(ctx).adminPanelInput = { mode: 'edit_user_field', telegramId, field } as ApInput
   const kb = new InlineKeyboard().text('‹ Назад', apCb('u', telegramId))
@@ -308,6 +329,11 @@ async function showTeamCard(ctx: Context, teamId: string) {
   kb.text('‹ К списку', apCb('tl', 0))
 
   await render(ctx, text, kb)
+}
+
+/** Открывает карточку команды новым сообщением — используется из топика поддержки. */
+export async function showAdminTeamCard(ctx: Context, teamId: string) {
+  await showTeamCard(replyOnlyCtx(ctx), teamId)
 }
 
 async function promptEditTeamName(ctx: Context, teamId: string) {
@@ -699,7 +725,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
 
       case 'edit_user_field':
         await ap.adminUpdateUserField(input.telegramId!, input.field as any, text)
-        await ctx.reply('✅ Обновлено')
+        await confirmAdminInput(ctx, '✅ Обновлено')
         await showUserCard(replyOnlyCtx(ctx), input.telegramId!)
         break
 
@@ -720,7 +746,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
 
       case 'edit_team_name':
         await ap.adminUpdateTeamName(input.teamId!, text)
-        await ctx.reply('✅ Название обновлено')
+        await confirmAdminInput(ctx, '✅ Название обновлено')
         await showTeamCard(replyOnlyCtx(ctx), input.teamId!)
         break
 
@@ -728,7 +754,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
         const newOwnerId = Number(text)
         if (!Number.isFinite(newOwnerId)) throw new Error('ID должен быть числом')
         await ap.adminTransferOwnership(input.teamId!, newOwnerId)
-        await ctx.reply('✅ Владение передано')
+        await confirmAdminInput(ctx, '✅ Владение передано')
         await showTeamCard(replyOnlyCtx(ctx), input.teamId!)
         break
       }
@@ -737,7 +763,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
         const telegramId = Number(text)
         if (!Number.isFinite(telegramId)) throw new Error('ID должен быть числом')
         await ap.adminAddTeamMember(input.teamId!, telegramId)
-        await ctx.reply('✅ Участник добавлен')
+        await confirmAdminInput(ctx, '✅ Участник добавлен')
         await showTeamCard(replyOnlyCtx(ctx), input.teamId!)
         break
       }
@@ -745,7 +771,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
       case 'set_team_sub_date': {
         const date = ap.parseDateInput(text)
         await ap.adminSetTeamSubExpiry(input.teamId!, input.product!, date)
-        await ctx.reply('✅ Дата обновлена')
+        await confirmAdminInput(ctx, '✅ Дата обновлена')
         await showTeamProductCard(replyOnlyCtx(ctx), input.teamId!, input.product!)
         break
       }
@@ -753,7 +779,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
       case 'set_team_sub_meta': {
         const value = input.field === 'flowNumber' ? Number(text) : text
         await ap.adminSetTeamSubMetaField(input.teamId!, input.product!, input.field!, value)
-        await ctx.reply('✅ Обновлено')
+        await confirmAdminInput(ctx, '✅ Обновлено')
         await showTeamProductCard(replyOnlyCtx(ctx), input.teamId!, input.product!)
         break
       }
@@ -762,14 +788,14 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
         await ap.adminUpdateStream(input.flowNumber!, {
           [input.field!]: input.field === 'capacity' ? Number(text) : text,
         } as any)
-        await ctx.reply('✅ Обновлено')
+        await confirmAdminInput(ctx, '✅ Обновлено')
         await showStreamCard(replyOnlyCtx(ctx), input.flowNumber!)
         break
 
       case 'stream_date': {
         const date = ap.parseDateInput(text)
         await ap.adminSetStreamExpiry(input.flowNumber!, date)
-        await ctx.reply('✅ Дата обновлена')
+        await confirmAdminInput(ctx, '✅ Дата обновлена')
         await showStreamCard(replyOnlyCtx(ctx), input.flowNumber!)
         break
       }
@@ -839,6 +865,23 @@ async function handleStreamCreationStep(ctx: Context, input: ApInput, text: stri
  */
 function replyOnlyCtx(ctx: Context): Context {
   const proxy = Object.create(ctx)
-  proxy.editMessageText = (text: string, opts: any) => ctx.reply(text, opts)
+  proxy.editMessageText = async (text: string, opts: any) => {
+    const session = getSession(ctx)
+    const panelMessageId = session?.supportPanelMessageId
+
+    if (ctx.chat?.id === SUPPORT_GROUP_ID && panelMessageId) {
+      try {
+        return await ctx.api.editMessageText(ctx.chat.id, panelMessageId, text, opts)
+      } catch {
+        session.supportPanelMessageId = undefined
+      }
+    }
+
+    const sent = await ctx.reply(text, opts)
+    if (ctx.chat?.id === SUPPORT_GROUP_ID && session) {
+      session.supportPanelMessageId = sent.message_id
+    }
+    return sent
+  }
   return proxy
 }

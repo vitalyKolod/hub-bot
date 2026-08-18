@@ -6,31 +6,24 @@ import type { ScreenView } from '../core/render.js'
 
 export function supportScreen(userId: number): ScreenView {
   const kb = new InlineKeyboard()
-
-    // .url('Вопрос по подписке?', 'https://t.me/k1r4r1k')
-    // .icon('5332600543963522398')
-    // .row()
-    // .url('Вопрос по обучению?', 'https://t.me/imacport')
-    // .icon('5472411062412254753')
-    // .row()
-
-    // .url('Вопрос на счет программы?', 'https://t.me/+ZAMZ3oP2Cs41MGYy')
-    // .icon('5251272469175631339')
-    // .row()
-
-    .url('ВОПРОС ПО БОТУ?', 'https://t.me/vitaly_kolodchenko')
-    .icon('5818813162815753343')
+    .text('Написать в поддержку', 'support:start')
+    .icon('5307746710682869587')
     .row()
-    .url('БОТ ПОМОЩНИК', 'https://t.me/hubbbhelp_bot')
+    .text('БОТ ПОМОЩНИК', 'https://t.me/hubbbhelp_bot')
     .icon('6030400221232501136')
     .row()
+    .url('Написать разработчику?', 'https://t.me/vitaly_kolodchenko')
+    .icon('5818813162815753343')
+    .row()
+
   kb.text('◀️ Назад', packCb({ a: 'home' }))
 
   // .text('❌ Завершить диалог', packCb({ a: 'end_support' })).row()
 
   return {
     photo: './public/help.jpg',
-    caption: `Если у вас остались какие-то вопросы по процессам работы ХАБ КОМЬЮНИТИ или есть сложности с ботом / обнаружили баги...\nВыберите соответствующий раздел:`,
+    caption:
+      'Если появились вопросы по работе ХАБ КОМЬЮНИТИ, сложности с ботом или вы обнаружили ошибку — напишите нам.\n\nВыбирите раздел 👇',
 
     keyboard: kb,
   }
