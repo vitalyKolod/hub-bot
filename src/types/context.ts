@@ -25,6 +25,7 @@ export type SessionData = {
   inSupportMode?: boolean
   isExtension: boolean
   supportThreadId?: number
+  supportPanelMessageId?: number
 }
 
 export type MyContext = Context & SessionFlavor<SessionData>
