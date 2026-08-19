@@ -4,7 +4,11 @@ import { goTo } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
 import { escapeUnderscore } from '../utils/escape.js'
 import { getOrCreateUser } from '../services/user.service.js'
-import { getTeamById, activateTeamSubscription } from '../services/team.service.js'
+import {
+  getTeamById,
+  activateTeamSubscription,
+  isTeamProductPurchaseLocked,
+} from '../services/team.service.js'
 import { getProduct } from '../config/products.js'
 import { createTeamInvite } from '../services/teamInvite.service.js'
 import { markCartInReview, getOrCreateCart } from '../services/cart.service.js'
@@ -19,6 +23,21 @@ export async function handlePayProduct(
   productId: string,
   teamId: string
 ) {
+  const team = await getTeamById(teamId)
+  if (!team || team.ownerId !== userId) {
+    await ctx.answerCallbackQuery({
+      text: 'Оплатить может только владелец команды',
+      show_alert: true,
+    })
+    return
+  }
+  if (await isTeamProductPurchaseLocked(teamId, productId)) {
+    await ctx.answerCallbackQuery({
+      text: '✅ Этот продукт уже оплачен',
+      show_alert: true,
+    })
+    return
+  }
   ctx.session.payment = {
     product: productId,
     teamId,
@@ -107,6 +126,16 @@ export async function handleReceiptUpload(ctx: MyContext) {
     const username = ctx.from!.username ? `@${ctx.from!.username}` : `ID:${userId}`
     const payment = ctx.session.payment
     const teamId = payment?.teamId
+    const validTeamId = teamId && teamId !== 'undefined' ? teamId : null
+    const team = validTeamId ? await getTeamById(validTeamId) : null
+
+    const operationFor = (productId?: string) => {
+      if (!productId || !team) return '🆕 Новая оплата'
+      const subscription = team.subscriptions.get(productId)
+      return subscription?.expiresAt && ['active', 'expired'].includes(subscription.status)
+        ? '🔄 Продление'
+        : '🆕 Новая подписка'
+    }
 
     let methodText = ''
     if (payment?.method === 'crypto' || payment?.network) {
@@ -130,14 +159,19 @@ export async function handleReceiptUpload(ctx: MyContext) {
 
     let kb = new InlineKeyboard()
     let productsText = ''
+    let operationText = '🆕 Новая оплата'
 
     if (payment?.product === 'cart' && teamId) {
       const cart = await markCartInReview(teamId)
       const items = cart.items.filter((i: any) => i.status === 'in_review')
+      const operations = items.map((i: any) => operationFor(i.product))
 
       productsText = items
-        .map((i: any) => `• ${getProduct(i.product)?.name || i.product}`)
+        .map(
+          (i: any) => `• ${getProduct(i.product)?.name || i.product} — ${operationFor(i.product)}`
+        )
         .join('\n')
+      operationText = new Set(operations).size === 1 ? operations[0] : '📦 Смешанный заказ'
 
       for (const item of items) {
         kb.text(
@@ -149,19 +183,20 @@ export async function handleReceiptUpload(ctx: MyContext) {
       }
       kb.url('Написать юзеру', `tg://user?id=${userId}`)
     } else {
-      productsText = `• ${getProduct(payment?.product || '')?.name || payment?.product}\n\`PRODUCT_ID:${payment?.product}\``
+      operationText = operationFor(payment?.product)
+      productsText = `• ${getProduct(payment?.product || '')?.name || payment?.product} — ${operationText}\n\`PRODUCT_ID:${payment?.product}\``
       kb.text('✅ Принять', packCb({ a: 'accept', p: teamId }))
         .text('❌ Отклонить', packCb({ a: 'reject', p: teamId }))
         .row()
         .url('Написать юзеру', `tg://user?id=${userId}`)
     }
 
-    const validTeamId = teamId && teamId !== 'undefined' ? teamId : null
-    const teamName = validTeamId ? (await getTeamById(validTeamId))?.name || 'Неизвестно' : '—'
+    const teamName = team?.name || (validTeamId ? 'Неизвестно' : '—')
 
     const adminText = `
-💰 *НОВАЯ ОПЛАТА*
+💰 *ОПЛАТА: ${operationText.toUpperCase()}*
 ━━━━━━━━━━━━━━
+🏷 *Тип операции:* ${operationText}
 📦 *Товары:*
 ${productsText}
 ━━━━━━━━━━━━━━
@@ -180,7 +215,10 @@ ${productsText}
 
     let threadId: number | undefined
     try {
-      const topic = await ctx.api.createForumTopic(ADMIN_GROUP_ID, `Новый заказ — ${username}`)
+      const topic = await ctx.api.createForumTopic(
+        ADMIN_GROUP_ID,
+        `${operationText.replace(/[^А-Яа-яA-Za-z ]/g, '').trim()} — ${username}`
+      )
       threadId = topic.message_thread_id
     } catch (err) {
       console.error('Ошибка создания темы:', err)
@@ -203,11 +241,16 @@ ${productsText}
       })
     }
 
+    // Реакция — только визуальное подтверждение и не должна ломать оплату,
+    // если Telegram не разрешил реакции в конкретном чате.
+    await ctx.react('👌').catch(() => {})
+
     await ctx.reply(
       '✅ Чек успешно отправлен администратору! Ожидайте подтверждения. \nЧтобы вернуться в меню команд - нажмите /team_list'
     )
   } catch (err) {
     console.error('🔥 ОБЩАЯ ОШИБКА в блоке отправки чека:', err)
+    await ctx.react('👎').catch(() => {})
     await ctx.reply('❌ Произошла ошибка при обработке чека. Попробуй ещё раз.')
   }
 }
@@ -269,10 +312,7 @@ export async function handleAdminAccept(
       })
       await ctx.api.sendMessage(
         team.ownerId,
-        `✅ ${isExtension ? 'Продлено' : 'Подписка активирована, '}:
-         Ваша ссылка ниже 👇
-          ${product.name}\n\n${invite.invite_link}
-        \nчтобы вернуться, нажмите /team_list`
+        `✅ ${isExtension ? 'Продлено' : 'Подписка активирована, '}:${product.name}\n\nВаша ссылка ниже 👇\n\n${invite.invite_link}\n\nчтобы вернуться в команду, нажмите /team_list`
       )
     } else {
       await ctx.api.sendMessage(

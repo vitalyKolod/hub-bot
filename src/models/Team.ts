@@ -36,6 +36,13 @@ const teamSchema = new mongoose.Schema(
       of: subscriptionSchema,
       default: () => new Map(),
     },
+
+    // Ключи уже отправленных напоминаний. В ключ входит дата окончания,
+    // поэтому после продления новый цикл уведомлений начнётся автоматически.
+    reminders: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true }
 )

@@ -1,5 +1,16 @@
 import { TeamModel } from '../models/Team.js'
 
+const RENEWAL_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
+
+/** Активную подписку нельзя купить повторно до начала окна продления. */
+export async function isTeamProductPurchaseLocked(teamId: string, productId: string) {
+  const team = await TeamModel.findById(teamId)
+  if (!team) return false
+  const subscription = team.subscriptions.get(productId)
+  if (subscription?.status !== 'active' || !subscription.expiresAt) return false
+  return subscription.expiresAt.getTime() - Date.now() > RENEWAL_WINDOW_MS
+}
+
 /**
  * Создать команду
  */

@@ -1,50 +1,18 @@
 // src/screens/storyloops.ts
 
-import { InlineKeyboard } from 'grammy'
 import { FormattedString } from '@grammyjs/parse-mode'
 
-import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
 import { getProduct } from '../config/products.js'
+import { buildProductPurchaseKeyboard } from './product-purchase.js'
 
-export function storyloopsScreen(userId: number, teamId: string): ScreenView {
+export async function storyloopsScreen(userId: number, teamId: string): Promise<ScreenView> {
   const product = getProduct('storyloops')
 
   if (!product) {
     throw new Error('Product "storyloops" not found')
   }
-  const kb = new InlineKeyboard()
-
-  kb.text(
-    'ОПЛАТИТЬ СРАЗУ',
-    packCb({
-      a: 'pay_product',
-      p: `storyloops:${teamId}`,
-    })
-  )
-    .icon('5318912792428814144')
-    .row()
-
-  kb.text(
-    '🛒 В КОРЗИНУ',
-    packCb({
-      a: 'add_to_cart',
-      p: `storyloops:${teamId}`,
-    })
-  ).row()
-
-  kb.text(
-    '🛒 ПЕРЕЙТИ В КОРЗИНУ',
-    packCb({
-      a: 'open',
-      s: 'cart',
-      p: teamId,
-    })
-  ).row()
-
-  kb.url('ОСТАЛИСЬ ВОПРОСЫ?', 'https://t.me/hubbbhelp_bot').icon('5436113877181941026').row()
-
-  kb.text('◀️ НАЗАД', packCb({ a: 'back' }))
+  const kb = await buildProductPurchaseKeyboard(teamId, 'storyloops')
 
   // ============================================================
   // ТЕКСТ

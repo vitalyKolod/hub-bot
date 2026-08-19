@@ -1,176 +1,185 @@
-import { Bot } from 'grammy'
-import { UserModel } from '../models/User.js'
-import { PROP_FLOWS } from '../data/ProPresenterFLows.js'
+import { Bot, InlineKeyboard } from 'grammy'
+import { getProduct } from '../config/products.js'
+import { packCb } from '../core/callback.js'
+import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
+import { TeamModel } from '../models/Team.js'
 
-// Функция расчета точного времени до истечения
-function getTimeLeft(date?: Date | string | null) {
-  if (!date) return null
+const DAY_MS = 24 * 60 * 60 * 1000
+const REMINDER_DAYS = new Set([14, 11, 8, 5, 3, 2, 1])
 
-  const target = new Date(date).getTime()
-  const now = Date.now()
-  const diffMs = target - now
-
-  if (diffMs <= 0) return { expired: true, days: 0, hours: 0, minutes: 0, seconds: 0 }
-
-  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
-  const seconds = Math.floor((diffMs % (1000 * 60)) / 1000)
-
-  return { expired: false, days, hours, minutes, seconds, totalMs: diffMs }
+function expiryToken(expiresAt: Date) {
+  return expiresAt.toISOString().slice(0, 10).replaceAll('-', '')
 }
 
-// Форматируем красивую строку оставшегося времени
-function formatTimeLeft(timeLeft: {
-  days: number
-  hours: number
-  minutes: number
-  seconds: number
-}) {
-  const parts = []
-  if (timeLeft.days > 0) parts.push(`${timeLeft.days} дн.`)
-  parts.push(`${timeLeft.hours} ч.`)
-  parts.push(`${timeLeft.minutes} мин.`)
-  parts.push(`${timeLeft.seconds} сек.`)
-  return parts.join(' ')
+function daysLeft(expiresAt: Date) {
+  return Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / DAY_MS))
 }
 
-// Проверка — надо ли отправлять напоминание (например, ровно за 3 дня, за 2 дня, за 1 день или за несколько часов)
-// Вместо строгой проверки по дням, проверяем пороги в миллисекундах
-function shouldSendReminder(totalMs: number, sentList: string[], prefix: string) {
-  const ONE_HOUR = 1000 * 60 * 60
-  const ONE_DAY = ONE_HOUR * 24
-
-  // Пороги для отправки: за 3 дня, за 2 дня, за 1 день, за 6 часов
-  const thresholds = [
-    { key: `${prefix}_3d`, ms: 3 * ONE_DAY },
-    { key: `${prefix}_2d`, ms: 2 * ONE_DAY },
-    { key: `${prefix}_1d`, ms: 1 * ONE_DAY },
-    { key: `${prefix}_6h`, ms: 6 * ONE_HOUR },
-  ]
-
-  for (const t of thresholds) {
-    // Если осталось меньше или равно порогу, но еще не отправляли этот ключ
-    if (totalMs <= t.ms && !sentList.includes(t.key)) {
-      return t.key
-    }
-  }
-
-  return null
+function renewalKeyboard(productId: string, teamId: string) {
+  const screen = productId === 'propresenter' ? 'propresenter' : productId
+  return new InlineKeyboard().text(
+    '🔄 Продлить подписку',
+    packCb({ a: 'open', s: screen, p: teamId })
+  )
 }
 
-// Универсальная отправка
-async function sendReminder({
-  bot,
-  user,
-  key,
-  text,
-}: {
-  bot: Bot
-  user: any
-  key: string
-  text: string
-}) {
-  const alreadySent = user.reminders || []
-  if (alreadySent.includes(key)) return
+async function notifyAdmin(
+  bot: Bot<any>,
+  team: any,
+  productId: string,
+  flowNumber: number,
+  expiresAt: Date,
+  remaining: number
+) {
+  const adminGroupId = Number(process.env.ADMIN_GROUP_ID)
+  if (!adminGroupId) return false
+
+  const productName = getProduct(productId)?.name || productId
+  const callbackData =
+    productId === 'propresenter'
+      ? `renew:f:${flowNumber}:${expiryToken(expiresAt)}`
+      : `renew:t:${team._id}:${productId}:${expiryToken(expiresAt)}`
+  const scope =
+    productId === 'propresenter'
+      ? `Поток ProPresenter №${flowNumber}`
+      : `Команда «${team.name}», продукт «${productName}»`
 
   try {
-    await bot.api.sendMessage(user.telegramId, text, {
-      parse_mode: 'Markdown',
-    })
-
-    await UserModel.updateOne(
-      { telegramId: user.telegramId },
-      {
-        $push: { reminders: key },
-      }
-    )
-  } catch (err) {
-    console.error('Ошибка напоминания:', err)
-  }
-}
-
-export async function runReminders(bot: Bot) {
-  const users = await UserModel.find({})
-
-  for (const user of users) {
-    const alreadySent = user.reminders || []
-
-    // ================= CONTENT =================
-    const content = user.subscriptions?.content
-
-    if (content?.status === 'active' && content.expiresAt) {
-      const time = getTimeLeft(content.expiresAt)
-
-      if (time) {
-        if (time.expired) {
-          // Действие при истечении (если нужно кикать или менять статус)
-          continue
-        }
-
-        const reminderKey = shouldSendReminder(time.totalMs, alreadySent, 'content')
-
-        if (reminderKey) {
-          const timeStr = formatTimeLeft(time)
-          const text =
-            `⏳ *Контент для экранов*\n\n` +
-            `До окончания подписки осталось:\n` +
-            `👉 *${timeStr}*\n\n` +
-            `Чтобы продлить доступ, зайдите в /profile`
-
-          await sendReminder({ bot, user, key: reminderKey, text })
-        }
-      }
-    }
-
-    // ================= PROPRESENTER =================
-    const prop = user.subscriptions?.propresenter
-
-    if (prop?.status === 'active') {
-      const flowData = PROP_FLOWS.find((f) => f.flow === Number(prop.flow))
-      if (!flowData?.expiresAt) continue
-
-      const time = getTimeLeft(flowData.expiresAt)
-
-      if (time) {
-        if (time.expired) {
-          await kickUser(bot, user, Number(process.env.CONTENT_GROUP_ID))
-          await UserModel.updateOne(
-            { telegramId: user.telegramId },
-            {
-              'subscriptions.content.status': 'expired',
-            }
-          )
-          continue
-        }
-
-        const reminderKey = shouldSendReminder(time.totalMs, alreadySent, `prop_${prop.flow}`)
-
-        if (reminderKey) {
-          const timeStr = formatTimeLeft(time)
-          const text =
-            `🎬 *Подписка на ${flowData.flow} поток ProPresenter*\n\n` +
-            `До окончания подписки осталось:\n` +
-            `👉 *${timeStr}*\n\n` +
-            `❗ Обсудите продление в чате потока, чтобы не потерять доступ.`
-
-          await sendReminder({ bot, user, key: reminderKey, text })
-        }
-      }
-    }
-  }
-}
-
-async function kickUser(bot: Bot, user: any, chatId: number) {
-  try {
-    await bot.api.banChatMember(chatId, user.telegramId)
-    await bot.api.unbanChatMember(chatId, user.telegramId)
     await bot.api.sendMessage(
-      user.telegramId,
-      '❌ Ваша подписка закончилась. Вы были удалены из группы.\n\n👉 Чтобы восстановить доступ, продлите подписку в /profile'
+      adminGroupId,
+      `🔔 ${scope}\nДо окончания осталось ${remaining} дн.\nДата: ${expiresAt.toLocaleDateString('ru-RU')}`,
+      {
+        reply_markup: new InlineKeyboard().text('✅ Продлил на 1 год', callbackData),
+      }
     )
-    console.log(`🚫 Кикнут пользователь ${user.telegramId}`)
-  } catch (err) {
-    console.error('Ошибка кика:', err)
+    return true
+  } catch (error) {
+    console.error('Admin renewal reminder failed:', error)
+    return false
+  }
+}
+
+async function notifyMembers(bot: Bot<any>, team: any, text: string, productId: string) {
+  const recipients = new Set<number>(
+    team.members
+      .filter((member: any) => member.status === 'active')
+      .map((member: any) => member.telegramId)
+  )
+
+  for (const telegramId of recipients) {
+    const options =
+      productId === 'propresenter'
+        ? undefined
+        : { reply_markup: renewalKeyboard(productId, String(team._id)) }
+    await bot.api
+      .sendMessage(telegramId, text, options)
+      .catch((error) => console.error(`Reminder delivery failed for ${telegramId}:`, error))
+  }
+}
+
+async function removeExpiredGroupAccess(bot: Bot<any>, team: any, productId: string) {
+  const groupId = getProduct(productId)?.groupId
+  if (!groupId) return
+
+  for (const member of team.members) {
+    if (member.status !== 'active') continue
+
+    // Не удаляем человека, если тот же продукт ещё активен у другой его команды.
+    const hasOtherAccess = await TeamModel.exists({
+      _id: { $ne: team._id },
+      'members.telegramId': member.telegramId,
+      [`subscriptions.${productId}.status`]: 'active',
+      [`subscriptions.${productId}.expiresAt`]: { $gt: new Date() },
+    })
+    if (hasOtherAccess) continue
+
+    await bot.api
+      .banChatMember(groupId, member.telegramId)
+      .then(() => bot.api.unbanChatMember(groupId, member.telegramId))
+      .catch((error) => console.error(`Group access removal failed for ${member.telegramId}:`, error))
+  }
+}
+
+export async function runReminders(bot: Bot<any>) {
+  const now = new Date()
+  const streams = await ProPresenterStreamModel.find({ expiresAt: { $ne: null } })
+  const streamsByNumber = new Map(streams.map((stream) => [stream.flowNumber, stream]))
+  const streamExpires = new Map(streams.map((stream) => [stream.flowNumber, stream.expiresAt!]))
+  const teams = await TeamModel.find({})
+
+  for (const team of teams) {
+    for (const [productId, subscription] of team.subscriptions.entries()) {
+      if (subscription.status !== 'active') continue
+
+      const flowNumber = Number((subscription.meta as any)?.flowNumber)
+      const expiryValue =
+        productId === 'propresenter' && streamExpires.get(flowNumber)
+          ? streamExpires.get(flowNumber)!
+          : subscription.expiresAt
+      if (!expiryValue) continue
+      const expiresAt = new Date(expiryValue)
+
+      // Поток является источником правды для всех команд в нём.
+      if (
+        productId === 'propresenter' &&
+        (!subscription.expiresAt || new Date(subscription.expiresAt).getTime() !== expiresAt.getTime())
+      ) {
+        subscription.expiresAt = expiresAt
+        team.subscriptions.set(productId, subscription)
+      }
+
+      if (expiresAt <= now) {
+        subscription.status = 'expired'
+        subscription.expiresAt = expiresAt
+        team.subscriptions.set(productId, subscription)
+        await team.save()
+        await removeExpiredGroupAccess(bot, team, productId)
+        await notifyMembers(
+          bot,
+          team,
+          `❌ Подписка «${getProduct(productId)?.name || productId}» команды «${team.name}» закончилась.\n\nДанные и ссылки на чаты больше недоступны. Чтобы вернуть доступ, продлите подписку.`,
+          productId
+        )
+        if (productId === 'propresenter') {
+          const expiredAdminKey = `admin:${productId}:${flowNumber || '-'}:${expiresAt.toISOString()}:expired`
+          const stream = streamsByNumber.get(flowNumber)
+          if (stream && !(stream.adminReminders || []).includes(expiredAdminKey)) {
+            if (await notifyAdmin(bot, team, productId, flowNumber, expiresAt, 0)) {
+              stream.adminReminders.push(expiredAdminKey)
+              await stream.save()
+            }
+          }
+        }
+        continue
+      }
+
+      const remaining = daysLeft(expiresAt)
+      if (!REMINDER_DAYS.has(remaining)) continue
+
+      const cycle = expiresAt.toISOString()
+      const reminderKey = `${productId}:${flowNumber || '-'}:${cycle}:${remaining}d`
+      if ((team.reminders || []).includes(reminderKey)) continue
+
+      const productName = getProduct(productId)?.name || productId
+      const text =
+        productId === 'propresenter'
+          ? `🎬 Вы находитесь в потоке ProPresenter №${flowNumber}. До окончания подписки осталось ${remaining} дн.\n\nОбсудите продление в чате своего потока, чтобы не потерять доступ.`
+          : `⏳ До окончания подписки «${productName}» команды «${team.name}» осталось ${remaining} дн.\n\nДля продления нажмите кнопку ниже.`
+
+      await notifyMembers(bot, team, text, productId)
+      team.reminders.push(reminderKey)
+
+      if (productId === 'propresenter') {
+        const adminKey = `admin:${reminderKey}`
+        const stream = streamsByNumber.get(flowNumber)
+        if (stream && !(stream.adminReminders || []).includes(adminKey)) {
+          if (await notifyAdmin(bot, team, productId, flowNumber, expiresAt, remaining)) {
+            stream.adminReminders.push(adminKey)
+            await stream.save()
+          }
+        }
+      }
+      await team.save()
+    }
   }
 }

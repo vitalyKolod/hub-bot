@@ -283,6 +283,7 @@ async function showTeamCard(ctx: Context, teamId: string) {
 
   let text = `👥 *${escapeMd(team.name)}*\n`
   text += `👑 Владелец: ${escapeMd(owner?.fio || 'не найден')} (\`${team.ownerId}\`)\n`
+  text += `💬 Username: ${owner?.username ? `@${escapeMd(owner.username)}` : 'нет'}\n`
   text += `━━━━━━━━━━━━━━\n*Подписки:*\n\n`
 
   for (const productId of TEAM_PRODUCT_IDS) {
@@ -308,7 +309,8 @@ async function showTeamCard(ctx: Context, teamId: string) {
   for (const m of team.members) {
     const mu = await ap.adminGetUser(m.telegramId)
     const role = m.telegramId === team.ownerId ? '👑' : '👤'
-    text += `${role} ${escapeMd(mu?.fio || 'без имени')} · \`${m.telegramId}\`\n`
+    const username = mu?.username ? `@${escapeMd(mu.username)}` : 'нет'
+    text += `${role} ${escapeMd(mu?.fio || 'без имени')} · \`${m.telegramId}\` · username: ${username}\n`
   }
 
   // ---- клавиатура ----
@@ -326,6 +328,7 @@ async function showTeamCard(ctx: Context, teamId: string) {
   kb.text('👑 Передать владение', apCb('t', teamId, 'owner'))
   kb.text('✏️ Название', apCb('t', teamId, 'edit', 'name'))
   kb.row()
+  kb.url('✉️ Написать владельцу', `tg://user?id=${team.ownerId}`).row()
   kb.text('‹ К списку', apCb('tl', 0))
 
   await render(ctx, text, kb)

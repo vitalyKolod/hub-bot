@@ -3,6 +3,7 @@ import { InlineKeyboard } from 'grammy'
 
 import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
+import { getProduct } from '../config/products.js'
 
 import { getTeamById } from '../services/team.service.js'
 import { UserModel } from '../models/User.js'
@@ -48,6 +49,21 @@ function formatExpiryDateTime(expiresAt?: Date | string | null): string {
   })
 }
 
+function isSubscriptionActive(subscription?: { status?: string; expiresAt?: Date | null }) {
+  return (
+    subscription?.status === 'active' &&
+    !!subscription.expiresAt &&
+    new Date(subscription.expiresAt).getTime() > Date.now()
+  )
+}
+
+function shouldShowRenewal(subscription?: { status?: string; expiresAt?: Date | null }) {
+  if (!subscription || !['active', 'expired'].includes(subscription.status || '')) return false
+  if (!subscription.expiresAt) return true
+  const remaining = new Date(subscription.expiresAt).getTime() - Date.now()
+  return remaining <= 14 * 24 * 60 * 60 * 1000
+}
+
 export async function teamScreen(userId: number, params: any): Promise<ScreenView> {
   const teamId = typeof params === 'string' ? params : params?.teamId
 
@@ -89,7 +105,7 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
 
   // --- Кнопки-ссылки на чаты: показываем ТОЛЬКО для активных подписок ---
 
-  if (prop?.status === 'active' && meta?.chatLink) {
+  if (isSubscriptionActive(prop) && meta?.chatLink) {
     kb.url(
       meta.flowNumber ? `Чат потока №${meta.flowNumber}` : 'Чат потока ProPresenter',
       meta.chatLink
@@ -98,29 +114,46 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
       .row()
   }
 
-  if (content?.status === 'active' && PRO_CONTENT_CHAT_LINK) {
+  if (isSubscriptionActive(content) && PRO_CONTENT_CHAT_LINK) {
     kb.url('Чат — ProContent', PRO_CONTENT_CHAT_LINK).icon('5251299351375937406').row()
   }
 
-  if (sunday?.status === 'active' && SUNDAY_SCREENS_CONTENT_CHAT_LINK) {
+  if (isSubscriptionActive(sunday) && SUNDAY_SCREENS_CONTENT_CHAT_LINK) {
     kb.url('Чат — Sunday Screens', SUNDAY_SCREENS_CONTENT_CHAT_LINK)
       .icon('5291749654017381020')
       .row()
   }
 
-  if (cmg?.status === 'active' && CMG_CONTENT_CHAT_LINK) {
+  if (isSubscriptionActive(cmg) && CMG_CONTENT_CHAT_LINK) {
     kb.url('Чат — CMG', CMG_CONTENT_CHAT_LINK).icon('5310127020213043624').row()
   }
 
-  if (cgs?.status === 'active' && CGS_CHAT_LINK) {
+  if (isSubscriptionActive(cgs) && CGS_CHAT_LINK) {
     kb.url('Чат — CGS', CGS_CHAT_LINK).icon('5190419001703963847').row()
   }
 
-  if (storyloops?.status === 'active' && STORY_LOOP_CHAT_LINK) {
+  if (isSubscriptionActive(storyloops) && STORY_LOOP_CHAT_LINK) {
     kb.url('Чат — StoryLoops', STORY_LOOP_CHAT_LINK).icon('5190877553887323413').row()
   }
 
   if (team.ownerId === userId) {
+    for (const [productId, subscription] of team.subscriptions.entries()) {
+      // ProPresenter продлевается только администратором через служебное уведомление.
+      if (productId === 'propresenter') continue
+      if (!shouldShowRenewal(subscription)) continue
+      const productName = getProduct(productId)?.name || productId
+      kb.text(
+        `Продлить ${productName}`,
+        packCb({
+          a: 'open',
+          s: productId === 'propresenter' ? 'propresenter' : productId,
+          p: teamId,
+        })
+      )
+        .icon('5346321684574003384')
+        .row()
+    }
+
     kb.text(
       'ДОБАВИТЬ ПОДПИСКУ',
       packCb({
@@ -158,7 +191,7 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
   message = message.emoji('🎬', '5251272469175631339').plain(' ').bold('ProPresenter').plain('\n')
 
   // PRO PRESENTER
-  if (prop?.status === 'active') {
+  if (isSubscriptionActive(prop)) {
     message = message.plain('┗ Статус: ').bold('✅ Активна').plain('\n')
 
     if (meta?.flowNumber) {
@@ -175,12 +208,14 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
 
     message = message
       .plain('┗ Осталось: ')
-      .bold(`${getDaysLeft(prop.expiresAt)} дн.`)
+      .bold(`${getDaysLeft(prop!.expiresAt)} дн.`)
       .plain('\n')
 
-    message = message.plain('┗ До: ').code(formatExpiryDateTime(prop.expiresAt)).plain('\n')
+    message = message.plain('┗ До: ').code(formatExpiryDateTime(prop!.expiresAt)).plain('\n')
   } else if (prop?.status === 'pending') {
     message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+  } else if (prop?.status === 'expired' || prop?.status === 'active') {
+    message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {
     message = message.plain('┗ Статус: ❌ Нет\n')
   }
@@ -190,17 +225,19 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
   // PROCONTENT
   message = message.emoji('🖥', '5251299351375937406').plain(' ').bold('ProContent').plain('\n')
 
-  if (content?.status === 'active') {
+  if (isSubscriptionActive(content)) {
     message = message.plain('┗ Статус: ').bold('✅ Активна').plain('\n')
 
     message = message
       .plain('┗ Осталось: ')
-      .bold(`${getDaysLeft(content.expiresAt)} дн.`)
+      .bold(`${getDaysLeft(content!.expiresAt)} дн.`)
       .plain('\n')
 
-    message = message.plain('┗ До: ').code(formatExpiryDateTime(content.expiresAt)).plain('\n')
+    message = message.plain('┗ До: ').code(formatExpiryDateTime(content!.expiresAt)).plain('\n')
   } else if (content?.status === 'pending') {
     message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+  } else if (content?.status === 'expired' || content?.status === 'active') {
+    message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {
     message = message.plain('┗ Статус: ❌ Нет\n')
   }
@@ -211,17 +248,19 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
 
   message = message.emoji('🎬', '5310127020213043624').plain(' ').bold('CMG').plain('\n')
 
-  if (cmg?.status === 'active') {
+  if (isSubscriptionActive(cmg)) {
     message = message.plain('┗ Статус: ').bold('✅ Активна').plain('\n')
 
     message = message
       .plain('┗ Осталось: ')
-      .bold(`${getDaysLeft(cmg.expiresAt)} дн.`)
+      .bold(`${getDaysLeft(cmg!.expiresAt)} дн.`)
       .plain('\n')
 
-    message = message.plain('┗ До: ').code(formatExpiryDateTime(cmg.expiresAt)).plain('\n')
+    message = message.plain('┗ До: ').code(formatExpiryDateTime(cmg!.expiresAt)).plain('\n')
   } else if (cmg?.status === 'pending') {
     message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+  } else if (cmg?.status === 'expired' || cmg?.status === 'active') {
+    message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {
     message = message.plain('┗ Статус: ❌ Нет\n')
   }
@@ -232,17 +271,19 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
 
   message = message.emoji('🎬', '5291749654017381020').plain(' ').bold('Sunday Screens').plain('\n')
 
-  if (sunday?.status === 'active') {
+  if (isSubscriptionActive(sunday)) {
     message = message.plain('┗ Статус: ').bold('✅ Активна').plain('\n')
 
     message = message
       .plain('┗ Осталось: ')
-      .bold(`${getDaysLeft(sunday.expiresAt)} дн.`)
+      .bold(`${getDaysLeft(sunday!.expiresAt)} дн.`)
       .plain('\n')
 
-    message = message.plain('┗ До: ').code(formatExpiryDateTime(sunday.expiresAt)).plain('\n')
+    message = message.plain('┗ До: ').code(formatExpiryDateTime(sunday!.expiresAt)).plain('\n')
   } else if (sunday?.status === 'pending') {
     message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+  } else if (sunday?.status === 'expired' || sunday?.status === 'active') {
+    message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {
     message = message.plain('┗ Статус: ❌ Нет\n')
   }
@@ -253,17 +294,19 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
 
   message = message.emoji('🎬', '5190419001703963847').plain(' ').bold('CGS').plain('\n')
 
-  if (cgs?.status === 'active') {
+  if (isSubscriptionActive(cgs)) {
     message = message.plain('┗ Статус: ').bold('✅ Активна').plain('\n')
 
     message = message
       .plain('┗ Осталось: ')
-      .bold(`${getDaysLeft(cgs.expiresAt)} дн.`)
+      .bold(`${getDaysLeft(cgs!.expiresAt)} дн.`)
       .plain('\n')
 
-    message = message.plain('┗ До: ').code(formatExpiryDateTime(cgs.expiresAt)).plain('\n')
+    message = message.plain('┗ До: ').code(formatExpiryDateTime(cgs!.expiresAt)).plain('\n')
   } else if (cgs?.status === 'pending') {
     message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+  } else if (cgs?.status === 'expired' || cgs?.status === 'active') {
+    message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {
     message = message.plain('┗ Статус: ❌ Нет\n')
   }
@@ -274,17 +317,19 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
 
   message = message.emoji('🎬', '5190877553887323413').plain(' ').bold('StoryLoops').plain('\n')
 
-  if (storyloops?.status === 'active') {
+  if (isSubscriptionActive(storyloops)) {
     message = message.plain('┗ Статус: ').bold('✅ Активна').plain('\n')
 
     message = message
       .plain('┗ Осталось: ')
-      .bold(`${getDaysLeft(storyloops.expiresAt)} дн.`)
+      .bold(`${getDaysLeft(storyloops!.expiresAt)} дн.`)
       .plain('\n')
 
-    message = message.plain('┗ До: ').code(formatExpiryDateTime(storyloops.expiresAt)).plain('\n')
+    message = message.plain('┗ До: ').code(formatExpiryDateTime(storyloops!.expiresAt)).plain('\n')
   } else if (storyloops?.status === 'pending') {
     message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+  } else if (storyloops?.status === 'expired' || storyloops?.status === 'active') {
+    message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {
     message = message.plain('┗ Статус: ❌ Нет\n')
   }
