@@ -109,6 +109,10 @@ import {
 } from './handlers/adminPanel.handlers.js'
 import { apCb } from './constants/admin-panel.js'
 import {
+  adminGetAllStreams,
+  adminGetUserIdsInStream,
+} from './services/adminPanel.service.js'
+import {
   closeOpenTicketForUser,
   closeSupportTicket,
   relayAdminMessage,
@@ -172,11 +176,14 @@ type MyContext = Context &
     waitingForVolunteer?: boolean
     editingField?: 'fio' | 'city' | 'church' | 'prop_stream_no' | 'screens_end_date'
 
-    adminMode?: 'broadcast' | 'waiting_broadcast'
+    adminMode?: 'waiting_broadcast'
     broadcastDraft?: {
-      type: 'text' | 'photo' | 'video' | 'document'
-      text?: string
-      fileId?: string
+      audience: 'all' | 'stream'
+      flowNumber?: number
+      sourceChatId?: number
+      messageIds: number[]
+      mediaGroupId?: string
+      isSending?: boolean
     }
     inSupportMode?: boolean
     isExtension: boolean
@@ -186,6 +193,167 @@ type MyContext = Context &
 
     adminPanelInput?: any
   }>
+
+const broadcastAlbumTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+function broadcastAudienceLabel(draft?: MyContext['session']['broadcastDraft']) {
+  return draft?.audience === 'stream' ? `поток #${draft.flowNumber}` : 'все пользователи'
+}
+
+function broadcastCancelKeyboard() {
+  return new InlineKeyboard()
+    .text('‹ Назад', 'admin:broadcast')
+    .text('✖️ Отмена', 'admin:broadcast:cancel')
+}
+
+async function showBroadcastAudience(ctx: MyContext) {
+  ctx.session.adminMode = undefined
+  ctx.session.broadcastDraft = undefined
+  const kb = new InlineKeyboard()
+    .text('👥 Всем пользователям', 'admin:broadcast:all')
+    .row()
+    .text('📡 Отдельному потоку', 'admin:broadcast:streams')
+    .row()
+    .text('‹ В админку', 'admin:broadcast:cancel')
+  await ctx.editMessageText('📢 Кому отправить рассылку?', { reply_markup: kb }).catch(() =>
+    ctx.reply('📢 Кому отправить рассылку?', { reply_markup: kb })
+  )
+}
+
+async function showBroadcastStreams(ctx: MyContext) {
+  const streams = await adminGetAllStreams()
+  const kb = new InlineKeyboard()
+  for (const stream of streams) {
+    kb.text(`Поток #${stream.flowNumber}`, `admin:broadcast:stream:${stream.flowNumber}`).row()
+  }
+  kb.text('‹ Назад', 'admin:broadcast').text('✖️ Отмена', 'admin:broadcast:cancel')
+  await ctx.editMessageText(
+    streams.length ? 'Выбери поток:' : 'Потоков пока нет.',
+    { reply_markup: kb }
+  ).catch(() =>
+    ctx.reply(streams.length ? 'Выбери поток:' : 'Потоков пока нет.', { reply_markup: kb })
+  )
+}
+
+async function promptBroadcastMessage(
+  ctx: MyContext,
+  audience: 'all' | 'stream',
+  flowNumber?: number
+) {
+  ctx.session.adminMode = 'waiting_broadcast'
+  ctx.session.broadcastDraft = { audience, flowNumber, messageIds: [] }
+  const text =
+    `📢 Получатели: ${broadcastAudienceLabel(ctx.session.broadcastDraft)}.\n\n` +
+    'Пришли сообщение для черновика. Поддерживаются текст, фото, альбомы, видео, аудио, голосовые, документы, анимации, стикеры и подписи с форматированием.'
+  await ctx.editMessageText(text, { reply_markup: broadcastCancelKeyboard() }).catch(() =>
+    ctx.reply(text, { reply_markup: broadcastCancelKeyboard() })
+  )
+}
+
+async function showBroadcastDraftControls(ctx: MyContext) {
+  const draft = ctx.session.broadcastDraft
+  if (!draft?.messageIds.length) return
+  ctx.session.adminMode = undefined
+  const kb = new InlineKeyboard()
+    .text('👁 Предпросмотр', 'admin:broadcast:preview')
+    .row()
+    .text('➕ Добавить ещё', 'admin:broadcast:add')
+    .row()
+    .text('✏️ Заменить', 'admin:broadcast:edit')
+    .text('✖️ Отмена', 'admin:broadcast:cancel')
+  await ctx.reply(
+    `✅ Черновик сохранён (${draft.messageIds.length > 1 ? `${draft.messageIds.length} сообщений` : '1 сообщение'}).\nПолучатели: ${broadcastAudienceLabel(draft)}.`,
+    { reply_markup: kb }
+  )
+}
+
+async function copyBroadcastDraft(ctx: MyContext, targetChatId: number) {
+  const draft = ctx.session.broadcastDraft
+  if (!draft?.sourceChatId || !draft.messageIds.length) throw new Error('Черновик пуст')
+  if (draft.messageIds.length === 1) {
+    await ctx.api.copyMessage(targetChatId, draft.sourceChatId, draft.messageIds[0])
+  } else {
+    await ctx.api.copyMessages(targetChatId, draft.sourceChatId, draft.messageIds)
+  }
+}
+
+async function getBroadcastRecipients(draft: NonNullable<MyContext['session']['broadcastDraft']>) {
+  if (draft.audience === 'stream') return adminGetUserIdsInStream(draft.flowNumber!)
+  const users = await UserModel.find({ reg: 'done' }).select({ telegramId: 1, _id: 0 }).lean()
+  return users.map((user) => user.telegramId)
+}
+
+async function handleBroadcastCallback(ctx: MyContext, data: string) {
+  if (!ctx.from || !isAdmin(ctx.from.id)) return
+  if (data === 'admin:broadcast:all') return promptBroadcastMessage(ctx, 'all')
+  if (data === 'admin:broadcast:streams') return showBroadcastStreams(ctx)
+  if (data.startsWith('admin:broadcast:stream:')) {
+    return promptBroadcastMessage(ctx, 'stream', Number(data.split(':')[3]))
+  }
+  if (data === 'admin:broadcast:cancel') {
+    ctx.session.adminMode = undefined
+    ctx.session.broadcastDraft = undefined
+    const kb = new InlineKeyboard().text('📢 Рассылка', 'admin:broadcast').row().text('✏️ Управление', apCb('menu'))
+    return ctx.editMessageText('Панель администратора', { reply_markup: kb }).catch(() =>
+      ctx.reply('Панель администратора', { reply_markup: kb })
+    )
+  }
+  const draft = ctx.session.broadcastDraft
+  if (!draft?.messageIds.length) return ctx.reply('Черновик не найден. Начни рассылку заново.')
+  if (data === 'admin:broadcast:edit') {
+    return promptBroadcastMessage(ctx, draft.audience, draft.flowNumber)
+  }
+  if (data === 'admin:broadcast:add') {
+    if (draft.messageIds.length >= 100) {
+      return ctx.reply('В одном черновике уже максимум — 100 сообщений.')
+    }
+    draft.mediaGroupId = undefined
+    ctx.session.adminMode = 'waiting_broadcast'
+    return ctx.reply('Пришли следующее сообщение или альбом для этого же черновика.', {
+      reply_markup: broadcastCancelKeyboard(),
+    })
+  }
+  if (data === 'admin:broadcast:preview') {
+    await ctx.reply('👁 Так рассылка будет выглядеть у получателя:')
+    await copyBroadcastDraft(ctx, ctx.chat!.id)
+    const recipients = await getBroadcastRecipients(draft)
+    const kb = new InlineKeyboard()
+      .text(`🚀 Отправить (${recipients.length})`, 'admin:broadcast:send')
+      .row()
+      .text('➕ Добавить ещё', 'admin:broadcast:add')
+      .row()
+      .text('✏️ Заменить', 'admin:broadcast:edit')
+      .text('✖️ Отмена', 'admin:broadcast:cancel')
+    await ctx.reply(`Получатели: ${broadcastAudienceLabel(draft)} — ${recipients.length}.`, { reply_markup: kb })
+    return
+  }
+  if (data === 'admin:broadcast:send') {
+    if (draft.isSending) {
+      await ctx.answerCallbackQuery({ text: 'Рассылка уже выполняется' }).catch(() => {})
+      return
+    }
+    draft.isSending = true
+    const recipients = await getBroadcastRecipients(draft)
+    await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {})
+    await ctx.reply(`⏳ Начинаю рассылку для ${recipients.length} пользователей...`)
+    let success = 0
+    let failed = 0
+    for (const telegramId of recipients) {
+      try {
+        await copyBroadcastDraft(ctx, telegramId)
+        success++
+      } catch (error) {
+        failed++
+        console.error(`Broadcast delivery failed for ${telegramId}:`, error)
+      }
+      // Альбом считается несколькими сообщениями и сильнее расходует лимит Telegram.
+      await new Promise((resolve) => setTimeout(resolve, 40 * draft.messageIds.length))
+    }
+    ctx.session.broadcastDraft = undefined
+    ctx.session.adminMode = undefined
+    await ctx.reply(`✅ Рассылка завершена\n\nОтправлено: ${success}\nОшибок: ${failed}`)
+  }
+}
 
 export function registerHandlers(bot: Bot<MyContext>) {
   initScreens()
@@ -418,19 +586,18 @@ export function registerHandlers(bot: Bot<MyContext>) {
     }
 
     if (data === 'admin:broadcast') {
-      ctx.session.adminMode = 'waiting_broadcast'
-
-      await ctx.reply(
-        `
-📢 **Режим рассылки**
-
-Отправьте в этот чат сообщение, которое нужно разослать пользователям.
-*Поддерживается всё:* текст, фото, видео, документы, альбомы (медиагруппы) и форматирование.
-`,
-        { parse_mode: 'Markdown' }
-      )
-
+      if (!isAdmin(userId)) {
+        await ctx.answerCallbackQuery({ text: 'Нет доступа', show_alert: true })
+        return
+      }
+      await showBroadcastAudience(ctx)
       await ctx.answerCallbackQuery()
+      return
+    }
+
+    if (data.startsWith('admin:broadcast:')) {
+      await handleBroadcastCallback(ctx, data)
+      await ctx.answerCallbackQuery().catch(() => {})
       return
     }
 
@@ -848,6 +1015,61 @@ export function registerHandlers(bot: Bot<MyContext>) {
     }
   })
 
+  // Черновик рассылки должен перехватываться до более узких text/photo handlers.
+  bot.on('message', async (ctx, next) => {
+    if (!ctx.from || !isAdmin(ctx.from.id)) return next()
+    if (ctx.session.adminMode !== 'waiting_broadcast') return next()
+    if (ctx.chat.type !== 'private') return next()
+
+    const draft = ctx.session.broadcastDraft
+    if (!draft) {
+      ctx.session.adminMode = undefined
+      return next()
+    }
+
+    if (draft.messageIds.length >= 100) {
+      ctx.session.adminMode = undefined
+      await ctx.reply('В одном черновике можно отправить не больше 100 сообщений.')
+      await showBroadcastDraftControls(ctx)
+      return
+    }
+
+    const mediaGroupId = ctx.message.media_group_id
+    if (draft.mediaGroupId && mediaGroupId !== draft.mediaGroupId) {
+      await ctx.reply('Черновик уже содержит сообщение. Нажми «Предпросмотр» или «Заменить».')
+      return
+    }
+
+    draft.sourceChatId = ctx.chat.id
+    draft.mediaGroupId = mediaGroupId
+    if (!draft.messageIds.includes(ctx.message.message_id)) {
+      draft.messageIds.push(ctx.message.message_id)
+      draft.messageIds.sort((a, b) => a - b)
+    }
+
+    if (!mediaGroupId) {
+      await showBroadcastDraftControls(ctx)
+      return
+    }
+
+    // Telegram присылает элементы альбома отдельными апдейтами. Ждём последний,
+    // затем показываем одну панель управления для всей медиагруппы.
+    const timerKey = `${ctx.chat.id}:${ctx.from.id}:${mediaGroupId}`
+    const previousTimer = broadcastAlbumTimers.get(timerKey)
+    if (previousTimer) clearTimeout(previousTimer)
+    broadcastAlbumTimers.set(
+      timerKey,
+      setTimeout(async () => {
+        broadcastAlbumTimers.delete(timerKey)
+        try {
+          await showBroadcastDraftControls(ctx)
+        } catch (error) {
+          console.error('Failed to finalize broadcast album draft:', error)
+        }
+      }, 1200)
+    )
+  })
+
   // ====================== СООБЩЕНИЯ ======================
   bot.on('message:text', async (ctx) => {
     const userId = ctx.from?.id
@@ -891,82 +1113,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
       return
     }
 
-    if (ctx.session.adminMode === 'broadcast') {
-      if (!isAdmin(ctx.from.id)) return
-
-      const text = ctx.message.text
-
-      const users = await UserModel.find({
-        reg: 'done',
-      })
-
-      let success = 0
-      let failed = 0
-
-      for (const user of users) {
-        try {
-          await ctx.api.sendMessage(user.telegramId, text)
-          success++
-        } catch {
-          failed++
-        }
-      }
-
-      ctx.session.adminMode = undefined
-
-      await ctx.reply(`
-✅ Рассылка завершена
-
-Отправлено: ${success}
-Ошибок: ${failed}
-`)
-
-      return
-    }
-  })
-
-  // ====================== РАССЫЛКА ДЛЯ АДМИНА ======================
-  bot.on('message', async (ctx, next) => {
-    // Проверяем, что сообщение от админа и включен режим рассылки
-    if (!ctx.from || !isAdmin(ctx.from.id)) return next()
-    if (ctx.session.adminMode !== 'waiting_broadcast') return next()
-
-    // Игнорируем сообщения из групп поддержки/админки, если они не относятся к рассылке в ЛС
-    // (тут проверяем, что это личка с ботом или админ шлет в ЛС)
-    if (ctx.chat.type !== 'private') return next()
-
-    ctx.session.adminMode = undefined
-
-    const users = await UserModel.find({ reg: 'done' })
-
-    let success = 0
-    let failed = 0
-
-    await ctx.reply(`⏳ Начинаю рассылку для ${users.length} пользователей...`)
-
-    for (const user of users) {
-      try {
-        // copyMessage идеально копирует текст, фото, видео, документы и подписи к ним в том же виде
-        await ctx.api.copyMessage(user.telegramId, ctx.chat.id, ctx.message.message_id, {
-          reply_markup: ctx.message.reply_markup, // сохраняет инлайн-кнопки, если они были прикреплены
-        })
-        success++
-        // Небольшая задержка, чтобы не упереться в лимиты Telegram API (flood control: ~30 сообщений в секунду)
-        await new Promise((resolve) => setTimeout(resolve, 35))
-      } catch (err) {
-        failed++
-      }
-    }
-
-    await ctx.reply(
-      `
-✅ **Рассылка завершена**
-
-Успешно отправлено: ${success}
-Ошибок (заблокировали бота / удалили аккаунт): ${failed}
-`,
-      { parse_mode: 'Markdown' }
-    )
   })
 
   // ========== ЧЕК (фото / документ) — ВЫСОКИЙ ПРИОРИТЕТ===========
