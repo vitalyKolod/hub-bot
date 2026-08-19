@@ -307,6 +307,24 @@ export async function adminGetTeamsInStream(flowNumber: number) {
   })
 }
 
+/** Уникальные зарегистрированные пользователи команд выбранного потока. */
+export async function adminGetUserIdsInStream(flowNumber: number): Promise<number[]> {
+  const teams = await adminGetTeamsInStream(flowNumber)
+  const memberIds = new Set<number>()
+  for (const team of teams) {
+    memberIds.add(team.ownerId)
+    for (const member of team.members) {
+      if (member.status === 'active') memberIds.add(member.telegramId)
+    }
+  }
+  if (!memberIds.size) return []
+
+  const users = await UserModel.find({ telegramId: { $in: [...memberIds] }, reg: 'done' })
+    .select({ telegramId: 1, _id: 0 })
+    .lean()
+  return users.map((user) => user.telegramId)
+}
+
 /** Сколько команд уже сидит в потоке (источник правды — сами команды, а не отдельный счётчик) */
 export async function adminGetStreamOccupancy(flowNumber: number): Promise<number> {
   return TeamModel.countDocuments({

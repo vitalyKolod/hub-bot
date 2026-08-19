@@ -16,11 +16,14 @@ export type SessionData = {
   volunteerId?: number
   waitingForVolunteer?: boolean
   editingField?: 'fio' | 'city' | 'church' | 'prop_stream_no' | 'screens_end_date'
-  adminMode?: 'broadcast' | 'waiting_broadcast'
+  adminMode?: 'waiting_broadcast'
   broadcastDraft?: {
-    type: 'text' | 'photo' | 'video' | 'document'
-    text?: string
-    fileId?: string
+    audience: 'all' | 'stream'
+    flowNumber?: number
+    sourceChatId?: number
+    messageIds: number[]
+    mediaGroupId?: string
+    isSending?: boolean
   }
   inSupportMode?: boolean
   isExtension: boolean
