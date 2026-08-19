@@ -4,6 +4,7 @@ import { goTo } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
 import {
   getTeamById,
+  isTeamProductPurchaseLocked,
   activateTeamSubscription,
   rejectTeamSubscription,
 } from '../services/team.service.js'
@@ -30,6 +31,11 @@ export async function handleAddToCart(
     return
   }
 
+  if (await isTeamProductPurchaseLocked(teamId, productId)) {
+    await ctx.answerCallbackQuery({ text: '✅ Этот продукт уже оплачен', show_alert: true })
+    return
+  }
+
   await addToCart(teamId, productId)
   await ctx.answerCallbackQuery({ text: '✅ Добавлено в корзину' })
 }
@@ -50,6 +56,20 @@ export async function handleCheckoutCart(ctx: MyContext, userId: number, teamId:
 
   if (items.length === 0) {
     await ctx.answerCallbackQuery({ text: 'Корзина пуста' })
+    return
+  }
+
+  const lockedNames: string[] = []
+  for (const item of items) {
+    if (await isTeamProductPurchaseLocked(teamId, item.product)) {
+      lockedNames.push(getProduct(item.product)?.name || item.product)
+    }
+  }
+  if (lockedNames.length) {
+    await ctx.answerCallbackQuery({
+      text: `Уже оплачено: ${lockedNames.join(', ')}. Удалите из корзины.`,
+      show_alert: true,
+    })
     return
   }
 
@@ -116,6 +136,13 @@ export async function handleCartAccept(ctx: MyContext, itemId: string) {
   const team = await getTeamById(teamId)
   const product = getProduct(item.product)
 
+  if (await isTeamProductPurchaseLocked(teamId, item.product)) {
+    await setCartItemStatus(teamId, itemId, 'rejected')
+    await updateCartAdminMessage(ctx, itemId, '⚠️ Уже оплачено.')
+    await ctx.answerCallbackQuery({ text: 'Уже оплачено', show_alert: true })
+    return
+  }
+
   const { isExtension } = await activateTeamSubscription(teamId, item.product)
   await setCartItemStatus(teamId, itemId, 'active')
 
@@ -127,8 +154,7 @@ export async function handleCartAccept(ctx: MyContext, itemId: string) {
       })
       await ctx.api.sendMessage(
         team!.ownerId,
-        `✅ ${isExtension ? 'Продлено' : 'Оплата подтверждена'}: ${product.name}\n\nВаша ссылка:\n${invite.invite_link}
-        \nЧтобы вернуться, нажмите /team_list`
+        `✅ ${isExtension ? 'Продлено' : 'Оплата подтверждена'}: ${product.name}\n\nВаша ссылка ниже 👇\n\n${invite.invite_link}\n\nЧтобы вернуться в команду, нажмите /team_list`
       )
     } catch (err) {
       console.error('Ошибка создания инвайта:', err)

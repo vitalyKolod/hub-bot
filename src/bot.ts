@@ -109,8 +109,10 @@ import {
 } from './handlers/adminPanel.handlers.js'
 import { apCb } from './constants/admin-panel.js'
 import {
+  adminExtendTeamSub,
   adminGetAllStreams,
   adminGetUserIdsInStream,
+  adminSetStreamExpiry,
 } from './services/adminPanel.service.js'
 import {
   closeOpenTicketForUser,
@@ -493,6 +495,57 @@ export function registerHandlers(bot: Bot<MyContext>) {
     console.log('callback data:', data)
 
     const message = ctx.callbackQuery.message
+
+    if (data.startsWith('renew:')) {
+      if (!isAdmin(userId)) {
+        await ctx.answerCallbackQuery({ text: 'Нет прав', show_alert: true })
+        return
+      }
+
+      const parts = data.split(':')
+      const kind = parts[1]
+      const expectedToken = parts.at(-1)
+      let label = ''
+      let newExpiry: Date
+
+      if (kind === 'f') {
+        const flowNumber = Number(parts[2])
+        const stream = await getStreamByNumber(flowNumber)
+        if (!stream?.expiresAt || stream.expiresAt.toISOString().slice(0, 10).replaceAll('-', '') !== expectedToken) {
+          await ctx.answerCallbackQuery({ text: 'Уже продлено или дата изменена', show_alert: true })
+          return
+        }
+        newExpiry = new Date(stream.expiresAt > new Date() ? stream.expiresAt : new Date())
+        newExpiry.setFullYear(newExpiry.getFullYear() + 1)
+        await adminSetStreamExpiry(flowNumber, newExpiry)
+        label = `ProPresenter, поток №${flowNumber}`
+      } else if (kind === 't') {
+        const [, , teamId, productId] = parts
+        const team = await getTeamById(teamId)
+        if (!team) {
+          await ctx.answerCallbackQuery({ text: 'Команда не найдена', show_alert: true })
+          return
+        }
+        const subscription = team.subscriptions.get(productId)
+        if (
+          !subscription?.expiresAt ||
+          subscription.expiresAt.toISOString().slice(0, 10).replaceAll('-', '') !== expectedToken
+        ) {
+          await ctx.answerCallbackQuery({ text: 'Уже продлено или дата изменена', show_alert: true })
+          return
+        }
+        newExpiry = await adminExtendTeamSub(teamId, productId)
+        label = `${getProduct(productId)?.name || productId}, команда «${team.name}»`
+      } else {
+        await ctx.answerCallbackQuery({ text: 'Неверная кнопка', show_alert: true })
+        return
+      }
+
+      await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {})
+      await ctx.reply(`✅ ${label} продлена до ${newExpiry.toLocaleDateString('ru-RU')}`)
+      await ctx.answerCallbackQuery({ text: 'Продлено на 1 год' })
+      return
+    }
 
     if (data.startsWith('support:profile:')) {
       if (ctx.chat?.id !== SUPPORT_GROUP_ID || !isAdmin(userId)) {
@@ -883,14 +936,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     if (parsed.a === 'pay_product' && parsed.p) {
       const [productId, teamId] = String(parsed.p).split(':')
-
-      ctx.session.payment = {
-        product: productId,
-        teamId,
-        method: null,
-      }
-      goTo(userId, 'payment')
-      await renderScreen(ctx, userId, 'payment')
+      await handlePayProduct(ctx, userId, productId, teamId)
       await ack()
       return
     }
@@ -1208,12 +1254,11 @@ export function registerHandlers(bot: Bot<MyContext>) {
       await ctx.reply('⚠️ Этот тип сообщения не удалось отправить. Попробуйте текст или файл.')
     }
   })
-  setInterval(
-    async () => {
-      console.log('⏰ Проверка напоминаний...')
-      await runReminders(bot)
-    },
-    1000 * 60 * 60 * 24
-  ) // раз в сутки
+  const checkSubscriptions = async () => {
+    console.log('⏰ Проверка подписок и напоминаний...')
+    await runReminders(bot).catch((error) => console.error('Ошибка проверки подписок:', error))
+  }
+  void checkSubscriptions()
+  setInterval(checkSubscriptions, 1000 * 60 * 60 * 24)
 }
 console.log('✅ Бот запущен')

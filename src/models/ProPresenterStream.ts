@@ -39,6 +39,11 @@ const proPresenterStreamSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    adminReminders: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true }
 )

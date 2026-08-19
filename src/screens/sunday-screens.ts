@@ -1,50 +1,18 @@
 // src/screens/sunday-screens.ts
 
-import { InlineKeyboard } from 'grammy'
 import { FormattedString } from '@grammyjs/parse-mode'
 
-import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
 import { getProduct } from '../config/products.js'
+import { buildProductPurchaseKeyboard } from './product-purchase.js'
 
-export function SundayScreensScreen(userId: number, teamId: string): ScreenView {
+export async function SundayScreensScreen(userId: number, teamId: string): Promise<ScreenView> {
   const product = getProduct('sunday_screens')
 
   if (!product) {
     throw new Error('Product "sunday_screens" not found')
   }
-  const kb = new InlineKeyboard()
-
-  kb.text(
-    'ОПЛАТИТЬ СРАЗУ',
-    packCb({
-      a: 'pay_product',
-      p: `sunday_screens:${teamId}`,
-    })
-  )
-    .icon('5318912792428814144')
-    .row()
-
-  kb.text(
-    '🛒 В КОРЗИНУ',
-    packCb({
-      a: 'add_to_cart',
-      p: `sunday_screens:${teamId}`,
-    })
-  ).row()
-
-  kb.text(
-    '🛒 ПЕРЕЙТИ В КОРЗИНУ',
-    packCb({
-      a: 'open',
-      s: 'cart',
-      p: teamId,
-    })
-  ).row()
-
-  kb.url('ОСТАЛИСЬ ВОПРОСЫ?', 'https://t.me/hubbbhelp_bot').icon('5436113877181941026').row()
-
-  kb.text('◀️ НАЗАД', packCb({ a: 'back' }))
+  const kb = await buildProductPurchaseKeyboard(teamId, 'sunday_screens')
 
   // ============================================================
   // ТЕКСТ

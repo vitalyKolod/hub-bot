@@ -266,11 +266,27 @@ export async function adminUpdateStream(
 }
 
 export async function adminSetStreamExpiry(flowNumber: number, expiresAt: Date | null) {
-  return ProPresenterStreamModel.findOneAndUpdate(
+  const stream = await ProPresenterStreamModel.findOneAndUpdate(
     { flowNumber },
     { $set: { expiresAt } },
     { new: true }
   )
+  await TeamModel.updateMany(
+    {
+      'subscriptions.propresenter.meta.flowNumber': flowNumber,
+      'subscriptions.propresenter.status': { $in: ['active', 'expired'] },
+    },
+    {
+      $set: {
+        'subscriptions.propresenter.expiresAt': expiresAt,
+        // Если администратор поставил новую будущую дату, доступ потока восстанавливается.
+        ...(expiresAt && expiresAt > new Date()
+          ? { 'subscriptions.propresenter.status': 'active' }
+          : {}),
+      },
+    }
+  )
+  return stream
 }
 
 export async function adminCreateStream(data: {
