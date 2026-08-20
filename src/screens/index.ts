@@ -37,7 +37,10 @@ import { propresenterNoStreamScreen } from './propresenter-no-stream.js'
 import { propresenterConfirmScreen } from './propresenter-confirm.js'
 
 export function initScreens() {
-  const registry: Record<ScreenId, (userId: number, params?: any, ctx?: any) => ScreenView> = {
+  const registry: Record<
+    ScreenId,
+    (userId: number, params?: any, ctx?: any) => ScreenView | Promise<ScreenView>
+  > = {
     main: mainScreen,
 
     // временные заглушки

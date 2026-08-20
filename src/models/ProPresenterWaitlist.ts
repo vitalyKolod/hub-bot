@@ -22,6 +22,12 @@ const proPresenterWaitlistSchema = new mongoose.Schema(
     assignedFlowNumber: {
       type: Number,
       default: null,
+      index: true,
+    },
+
+    batchReadyNotified: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

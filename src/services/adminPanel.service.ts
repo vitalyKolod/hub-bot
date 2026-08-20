@@ -5,6 +5,7 @@
 import { UserModel } from '../models/User.js'
 import { TeamModel } from '../models/Team.js'
 import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
+import { ProPresenterWaitlistModel } from '../models/ProPresenterWaitlist.js'
 import { PAGE_SIZE, SUB_STATUSES } from '../constants/admin-panel.js'
 
 function escapeRegex(str: string) {
@@ -305,6 +306,56 @@ export async function adminCreateStream(data: {
     capacity: data.capacity || 30,
     status: 'active',
   })
+}
+
+export async function adminCreateStreamFromWaitlist(data: {
+  flowNumber: number
+  email: string
+  password: string
+  chatLink?: string
+  expiresAt: Date
+}) {
+  const existing = await ProPresenterStreamModel.findOne({ flowNumber: data.flowNumber })
+  if (existing) throw new Error(`Поток #${data.flowNumber} уже существует`)
+
+  const entries = await ProPresenterWaitlistModel.find({
+    status: 'pending',
+    assignedFlowNumber: data.flowNumber,
+  }).sort({ createdAt: 1 })
+  if (!entries.length) throw new Error('В этой партии нет заявок')
+
+  const stream = await ProPresenterStreamModel.create({
+    flowNumber: data.flowNumber,
+    email: data.email,
+    password: data.password,
+    chatLink: data.chatLink || '',
+    capacity: 20,
+    status: 'active',
+    expiresAt: data.expiresAt,
+  })
+
+  for (const entry of entries) {
+    const team = await TeamModel.findById(entry.teamId)
+    if (!team) continue
+    team.subscriptions.set('propresenter', {
+      status: 'active',
+      expiresAt: data.expiresAt,
+      meta: {
+        flowNumber: data.flowNumber,
+        email: data.email,
+        password: data.password,
+        chatLink: data.chatLink || '',
+      },
+    } as any)
+    await saveTeam(team)
+  }
+
+  await ProPresenterWaitlistModel.updateMany(
+    { status: 'pending', assignedFlowNumber: data.flowNumber },
+    { $set: { status: 'assigned' } }
+  )
+
+  return { stream, entries }
 }
 
 export async function adminDeleteStream(flowNumber: number) {

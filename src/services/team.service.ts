@@ -91,6 +91,19 @@ export async function getTeamById(teamId: string) {
   return TeamModel.findById(teamId)
 }
 
+/** Номер потока команды с активным доступом ProPresenter. */
+export async function getActiveProPresenterFlowNumber(teamId: string) {
+  const team = await TeamModel.findById(teamId)
+  if (!team) return null
+
+  const subscription = team.subscriptions.get('propresenter')
+  const flowNumber = Number((subscription?.meta as { flowNumber?: number } | undefined)?.flowNumber)
+
+  return subscription?.status === 'active' && Number.isFinite(flowNumber) && flowNumber > 0
+    ? flowNumber
+    : null
+}
+
 export async function activateTeamSubscription(teamId: string, productId: string, extendYears = 1) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Team not found')

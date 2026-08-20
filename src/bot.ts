@@ -55,7 +55,7 @@ import {
   isOwner,
 } from './services/team.service.js'
 import { createTeamInvite } from './services/teamInvite.service.js'
-import { addToWaitlist, getPendingWaitlist } from './services/proPresenterWaitlist.service.js'
+import { getPendingBatches } from './services/proPresenterWaitlist.service.js'
 import { getStreamByNumber } from './services/proPresenterStream.service.js'
 import { handleBack, handleHome, handleOpen } from './handlers/navigation.hadlers.js'
 import {
@@ -470,8 +470,17 @@ export function registerHandlers(bot: Bot<MyContext>) {
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx.from.id)) return
 
+    const batches = await getPendingBatches()
+    const nextBatch = batches[0]
+
     const kb = new InlineKeyboard()
       .text('📢 Рассылка', 'admin:broadcast')
+      .row()
+      .text('📡 Потоки', apCb('streams'))
+      .text(
+        nextBatch ? `📋 Заявки №${nextBatch._id} (${nextBatch.count}/20)` : '📋 Заявки',
+        apCb('wait')
+      )
       .row()
       .text('✏️ Управление', apCb('menu'))
 

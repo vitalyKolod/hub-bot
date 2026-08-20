@@ -5,20 +5,26 @@ import { FormattedString } from '@grammyjs/parse-mode'
 
 import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
+import { getActiveProPresenterFlowNumber } from '../services/team.service.js'
 
-export function propresenterScreen(userId: number, teamId: string): ScreenView {
+export async function propresenterScreen(userId: number, teamId: string): Promise<ScreenView> {
   const kb = new InlineKeyboard()
+  const flowNumber = await getActiveProPresenterFlowNumber(teamId)
 
-  kb.text(
-    'ПОДАТЬ ЗАЯВКУ НА ПОДКЛЮЧЕНИЕ',
-    packCb({
-      a: 'open',
-      s: 'propresenter_check',
-      p: teamId,
-    })
-  )
-    .icon('5215209935188534658')
-    .row()
+  if (flowNumber) {
+    kb.text(`✅ УЖЕ ЕСТЬ ПОТОК №${flowNumber}`, packCb({ a: 'noop' })).row()
+  } else {
+    kb.text(
+      'ПОДРОБНЕЕ',
+      packCb({
+        a: 'open',
+        s: 'propresenter_check',
+        p: teamId,
+      })
+    )
+      .icon('5215209935188534658')
+      .row()
+  }
 
   kb.url('ОСТАЛИСЬ ВОПРОСЫ?', 'https://t.me/hubbbhelp_bot').icon('5436113877181941026').row()
 
