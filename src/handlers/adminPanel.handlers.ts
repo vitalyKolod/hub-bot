@@ -19,6 +19,11 @@ import {
 } from '../constants/admin-panel.js'
 import * as ap from '../services/adminPanel.service.js'
 import { SUPPORT_GROUP_ID } from '../config/env.js'
+import {
+  getPendingBatch,
+  getPendingBatches,
+  PROPRESENTER_BATCH_SIZE,
+} from '../services/proPresenterWaitlist.service.js'
 
 // ---------- session helpers ----------
 
@@ -35,6 +40,7 @@ type ApInputMode =
   | 'stream_field'
   | 'stream_date'
   | 'stream_new'
+  | 'waitlist_stream_new'
   | 'add_team_to_stream'
 
 type ApInput = {
@@ -107,13 +113,73 @@ function paginationRow(kb: InlineKeyboard, page: number, totalPages: number, bas
 // ==================== ГЛАВНОЕ МЕНЮ ====================
 
 export async function showAdminPanelMenu(ctx: Context) {
+  const batches = await getPendingBatches()
+  const nextBatch = batches[0]
   const kb = new InlineKeyboard()
     .text('👥 Юзеры', apCb('ul', 0))
     .text('🏘 Команды', apCb('tl', 0))
     .row()
     .text('📡 Потоки ProPresenter', apCb('streams'))
+    .text(
+      nextBatch ? `📋 Заявки №${nextBatch._id} (${nextBatch.count}/20)` : '📋 Заявки на поток',
+      apCb('wait')
+    )
 
   await render(ctx, '🛠 *Панель управления*\n\nВыбери раздел.', kb)
+}
+
+async function showWaitlistBatches(ctx: Context) {
+  const batches = await getPendingBatches()
+  const kb = new InlineKeyboard()
+  for (const batch of batches) {
+    kb.text(
+      `Поток №${batch._id} · ${batch.count}/${PROPRESENTER_BATCH_SIZE}`,
+      apCb('wait', batch._id)
+    ).row()
+  }
+  kb.text('‹ Меню', apCb('menu'))
+  await render(ctx, batches.length ? '📋 Очереди ProPresenter:' : 'Заявок сейчас нет.', kb, false)
+}
+
+async function showWaitlistBatch(ctx: Context, flowNumber: number) {
+  const entries = await getPendingBatch(flowNumber)
+  const kb = new InlineKeyboard()
+  let position = 0
+  for (const entry of entries) {
+    position += 1
+    const team = await ap.adminGetTeam(entry.teamId)
+    const label = team ? `👥 ${position}. ${team.name}` : `⚠️ ${position}. Команда не найдена`
+    kb.text(label.slice(0, 60), apCb('wt', entry.teamId, flowNumber)).row()
+  }
+
+  if (entries.length >= PROPRESENTER_BATCH_SIZE) {
+    kb.text(`✅ Поток №${flowNumber} создал`, apCb('wait', flowNumber, 'create')).row()
+  }
+  kb.text('‹ К заявкам', apCb('wait'))
+  const text =
+    `📋 Заявки на поток №${flowNumber}\n\n` +
+    `Заполнено: ${entries.length}/${PROPRESENTER_BATCH_SIZE}\n` +
+    (entries.length ? 'Нажми на команду, чтобы открыть её профиль.' : 'Заявок пока нет.')
+  await render(ctx, text, kb, false)
+}
+
+async function startWaitlistStream(ctx: Context, flowNumber: number) {
+  const entries = await getPendingBatch(flowNumber)
+  if (entries.length < PROPRESENTER_BATCH_SIZE) {
+    throw new Error(`Поток ещё не собран: ${entries.length}/${PROPRESENTER_BATCH_SIZE}`)
+  }
+  getSession(ctx).adminPanelInput = {
+    mode: 'waitlist_stream_new',
+    step: 'email',
+    flowNumber,
+    draft: {},
+  } as ApInput
+  await render(
+    ctx,
+    `Создание потока №${flowNumber} для ${entries.length} команд.\n\nВведи логин (email):`,
+    new InlineKeyboard().text('‹ Отмена', apCb('wait', flowNumber)),
+    false
+  )
 }
 
 // ==================== ЮЗЕРЫ: список / поиск ====================
@@ -272,10 +338,19 @@ async function runTeamSearch(ctx: Context, query: string) {
 
 // ==================== КАРТОЧКА КОМАНДЫ (как у юзеров + админ-блок) ====================
 
-async function showTeamCard(ctx: Context, teamId: string) {
+async function showTeamCard(
+  ctx: Context,
+  teamId: string,
+  back?: { label: string; callback: string }
+) {
   const team = await ap.adminGetTeam(teamId)
   if (!team) {
-    await render(ctx, 'Команда не найдена', new InlineKeyboard().text('‹ Меню', apCb('menu')))
+    await render(
+      ctx,
+      'Команда не найдена. Возможно, она была удалена после подачи заявки.',
+      new InlineKeyboard().text(back?.label || '‹ Меню', back?.callback || apCb('menu')),
+      false
+    )
     return
   }
 
@@ -329,7 +404,7 @@ async function showTeamCard(ctx: Context, teamId: string) {
   kb.text('✏️ Название', apCb('t', teamId, 'edit', 'name'))
   kb.row()
   kb.url('✉️ Написать владельцу', `tg://user?id=${team.ownerId}`).row()
-  kb.text('‹ К списку', apCb('tl', 0))
+  kb.text(back?.label || '‹ К списку', back?.callback || apCb('tl', 0))
 
   await render(ctx, text, kb)
 }
@@ -658,6 +733,22 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
       case 'stream_new':
         await startNewStream(ctx)
         break
+      case 'wait': {
+        const flowNumber = Number(rest[0])
+        if (!flowNumber) await showWaitlistBatches(ctx)
+        else if (rest[1] === 'create') await startWaitlistStream(ctx, flowNumber)
+        else await showWaitlistBatch(ctx, flowNumber)
+        break
+      }
+      case 'wt': {
+        const teamId = rest[0]
+        const flowNumber = Number(rest[1])
+        await showTeamCard(ctx, teamId, {
+          label: `‹ К заявкам №${flowNumber}`,
+          callback: apCb('wait', flowNumber),
+        })
+        break
+      }
       case 'stream': {
         const flowNumber = Number(rest[0])
         const action = rest[1]
@@ -822,6 +913,10 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
         await handleStreamCreationStep(ctx, input, text)
         break
 
+      case 'waitlist_stream_new':
+        await handleWaitlistStreamCreationStep(ctx, input, text)
+        break
+
       default:
         return false
     }
@@ -830,6 +925,60 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
   }
 
   return true
+}
+
+async function handleWaitlistStreamCreationStep(ctx: Context, input: ApInput, text: string) {
+  const session = getSession(ctx)
+  const draft = input.draft || {}
+  const next = async (step: string, prompt: string) => {
+    session.adminPanelInput = { ...input, step, draft } as ApInput
+    await ctx.reply(prompt)
+  }
+
+  if (input.step === 'email') {
+    draft.email = text
+    await next('password', 'Введи пароль:')
+    return
+  }
+  if (input.step === 'password') {
+    draft.password = text
+    await next('chatLink', 'Введи ссылку на чат потока (или "-", если ссылки пока нет):')
+    return
+  }
+  if (input.step === 'chatLink') {
+    draft.chatLink = text === '-' ? '' : text
+    await next('expiresAt', 'Введи дату окончания в формате ДД.ММ.ГГГГ:')
+    return
+  }
+  if (input.step === 'expiresAt') {
+    const expiresAt = ap.parseDateInput(text)
+    if (!expiresAt) throw new Error('Нужна дата в формате ДД.ММ.ГГГГ')
+    const { stream, entries } = await ap.adminCreateStreamFromWaitlist({
+      flowNumber: input.flowNumber!,
+      email: draft.email,
+      password: draft.password,
+      chatLink: draft.chatLink,
+      expiresAt,
+    })
+
+    const recipients = [...new Set(entries.map((entry: any) => entry.requestedBy as number))]
+    for (const telegramId of recipients) {
+      await ctx.api
+        .sendMessage(
+          telegramId,
+          `✅ Поток ProPresenter №${stream.flowNumber} создан!\n\n` +
+            `📧 Логин: ${stream.email}\n` +
+            `🔑 Пароль: ${stream.password}\n` +
+            (stream.chatLink ? `💬 Чат: ${stream.chatLink}\n` : '') +
+            `📅 Доступ до: ${formatDate(stream.expiresAt)}\n\n` +
+            'Доступ уже появился в профиле команды.'
+        )
+        .catch((error) => console.error(`Не удалось уведомить ${telegramId}:`, error))
+    }
+
+    await ctx.reply(`✅ Поток №${stream.flowNumber} создан, подключено команд: ${entries.length}.`)
+    await showStreamCard(replyOnlyCtx(ctx), stream.flowNumber)
+  }
 }
 
 async function handleStreamCreationStep(ctx: Context, input: ApInput, text: string) {

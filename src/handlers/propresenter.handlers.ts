@@ -4,8 +4,12 @@ import { renderScreen } from '../core/render.js'
 import { packCb } from '../core/callback.js'
 import { escapeUnderscore } from '../utils/escape.js'
 import { getOrCreateUser } from '../services/user.service.js'
-import { getTeamById } from '../services/team.service.js'
-import { addToWaitlist, getPendingWaitlist } from '../services/proPresenterWaitlist.service.js'
+import { getActiveProPresenterFlowNumber, getTeamById } from '../services/team.service.js'
+import {
+  addToWaitlist,
+  claimBatchReadyNotification,
+  PROPRESENTER_BATCH_SIZE,
+} from '../services/proPresenterWaitlist.service.js'
 import { getStreamByNumber } from '../services/proPresenterStream.service.js'
 import {
   ADMIN_GROUP_ID,
@@ -16,12 +20,25 @@ import type { MyContext } from '../types/context.js'
 
 // ===== Навигация (просто переходы между экранами) =====
 
+async function stopIfTeamAlreadyHasStream(ctx: MyContext, teamId: string) {
+  const flowNumber = await getActiveProPresenterFlowNumber(teamId)
+  if (!flowNumber) return false
+
+  await ctx.answerCallbackQuery({
+    text: `У вашей команды уже есть поток №${flowNumber}`,
+    show_alert: true,
+  })
+  return true
+}
+
 export async function handlePropNoStream(ctx: MyContext, userId: number, teamId: string) {
+  if (await stopIfTeamAlreadyHasStream(ctx, teamId)) return
   goTo(userId, 'propresenter_no_stream', teamId)
   await renderScreen(ctx, userId, 'propresenter_no_stream', teamId)
 }
 
 export async function handlePropHasStream(ctx: MyContext, userId: number, teamId: string) {
+  if (await stopIfTeamAlreadyHasStream(ctx, teamId)) return
   goTo(userId, 'propresenter_streams', teamId)
   await renderScreen(ctx, userId, 'propresenter_streams', teamId)
 }
@@ -35,6 +52,8 @@ export async function handlePropSelectStream(ctx: MyContext, userId: number, par
 
 export async function handlePropConfirmStream(ctx: MyContext, userId: number, params: string) {
   const [flowNumber, teamId] = params.split(':')
+
+  if (await stopIfTeamAlreadyHasStream(ctx, teamId)) return
 
   const team = await getTeamById(teamId)
   const owner = await getOrCreateUser(userId)
@@ -86,39 +105,60 @@ export async function handlePropConfirmStream(ctx: MyContext, userId: number, pa
 }
 
 export async function handlePropNoStreamConfirm(ctx: MyContext, userId: number, teamId: string) {
-  await addToWaitlist(teamId, userId)
+  if (await stopIfTeamAlreadyHasStream(ctx, teamId)) return
+  const { entry, position, created } = await addToWaitlist(teamId, userId)
 
   const team = await getTeamById(teamId)
   const owner = await getOrCreateUser(userId)
-
-  const waitlist = await getPendingWaitlist()
+  const flowNumber = entry.assignedFlowNumber!
 
   const kb = new InlineKeyboard().url('Написать юзеру', `tg://user?id=${userId}`)
 
-  await ctx.api.sendMessage(
-    ADMIN_GROUP_ID,
-    `📋 *Новая заявка в лист ожидания ProPresenter*\n\n` +
-      `👤 ${owner.fio || 'не указано'}\n` +
-      `👥 Команда: ${team?.name || 'неизвестно'}\n` +
-      `🆔 Team ID: \`${teamId}\`\n\n` +
-      `Сейчас в очереди: *${waitlist.length}* заявок.\n\n` +
-      `Когда наберётся достаточно людей — создай новый поток и назначь их вручную.`,
-    {
-      parse_mode: 'Markdown',
-      message_thread_id: PROP_WAITLIST_THREAD_ID,
-      reply_markup: kb,
-    }
-  )
+  if (created) {
+    await ctx.api.sendMessage(
+      ADMIN_GROUP_ID,
+      `📋 *Новая заявка на поток ProPresenter №${flowNumber}*\n\n` +
+        `👤 ${owner.fio || 'не указано'}\n` +
+        `👥 Команда: ${team?.name || 'неизвестно'}\n` +
+        `🆔 Team ID: \`${teamId}\`\n\n` +
+        `Заполнено: *${position}/${PROPRESENTER_BATCH_SIZE}*.`,
+      {
+        parse_mode: 'Markdown',
+        message_thread_id: PROP_WAITLIST_THREAD_ID,
+        reply_markup: kb,
+      }
+    )
+  }
+
+  if (await claimBatchReadyNotification(flowNumber)) {
+    await ctx.api.sendMessage(
+      ADMIN_GROUP_ID,
+      `✅ *Поток ProPresenter №${flowNumber} собран!*\n\n` +
+        `В очереди ${PROPRESENTER_BATCH_SIZE}/${PROPRESENTER_BATCH_SIZE} команд. Можно создавать поток.`,
+      {
+        parse_mode: 'Markdown',
+        message_thread_id: PROP_WAITLIST_THREAD_ID,
+        reply_markup: new InlineKeyboard().text(
+          `✅ Поток №${flowNumber} создал`,
+          `ap:wait:${flowNumber}:create`
+        ),
+      }
+    )
+  }
 
   await ctx.editMessageCaption({
     caption:
-      '✅ *Вы добавлены в лист ожидания!*\n\n' +
-      'Как только откроется новый поток ProPresenter, мы вам сообщим и выдадим доступ.',
+      `${created ? '✅ *Заявка отправлена!*' : 'ℹ️ *Вы уже находитесь в очереди.*'}\n\n` +
+      `Будущий поток: *№${flowNumber}*\n` +
+      `Ваше место: *${position} из ${PROPRESENTER_BATCH_SIZE}*\n\n` +
+      'Как только поток будет создан, мы сообщим и выдадим доступ.',
     parse_mode: 'Markdown',
     reply_markup: new InlineKeyboard().text('🏠 Главное меню', packCb({ a: 'home' })),
   })
 
-  await ctx.answerCallbackQuery({ text: 'Заявка отправлена ✓' })
+  await ctx.answerCallbackQuery({
+    text: created ? 'Заявка отправлена ✓' : `Вы уже №${position} в очереди`,
+  })
 }
 
 // ===== Подтверждение/отклонение админом (пишет в БД) =====
