@@ -9,7 +9,7 @@ export function supportScreen(userId: number): ScreenView {
     .text('Написать в поддержку', 'support:start')
     .icon('5307746710682869587')
     .row()
-    .text('БОТ ПОМОЩНИК', 'https://t.me/hubbbhelp_bot')
+    .url('БОТ ПОМОЩНИК', 'https://t.me/hubbbhelp_bot')
     .icon('6030400221232501136')
     .row()
     .url('Написать разработчику?', 'https://t.me/vitaly_kolodchenko')
