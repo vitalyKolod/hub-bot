@@ -35,7 +35,7 @@ const teamInviteSchema = new mongoose.Schema(
 
     expiresAt: {
       type: Date,
-      required: true,
+      default: null,
     },
   },
   { timestamps: true }

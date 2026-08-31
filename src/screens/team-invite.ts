@@ -14,7 +14,7 @@ export async function teamInviteScreen(userId: number, code: string): Promise<Sc
     const reasonText: Record<string, string> = {
       not_found: 'Приглашение не найдено.',
       used: 'Эта ссылка уже была использована.',
-      expired: 'Срок действия ссылки истёк (24 часа).',
+      expired: 'Срок действия старой ссылки истёк.',
       team_not_found: 'Команда не найдена.',
       team_full: 'Команда уже заполнена (максимум 5 участников).',
     }

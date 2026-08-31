@@ -2,7 +2,6 @@ import crypto from 'crypto'
 import { TeamInviteModel } from '../models/TeamInvite.js'
 import { getTeamById } from './team.service.js'
 
-const INVITE_TTL_MS = 3 * 24 * 60 * 60 * 1000
 const MAX_TEAM_MEMBERS = 5
 
 function generateCode(): string {
@@ -15,7 +14,6 @@ function generateCode(): string {
  */
 export async function createTeamInvite(teamId: string, createdBy: number) {
   const code = generateCode()
-  const expiresAt = new Date(Date.now() + INVITE_TTL_MS)
 
   const invite = await TeamInviteModel.create({
     teamId,
@@ -23,7 +21,6 @@ export async function createTeamInvite(teamId: string, createdBy: number) {
     status: 'active',
     createdBy,
     usedBy: null,
-    expiresAt,
   })
 
   return invite
@@ -51,7 +48,9 @@ export async function validateInvite(code: string) {
     return { ok: false, reason: 'used' as const }
   }
 
-  if (invite.status === 'expired' || invite.expiresAt < new Date()) {
+  // Старые приглашения могли иметь TTL. Новые ссылки остаются активными,
+  // пока первый участник не примет приглашение.
+  if (invite.status === 'expired' || (invite.expiresAt && invite.expiresAt < new Date())) {
     if (invite.status !== 'expired') {
       invite.status = 'expired'
       await invite.save()
@@ -76,14 +75,19 @@ export async function validateInvite(code: string) {
  * Погасить приглашение — вызывается, когда человек реально жмёт "Принять".
  */
 export async function consumeInvite(code: string, usedBy: number) {
-  const invite = await getInviteByCode(code)
-  if (!invite) return null
+  return TeamInviteModel.findOneAndUpdate(
+    { code, status: 'active' },
+    { $set: { status: 'used', usedBy } },
+    { new: true }
+  )
+}
 
-  invite.status = 'used'
-  invite.usedBy = usedBy
-  await invite.save()
-
-  return invite
+/** Вернуть приглашение в работу, если добавление участника не сохранилось. */
+export async function restoreInvite(code: string, usedBy: number) {
+  return TeamInviteModel.updateOne(
+    { code, status: 'used', usedBy },
+    { $set: { status: 'active', usedBy: null } }
+  )
 }
 
 /**

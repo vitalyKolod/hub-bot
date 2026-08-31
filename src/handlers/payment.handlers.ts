@@ -7,6 +7,7 @@ import { getOrCreateUser } from '../services/user.service.js'
 import {
   getTeamById,
   activateTeamSubscription,
+  hasActiveTeamSubscription,
   isTeamProductPurchaseLocked,
 } from '../services/team.service.js'
 import { getProduct } from '../config/products.js'
@@ -27,6 +28,13 @@ export async function handlePayProduct(
   if (!team || team.ownerId !== userId) {
     await ctx.answerCallbackQuery({
       text: 'Оплатить может только владелец команды',
+      show_alert: true,
+    })
+    return
+  }
+  if (productId === 'add_member' && !hasActiveTeamSubscription(team)) {
+    await ctx.answerCallbackQuery({
+      text: 'Сначала приобретите подписку для команды',
       show_alert: true,
     })
     return
@@ -290,7 +298,7 @@ export async function handleAdminAccept(
         team.ownerId,
         `✅ Оплата подтверждена!\n\n` +
           `Вот персональная ссылка-приглашение для нового участника:\n${inviteLink}\n\n` +
-          `⚠️ Ссылка одноразовая и действует 24 часа. Отправьте её человеку, которого хотите добавить в команду «${team.name}».Чтобы вернуться в меню команд - нажмите /team_list`
+          `⚠️ Ссылка одноразовая: после вступления участника она станет недействительной. Отправьте её человеку, которого хотите добавить в команду «${team.name}».\n\nЧтобы вернуться в меню команд, нажмите /team_list`
       )
 
       const safeCaption = escapeUnderscore(`${caption}\n\n✅ Принято! Ссылка сгенерирована.`)
@@ -308,7 +316,6 @@ export async function handleAdminAccept(
     if (product?.groupId) {
       const invite = await ctx.api.createChatInviteLink(product.groupId, {
         member_limit: 1,
-        expire_date: Math.floor(Date.now() / 1000) + 1800,
       })
       await ctx.api.sendMessage(
         team.ownerId,

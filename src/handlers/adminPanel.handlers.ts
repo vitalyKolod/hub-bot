@@ -3,6 +3,7 @@
 // Подключение — см. WIRING.md (несколько вставок в bot.ts).
 
 import { InlineKeyboard, type Context } from 'grammy'
+import { FormattedString } from '@grammyjs/parse-mode'
 import { isAdmin } from '../config/admin.js'
 import { getProduct } from '../config/products.js'
 import {
@@ -11,10 +12,13 @@ import {
   isAdminPanelCallback,
   statusLabel,
   statusDot,
+  statusText,
+  statusCustomEmojiId,
   formatDate,
   getDaysLeft,
   TEAM_PRODUCT_IDS,
   PRODUCT_EMOJI,
+  PRODUCT_CUSTOM_EMOJI_IDS,
   PAGE_SIZE,
 } from '../constants/admin-panel.js'
 import * as ap from '../services/adminPanel.service.js'
@@ -90,9 +94,21 @@ function escapeMd(text: string): string {
 }
 
 /** Рендерит экран: если есть callbackQuery — редактирует сообщение, иначе шлёт новое. */
-async function render(ctx: Context, text: string, kb: InlineKeyboard, markdown = true) {
+async function render(
+  ctx: Context,
+  content: string | FormattedString,
+  kb: InlineKeyboard,
+  markdown = true
+) {
   const opts: any = { reply_markup: kb }
-  if (markdown) opts.parse_mode = 'Markdown'
+  const text = typeof content === 'string' ? content : content.text
+
+  if (typeof content === 'string') {
+    if (markdown) opts.parse_mode = 'Markdown'
+  } else {
+    opts.entities = content.entities
+  }
+
   if (ctx.callbackQuery) {
     await ctx.editMessageText(text, opts).catch(() => ctx.reply(text, opts))
   } else {
@@ -124,6 +140,8 @@ export async function showAdminPanelMenu(ctx: Context) {
       nextBatch ? `📋 Заявки №${nextBatch._id} (${nextBatch.count}/20)` : '📋 Заявки на поток',
       apCb('wait')
     )
+    .row()
+    .text('‹ Назад', 'admin:root')
 
   await render(ctx, '🛠 *Панель управления*\n\nВыбери раздел.', kb)
 }
@@ -356,36 +374,60 @@ async function showTeamCard(
 
   const owner = await ap.adminGetUser(team.ownerId)
 
-  let text = `👥 *${escapeMd(team.name)}*\n`
-  text += `👑 Владелец: ${escapeMd(owner?.fio || 'не найден')} (\`${team.ownerId}\`)\n`
-  text += `💬 Username: ${owner?.username ? `@${escapeMd(owner.username)}` : 'нет'}\n`
-  text += `━━━━━━━━━━━━━━\n*Подписки:*\n\n`
+  let text = new FormattedString('')
+    .plain('👥 ')
+    .bold(team.name)
+    .plain('\n👑 Владелец: ')
+    .plain(owner?.fio || 'не найден')
+    .plain(' (')
+    .code(String(team.ownerId))
+    .plain(')\n💬 Username: ')
+    .plain(owner?.username ? `@${owner.username}` : 'нет')
+    .plain('\n━━━━━━━━━━━━━━\n')
+    .bold('Подписки:')
+    .plain('\n\n')
 
   for (const productId of TEAM_PRODUCT_IDS) {
     const sub: any = team.subscriptions.get(productId)
     const emoji = PRODUCT_EMOJI[productId] || '📦'
-    text += `${emoji} *${escapeMd(productName(productId))}*\n`
-    text += `┗ Статус: ${statusLabel(sub?.status)}\n`
+    const productIconId = PRODUCT_CUSTOM_EMOJI_IDS[productId]
+    const statusIconId = statusCustomEmojiId(sub?.status)
+
+    text = productIconId ? text.emoji(emoji, productIconId) : text.plain(emoji)
+    text = text.plain(' ').bold(productName(productId)).plain('\n┗ Статус: ')
+    text = statusIconId
+      ? text.emoji(statusDot(sub?.status), statusIconId)
+      : text.plain(statusDot(sub?.status))
+    text = text.plain(` ${statusText(sub?.status)}\n`)
 
     if (sub?.status === 'active') {
-      text += `┗ Осталось: ${getDaysLeft(sub.expiresAt)} дн. (до ${formatDate(sub.expiresAt)})\n`
+      text = text.plain(
+        `┗ Осталось: ${getDaysLeft(sub.expiresAt)} дн. (до ${formatDate(sub.expiresAt)})\n`
+      )
     }
 
     if (productId === 'propresenter' && sub?.meta) {
-      if (sub.meta.flowNumber) text += `┗ Поток: №${sub.meta.flowNumber}\n`
-      if (sub.meta.email) text += `┗ Логин: \`${escapeMd(sub.meta.email)}\`\n`
-      if (sub.meta.password) text += `┗ Пароль: \`${escapeMd(sub.meta.password)}\`\n`
-      if (sub.meta.chatLink) text += `┗ Чат: есть\n`
+      if (sub.meta.flowNumber) text = text.plain(`┗ Поток: №${sub.meta.flowNumber}\n`)
+      if (sub.meta.email) text = text.plain('┗ Логин: ').code(sub.meta.email).plain('\n')
+      if (sub.meta.password) text = text.plain('┗ Пароль: ').code(sub.meta.password).plain('\n')
+      if (sub.meta.chatLink) text = text.plain('┗ Чат: есть\n')
     }
-    text += '\n'
+    text = text.plain('\n')
   }
 
-  text += `━━━━━━━━━━━━━━\n*Состав (${team.members.length}/5):*\n`
+  text = text
+    .plain('━━━━━━━━━━━━━━\n')
+    .bold(`Состав (${team.members.length}/5):`)
+    .plain('\n')
+
   for (const m of team.members) {
     const mu = await ap.adminGetUser(m.telegramId)
     const role = m.telegramId === team.ownerId ? '👑' : '👤'
-    const username = mu?.username ? `@${escapeMd(mu.username)}` : 'нет'
-    text += `${role} ${escapeMd(mu?.fio || 'без имени')} · \`${m.telegramId}\` · username: ${username}\n`
+    const username = mu?.username ? `@${mu.username}` : 'нет'
+    text = text
+      .plain(`${role} ${mu?.fio || 'без имени'} · `)
+      .code(String(m.telegramId))
+      .plain(` · username: ${username}\n`)
   }
 
   // ---- клавиатура ----
@@ -393,8 +435,10 @@ async function showTeamCard(
 
   for (const productId of TEAM_PRODUCT_IDS) {
     const sub: any = team.subscriptions.get(productId)
-    const dot = statusDot(sub?.status)
-    kb.text(`${dot} ${productName(productId)}`, apCb('t', teamId, productId)).row()
+    const callback = apCb('t', teamId, productId)
+    kb.text(`${productName(productId)} ${statusDot(sub?.status)}`, callback)
+      .icon(PRODUCT_CUSTOM_EMOJI_IDS[productId])
+      .row()
   }
 
   kb.text('➕ Добавить участника', apCb('t', teamId, 'mem', 'add'))
@@ -455,16 +499,30 @@ async function showRemoveMemberMenu(ctx: Context, teamId: string) {
 async function showTeamProductCard(ctx: Context, teamId: string, product: string) {
   const team = await ap.adminGetTeam(teamId)
   const sub: any = team?.subscriptions.get(product)
+  const productEmoji = PRODUCT_EMOJI[product] || '📦'
+  const productIconId = PRODUCT_CUSTOM_EMOJI_IDS[product]
+  const statusIconId = statusCustomEmojiId(sub?.status)
 
-  let text = `${PRODUCT_EMOJI[product] || '📦'} *${escapeMd(productName(product))}* — команда\n\n`
-  text += `Статус: ${statusLabel(sub?.status)}\n`
-  text += `Действует до: ${formatDate(sub?.expiresAt)}\n`
+  let text = new FormattedString('')
+  text = productIconId ? text.emoji(productEmoji, productIconId) : text.plain(productEmoji)
+  text = text
+    .plain(' ')
+    .bold(productName(product))
+    .plain(' — команда\n\nСтатус: ')
+  text = statusIconId
+    ? text.emoji(statusDot(sub?.status), statusIconId)
+    : text.plain(statusDot(sub?.status))
+  text = text
+    .plain(` ${statusText(sub?.status)}\n`)
+    .plain(`Действует до: ${formatDate(sub?.expiresAt)}\n`)
 
   if (product === 'propresenter') {
-    text += `Поток: ${sub?.meta?.flowNumber ? '№' + sub.meta.flowNumber : '—'}\n`
-    text += `Логин: \`${escapeMd(sub?.meta?.email || '—')}\`\n`
-    text += `Пароль: \`${escapeMd(sub?.meta?.password || '—')}\`\n`
-    text += `Ссылка на чат: ${sub?.meta?.chatLink ? 'задана' : '—'}\n`
+    text = text
+      .plain(`Поток: ${sub?.meta?.flowNumber ? '№' + sub.meta.flowNumber : '—'}\nЛогин: `)
+      .code(sub?.meta?.email || '—')
+      .plain('\nПароль: ')
+      .code(sub?.meta?.password || '—')
+      .plain(`\nСсылка на чат: ${sub?.meta?.chatLink ? 'задана' : '—'}\n`)
   }
 
   const kb = new InlineKeyboard()

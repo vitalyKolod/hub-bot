@@ -4,7 +4,7 @@ import { INPUT_MODES } from '../constants/input-modes.js'
 import { goTo, goHome } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
 import { createTeam, addMemberToTeam } from '../services/team.service.js'
-import { validateInvite, consumeInvite } from '../services/teamInvite.service.js'
+import { validateInvite, consumeInvite, restoreInvite } from '../services/teamInvite.service.js'
 import { UserModel } from '../models/User.js'
 import type { MyContext } from '../types/context.js'
 
@@ -44,7 +44,7 @@ export async function handleAcceptTeamInvite(ctx: MyContext, userId: number, cod
     const reasonText: Record<string, string> = {
       not_found: 'Приглашение не найдено.',
       used: 'Эта ссылка уже была использована.',
-      expired: 'Срок действия ссылки истёк.',
+      expired: 'Срок действия старой ссылки истёк.',
       team_not_found: 'Команда не найдена.',
       team_full: 'Команда уже заполнена.',
     }
@@ -54,8 +54,22 @@ export async function handleAcceptTeamInvite(ctx: MyContext, userId: number, cod
     return
   }
 
-  await addMemberToTeam(check.team._id.toString(), userId)
-  await consumeInvite(code, userId)
+  // Условное обновление не даст двум одновременным нажатиям использовать
+  // одну оплаченную ссылку дважды.
+  const consumedInvite = await consumeInvite(code, userId)
+  if (!consumedInvite) {
+    await ctx.answerCallbackQuery({ text: 'Эта ссылка уже была использована.' })
+    goHome(userId)
+    await renderScreen(ctx, userId, 'main', undefined, { forceNew: true })
+    return
+  }
+
+  try {
+    await addMemberToTeam(check.team._id.toString(), userId)
+  } catch (error) {
+    await restoreInvite(code, userId)
+    throw error
+  }
 
   await UserModel.updateOne({ telegramId: userId }, { pendingInviteCode: null })
 

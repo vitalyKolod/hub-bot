@@ -52,6 +52,7 @@ import {
   activateTeamSubscription,
   rejectTeamSubscription,
   getTeamById,
+  hasActiveTeamSubscription,
   isOwner,
 } from './services/team.service.js'
 import { createTeamInvite } from './services/teamInvite.service.js'
@@ -198,6 +199,33 @@ type MyContext = Context &
 
 const broadcastAlbumTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
+async function showAdminRootMenu(ctx: MyContext, editCurrent = false) {
+  ctx.session.adminMode = undefined
+  ctx.session.adminPanelInput = undefined
+
+  const batches = await getPendingBatches()
+  const nextBatch = batches[0]
+  const kb = new InlineKeyboard()
+    .text('📢 Рассылка', 'admin:broadcast')
+    .row()
+    .text('📡 Потоки', apCb('streams'))
+    .text(
+      nextBatch ? `📋 Заявки №${nextBatch._id} (${nextBatch.count}/20)` : '📋 Заявки',
+      apCb('wait')
+    )
+    .row()
+    .text('✏️ Управление', apCb('menu'))
+
+  if (editCurrent) {
+    await ctx
+      .editMessageText('Панель администратора', { reply_markup: kb })
+      .catch(() => ctx.reply('Панель администратора', { reply_markup: kb }))
+    return
+  }
+
+  await ctx.reply('Панель администратора', { reply_markup: kb })
+}
+
 function broadcastAudienceLabel(draft?: MyContext['session']['broadcastDraft']) {
   return draft?.audience === 'stream' ? `поток #${draft.flowNumber}` : 'все пользователи'
 }
@@ -293,12 +321,8 @@ async function handleBroadcastCallback(ctx: MyContext, data: string) {
     return promptBroadcastMessage(ctx, 'stream', Number(data.split(':')[3]))
   }
   if (data === 'admin:broadcast:cancel') {
-    ctx.session.adminMode = undefined
     ctx.session.broadcastDraft = undefined
-    const kb = new InlineKeyboard().text('📢 Рассылка', 'admin:broadcast').row().text('✏️ Управление', apCb('menu'))
-    return ctx.editMessageText('Панель администратора', { reply_markup: kb }).catch(() =>
-      ctx.reply('Панель администратора', { reply_markup: kb })
-    )
+    return showAdminRootMenu(ctx, true)
   }
   const draft = ctx.session.broadcastDraft
   if (!draft?.messageIds.length) return ctx.reply('Черновик не найден. Начни рассылку заново.')
@@ -376,6 +400,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
   bot.command('start', async (ctx) => {
     const payload = ctx.match
     const userId = ctx.from.id
+    await clearInputMode(userId)
 
     if (payload && typeof payload === 'string' && payload.startsWith('join_')) {
       const code = payload.replace('join_', '')
@@ -387,7 +412,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
         const reasonText: Record<string, string> = {
           not_found: '❌ Приглашение не найдено.',
           used: '❌ Эта ссылка уже была использована.',
-          expired: '❌ Срок действия ссылки истёк (24 часа).',
+          expired: '❌ Срок действия старой ссылки истёк.',
           team_not_found: '❌ Команда не найдена.',
           team_full: '❌ Команда уже заполнена (максимум 5 участников).',
         }
@@ -411,6 +436,14 @@ export function registerHandlers(bot: Bot<MyContext>) {
         // если ещё не зарегистрирован — падаем ниже, в обычный онбординг,
         // код уже сохранён и всплывёт после завершения регистрации
       }
+    }
+
+    const profile = await getOrCreateUser(userId)
+    if (profile.reg === 'done') {
+      await ctx.reply('✅ Вы уже зарегистрированы в ХАБе.')
+      goHome(userId)
+      await renderScreen(ctx, userId, 'main', undefined, { forceNew: true })
+      return
     }
 
     const kb = new InlineKeyboard().text('СТАРТ', 'sub:check').style('success')
@@ -448,43 +481,32 @@ export function registerHandlers(bot: Bot<MyContext>) {
   })
 
   bot.command('main', async (ctx) => {
+    await clearInputMode(ctx.from.id)
     goHome(ctx.from.id)
     await renderScreen(ctx, ctx.from.id, 'main', undefined, { forceNew: true })
   })
 
   bot.command('profile', async (ctx) => {
+    await clearInputMode(ctx.from.id)
     goTo(ctx.from.id, 'profile')
     await renderScreen(ctx, ctx.from.id, 'profile', undefined, { forceNew: true })
   })
 
   bot.command('team_list', async (ctx) => {
+    await clearInputMode(ctx.from.id)
     goTo(ctx.from.id, 'team_list')
     await renderScreen(ctx, ctx.from.id, 'team_list', undefined, { forceNew: true })
   })
 
   bot.command('support', async (ctx) => {
+    await clearInputMode(ctx.from.id)
     goTo(ctx.from.id, 'support')
     await renderScreen(ctx, ctx.from.id, 'support', undefined, { forceNew: true })
   })
 
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx.from.id)) return
-
-    const batches = await getPendingBatches()
-    const nextBatch = batches[0]
-
-    const kb = new InlineKeyboard()
-      .text('📢 Рассылка', 'admin:broadcast')
-      .row()
-      .text('📡 Потоки', apCb('streams'))
-      .text(
-        nextBatch ? `📋 Заявки №${nextBatch._id} (${nextBatch.count}/20)` : '📋 Заявки',
-        apCb('wait')
-      )
-      .row()
-      .text('✏️ Управление', apCb('menu'))
-
-    await ctx.reply('Панель администратора', { reply_markup: kb })
+    await showAdminRootMenu(ctx)
   })
 
   // ====================== CALLBACK QUERY ======================
@@ -644,6 +666,16 @@ export function registerHandlers(bot: Bot<MyContext>) {
     if (data === 'confirm_registration') {
       await handleConfirmRegistration(ctx, userId)
       await ctx.answerCallbackQuery()
+      return
+    }
+
+    if (data === 'admin:root') {
+      if (!isAdmin(userId)) {
+        await ctx.answerCallbackQuery({ text: 'Нет доступа', show_alert: true })
+        return
+      }
+      await showAdminRootMenu(ctx, true)
+      await ctx.answerCallbackQuery().catch(() => {})
       return
     }
 
@@ -823,18 +855,20 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     // Онбординг
     if (isOnboardingCallback(data)) {
+      const profile = await getOrCreateUser(userId)
+      if (profile.reg === 'done') {
+        await ctx.reply('✅ Вы уже зарегистрированы в ХАБе.')
+        goHome(userId)
+        await renderScreen(ctx, userId, 'main', undefined, { forceNew: true })
+        await ack()
+        return
+      }
+
       const onboardingParsed = parseOnboardingCallback(data)
       if (!onboardingParsed) return await ack()
 
       if (onboardingParsed.type === 'confirm') {
-        const profile = await getOrCreateUser(userId)
-        if (profile.reg !== 'done') {
-          await startRegistration(ctx, userId)
-        } else {
-          goHome(userId)
-
-          await renderScreen(ctx, userId, 'main')
-        }
+        await startRegistration(ctx, userId)
         await ack()
         return
       }
@@ -926,6 +960,24 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     // Обычная навигация + оплата
     if (parsed.a === 'open' && parsed.s) {
+      if (parsed.s === 'add_volunteer') {
+        const teamId = typeof parsed.p === 'string' ? parsed.p : ''
+        const team = teamId ? await getTeamById(teamId) : null
+
+        if (!team || team.ownerId !== userId) {
+          await ctx.answerCallbackQuery({ text: 'Нет прав для этой команды', show_alert: true })
+          return
+        }
+
+        if (!hasActiveTeamSubscription(team)) {
+          await ctx.answerCallbackQuery({
+            text: 'Сначала приобретите подписку для команды',
+            show_alert: true,
+          })
+          return
+        }
+      }
+
       await handleOpen(ctx, userId, parsed)
       await ack()
       return

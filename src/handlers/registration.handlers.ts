@@ -2,7 +2,7 @@ import { InlineKeyboard } from 'grammy'
 import { UserModel } from '../models/User.js'
 import { getOrCreateUser } from '../services/user.service.js'
 import { finishRegistration } from '../flows/registration/index.js'
-import { goTo } from '../state/ui.js'
+import { goHome, goTo } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
 import type { MyContext } from '../types/context.js'
 import { computeDaysLeft } from '../state/profile.js'
@@ -44,6 +44,14 @@ export async function handleEditField(ctx: MyContext, field: string) {
 }
 
 export async function handleConfirmRegistration(ctx: MyContext, userId: number) {
+  const existingProfile = await getOrCreateUser(userId)
+  if (existingProfile.reg === 'done') {
+    await ctx.reply('✅ Вы уже зарегистрированы в ХАБе.')
+    goHome(userId)
+    await renderScreen(ctx, userId, 'main', undefined, { forceNew: true })
+    return
+  }
+
   await UserModel.updateOne(
     { telegramId: userId },
     {

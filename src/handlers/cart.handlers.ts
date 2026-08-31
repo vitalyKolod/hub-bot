@@ -150,7 +150,6 @@ export async function handleCartAccept(ctx: MyContext, itemId: string) {
     try {
       const invite = await ctx.api.createChatInviteLink(product.groupId, {
         member_limit: 1,
-        expire_date: Math.floor(Date.now() / 1000) + 1800,
       })
       await ctx.api.sendMessage(
         team!.ownerId,

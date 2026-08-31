@@ -5,7 +5,7 @@ import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
 import { getProduct } from '../config/products.js'
 
-import { getTeamById } from '../services/team.service.js'
+import { getTeamById, hasActiveTeamSubscription } from '../services/team.service.js'
 import { UserModel } from '../models/User.js'
 import {
   PRO_CONTENT_CHAT_LINK,
@@ -165,16 +165,18 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
       .icon('5397916757333654639')
       .row()
 
-    kb.text(
-      'ДОБАВИТЬ УЧАСТНИКА',
-      packCb({
-        a: 'open',
-        s: 'add_volunteer',
-        p: teamId,
-      })
-    )
-      .icon('5258362837411045098')
-      .row()
+    if (hasActiveTeamSubscription(team)) {
+      kb.text(
+        'ДОБАВИТЬ УЧАСТНИКА',
+        packCb({
+          a: 'open',
+          s: 'add_volunteer',
+          p: teamId,
+        })
+      )
+        .icon('5258362837411045098')
+        .row()
+    }
   }
 
   kb.text('◀️ НАЗАД', packCb({ a: 'back' }))
