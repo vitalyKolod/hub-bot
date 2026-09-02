@@ -1,5 +1,5 @@
 import { CartModel } from '../models/Cart.js'
-import { getProduct } from '../config/products.js'
+import { Currency, getProduct, getProductPrice } from '../config/products.js'
 
 export async function getOrCreateCart(teamId: string) {
   let cart = await CartModel.findOne({ teamId })
@@ -31,10 +31,19 @@ export function getPendingItems(cart: any) {
   return cart.items.filter((i: any) => i.status === 'pending')
 }
 
-export function getCartTotal(cart: any): number {
-  return getPendingItems(cart).reduce((sum: number, item: any) => {
+export function getCartTotal(cart: any, currency: Currency = 'rub'): number {
+  const items = getPendingItems(cart)
+
+  return items.reduce((total, item) => {
     const product = getProduct(item.product)
-    return sum + (product?.price || 0)
+
+    if (!product) {
+      return total
+    }
+
+    const price = getProductPrice(product, currency)
+
+    return total + (price ?? 0)
   }, 0)
 }
 

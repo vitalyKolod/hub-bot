@@ -14,31 +14,15 @@ export async function storyloopsScreen(userId: number, teamId: string): Promise<
   }
   const kb = await buildProductPurchaseKeyboard(teamId, 'storyloops')
 
-  // ============================================================
-  // ТЕКСТ
-  // ============================================================
-
   let message = new FormattedString('')
 
-  // ============================================================
-  // ЗАГОЛОВОК
-  // ============================================================
-
   message = message.emoji('⬜️', '5190877553887323413').plain(' ').bold('STORYLOOPS').plain('\n\n')
-
-  // ============================================================
-  // ОПИСАНИЕ
-  // ============================================================
 
   message = message
     .plain(
       'Коллекция анимированных фонов и визуальных материалов для создания атмосферных церковных презентаций.'
     )
     .plain('\n\n')
-
-  // ============================================================
-  // ПРЕИМУЩЕСТВА
-  // ============================================================
 
   let benefits = new FormattedString('')
 
@@ -59,9 +43,9 @@ export async function storyloopsScreen(userId: number, teamId: string): Promise<
     .plain(' Можно подключить членов вашей команды')
 
   message = message.blockquote(benefits, true).plain('\n\n')
-
-  message = message.plain('💰 ').bold(`Стоимость: ${product.price} ₽/год`).plain('\n\n')
-
+  message = message
+    .plain('💰')
+    .bold(`Стоимость в год: ${product.priceRub}₽ или ${product.priceUsd}$`)
   return {
     photo: './public/content.jpg',
     caption: message.caption,

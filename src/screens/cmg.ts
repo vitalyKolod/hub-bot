@@ -14,15 +14,7 @@ export async function cmgScreen(userId: number, teamId: string): Promise<ScreenV
   }
   const kb = await buildProductPurchaseKeyboard(teamId, 'cmg')
 
-  // ============================================================
-  // ТЕКСТ
-  // ============================================================
-
   let message = new FormattedString('')
-
-  // ============================================================
-  // ЗАГОЛОВОК
-  // ============================================================
 
   message = message
     .emoji('🛜', '5310127020213043624')
@@ -30,17 +22,9 @@ export async function cmgScreen(userId: number, teamId: string): Promise<ScreenV
     .bold('CHURCH MOTION GRAPHICS (CMG)')
     .plain('\n\n')
 
-  // ============================================================
-  // ОПИСАНИЕ
-  // ============================================================
-
   message = message
     .plain('Библиотека motion-графики и анимированных фонов для церковных презентаций.')
     .plain('\n\n')
-
-  // ============================================================
-  // ПРЕИМУЩЕСТВА
-  // ============================================================
 
   let benefits = new FormattedString('')
 
@@ -62,7 +46,9 @@ export async function cmgScreen(userId: number, teamId: string): Promise<ScreenV
 
   message = message.blockquote(benefits, true).plain('\n\n')
 
-  message = message.plain('💰 ').bold(`Стоимость: ${product.price} ₽/год`)
+  message = message
+    .plain('💰')
+    .bold(`Стоимость в год: ${product.priceRub}₽ или ${product.priceUsd}$`)
 
   return {
     photo: './public/cmg.png',

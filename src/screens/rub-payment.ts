@@ -100,12 +100,12 @@ export async function rubPaymentScreen(userId: number, params?: any): Promise<Sc
 
     productName = items.map((i: any) => getProduct(i.product)?.name || i.product).join(', ')
 
-    amount = getCartTotal(cart)
+    amount = getCartTotal(cart, 'rub')
   } else {
     const productConfig = getProduct(payment.product)
 
     productName = productConfig?.name || payment.product
-    amount = productConfig?.price ?? null
+    amount = productConfig?.priceRub ?? null
   }
 
   let message = new FormattedString('')

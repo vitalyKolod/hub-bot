@@ -41,7 +41,9 @@ export async function cgsScreen(userId: number, teamId: string): Promise<ScreenV
 
   message = message.blockquote(benefits, true).plain('\n\n')
 
-  message = message.plain('💰 ').bold(`Стоимость: ${product.price} ₽/год`)
+  message = message
+    .plain('💰')
+    .bold(`Стоимость в год: ${product.priceRub}₽ или ${product.priceUsd}$`)
 
   return {
     photo: './public/content.jpg',

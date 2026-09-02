@@ -45,7 +45,9 @@ export async function procontentScreen(userId: number, teamId: string): Promise<
 
   message = message.blockquote(content, true).plain('\n\n')
 
-  message = message.plain('💰 ').bold(`Стоимость: ${product.price} ₽/год`)
+  message = message
+    .plain('💰')
+    .bold(`Стоимость в год: ${product.priceRub}₽ или ${product.priceUsd}$`)
 
   return {
     photo: './public/procontent.png',

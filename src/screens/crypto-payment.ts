@@ -76,13 +76,13 @@ export async function cryptoPaymentScreen(
 
     productName = items.map((i: any) => getProduct(i.product)?.name || i.product).join(', ')
 
-    amount = getCartTotal(cart)
+    amount = getCartTotal(cart, 'usd')
   } else {
     const productConfig = getProduct(params?.product || '')
 
     productName = productConfig?.name || params?.product || ''
 
-    amount = productConfig?.price ?? null
+    amount = productConfig?.priceUsd ?? null
   }
 
   let message = new FormattedString('')

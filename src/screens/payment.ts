@@ -14,7 +14,8 @@ export async function paymentScreen(userId: number, params: any, ctx: any): Prom
   const isExtension = payment?.isExtension
 
   let productName = 'подписка'
-  let amount: number | null = null
+  let amountRub: number | null = null
+  let amountUsd: number | null = null
 
   if (product === 'cart' && teamId) {
     const cart = await getOrCreateCart(teamId)
@@ -23,12 +24,15 @@ export async function paymentScreen(userId: number, params: any, ctx: any): Prom
     productName =
       items.map((i: any) => getProduct(i.product)?.name || i.product).join(', ') || 'корзина'
 
-    amount = getCartTotal(cart)
+    amountRub = getCartTotal(cart, 'rub')
+    amountUsd = getCartTotal(cart, 'usd')
   } else {
     const productConfig = getProduct(product)
 
     productName = productConfig?.name || 'подписка'
-    amount = productConfig?.price ?? null
+
+    amountRub = productConfig?.priceRub ?? null
+    amountUsd = productConfig?.priceUsd ?? null
   }
 
   const kb = new InlineKeyboard()
@@ -80,9 +84,17 @@ export async function paymentScreen(userId: number, params: any, ctx: any): Prom
 
   order = order.plain('Продукт: ').bold(productName).plain('\n')
 
-  order = order
-    .plain('Стоимость: ')
-    .bold(amount !== null ? `${amount.toLocaleString('ru-RU')} ₽/год` : 'по договорённости')
+  order = order.plain('Стоимость: ')
+
+  if (amountRub !== null && amountUsd !== null) {
+    order = order
+      .bold(`${amountRub.toLocaleString('ru-RU')}₽`)
+      .plain(' или ')
+      .bold(`${amountUsd.toLocaleString('en-US')}$`)
+      .plain(' в год')
+  } else {
+    order = order.bold('по договорённости')
+  }
 
   message = message.blockquote(order, true).plain('\n\n')
 

@@ -319,7 +319,7 @@ export async function handleAdminAccept(
       })
       await ctx.api.sendMessage(
         team.ownerId,
-        `✅ ${isExtension ? 'Продлено' : 'Подписка активирована, '}:${product.name}\n\nВаша ссылка ниже 👇\n\n${invite.invite_link}\n\nчтобы вернуться в команду, нажмите /team_list`
+        `✅ ${isExtension ? 'Продлено' : 'Подписка активирована:'} ${product.name}\n\nВаша ссылка ниже 👇\n\n${invite.invite_link}\n\nчтобы вернуться в команду, нажмите /team_list`
       )
     } else {
       await ctx.api.sendMessage(

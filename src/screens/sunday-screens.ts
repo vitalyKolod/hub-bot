@@ -14,15 +14,7 @@ export async function SundayScreensScreen(userId: number, teamId: string): Promi
   }
   const kb = await buildProductPurchaseKeyboard(teamId, 'sunday_screens')
 
-  // ============================================================
-  // ТЕКСТ
-  // ============================================================
-
   let message = new FormattedString('')
-
-  // ============================================================
-  // ЗАГОЛОВОК
-  // ============================================================
 
   message = message
     .emoji('☀️', '5291749654017381020')
@@ -30,19 +22,11 @@ export async function SundayScreensScreen(userId: number, teamId: string): Promi
     .bold('SUNDAY SCREENS')
     .plain('\n\n')
 
-  // ============================================================
-  // ОПИСАНИЕ
-  // ============================================================
-
   message = message
     .plain(
       'Профессиональная платформа с визуальными фонами, анимациями и графикой для экранов во время богослужений.'
     )
     .plain('\n\n')
-
-  // ============================================================
-  // ПРЕИМУЩЕСТВА
-  // ============================================================
 
   let benefits = new FormattedString('')
 
@@ -61,7 +45,9 @@ export async function SundayScreensScreen(userId: number, teamId: string): Promi
 
   message = message.blockquote(benefits, true).plain('\n\n')
 
-  message = message.plain('💰 ').bold(`Стоимость: ${product.price} ₽/год`).plain('\n\n')
+  message = message
+    .plain('💰')
+    .bold(`Стоимость в год: ${product.priceRub}₽ или ${product.priceUsd}$\n\n`)
 
   message = message.plain('Доступ через приватный поток — без ограничений и блокировок.')
 
