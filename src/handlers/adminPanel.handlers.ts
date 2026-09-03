@@ -10,7 +10,6 @@ import {
   apCb,
   parseAdminPanelCallback,
   isAdminPanelCallback,
-  statusLabel,
   statusDot,
   statusText,
   statusCustomEmojiId,
@@ -38,7 +37,7 @@ type ApInputMode =
   | 'add_user_to_team'
   | 'edit_team_name'
   | 'set_team_sub_date'
-  | 'set_team_sub_meta'
+  | 'assign_team_stream'
   | 'add_team_member'
   | 'transfer_ownership'
   | 'stream_field'
@@ -415,10 +414,7 @@ async function showTeamCard(
     text = text.plain('\n')
   }
 
-  text = text
-    .plain('━━━━━━━━━━━━━━\n')
-    .bold(`Состав (${team.members.length}/5):`)
-    .plain('\n')
+  text = text.plain('━━━━━━━━━━━━━━\n').bold(`Состав (${team.members.length}/5):`).plain('\n')
 
   for (const m of team.members) {
     const mu = await ap.adminGetUser(m.telegramId)
@@ -448,6 +444,7 @@ async function showTeamCard(
   kb.text('✏️ Название', apCb('t', teamId, 'edit', 'name'))
   kb.row()
   kb.url('✉️ Написать владельцу', `tg://user?id=${team.ownerId}`).row()
+  kb.text('🗑 Удалить команду', apCb('t', teamId, 'delete')).row()
   kb.text(back?.label || '‹ К списку', back?.callback || apCb('tl', 0))
 
   await render(ctx, text, kb)
@@ -462,6 +459,23 @@ async function promptEditTeamName(ctx: Context, teamId: string) {
   getSession(ctx).adminPanelInput = { mode: 'edit_team_name', teamId } as ApInput
   const kb = new InlineKeyboard().text('‹ Назад', apCb('t', teamId))
   await render(ctx, 'Введи новое название команды:', kb, false)
+}
+
+async function showDeleteTeamConfirm(ctx: Context, teamId: string) {
+  const team = await ap.adminGetTeam(teamId)
+  if (!team) throw new Error('Команда не найдена')
+
+  const kb = new InlineKeyboard()
+    .text('✅ Да, удалить полностью', apCb('t', teamId, 'delete_confirm'))
+    .row()
+    .text('‹ Отмена', apCb('t', teamId))
+
+  await render(
+    ctx,
+    `Удалить команду «${team.name}» полностью?\n\nБудут удалены сама команда, её корзина, приглашения и заявки на поток. Пользователи команды останутся в базе. Действие необратимо.`,
+    kb,
+    false
+  )
 }
 
 async function promptTransferOwnership(ctx: Context, teamId: string) {
@@ -505,10 +519,7 @@ async function showTeamProductCard(ctx: Context, teamId: string, product: string
 
   let text = new FormattedString('')
   text = productIconId ? text.emoji(productEmoji, productIconId) : text.plain(productEmoji)
-  text = text
-    .plain(' ')
-    .bold(productName(product))
-    .plain(' — команда\n\nСтатус: ')
+  text = text.plain(' ').bold(productName(product)).plain(' — команда\n\nСтатус: ')
   text = statusIconId
     ? text.emoji(statusDot(sub?.status), statusIconId)
     : text.plain(statusDot(sub?.status))
@@ -527,23 +538,22 @@ async function showTeamProductCard(ctx: Context, teamId: string, product: string
 
   const kb = new InlineKeyboard()
 
+  if (product === 'propresenter') {
+    kb.text('➕ Добавить поток', apCb('t', teamId, product, 'assign')).row()
+    kb.text('♻️ Сбросить поток', apCb('t', teamId, product, 'rs')).row()
+    kb.text('‹ К команде', apCb('t', teamId))
+    await render(ctx, text, kb)
+    return
+  }
+
   kb.text(
     sub?.status === 'active' ? '🔁 Продлить ещё на 1 год' : '➕ Добавить подписку (на 1 год)',
     apCb('t', teamId, product, 'ex')
   ).row()
   kb.text('📅 Изменить дату окончания', apCb('t', teamId, product, 'dt')).row()
 
-  if (product === 'propresenter') {
-    kb.text('✏️ Поток', apCb('t', teamId, product, 'f', 'flowNumber'))
-    kb.text('✏️ Логин', apCb('t', teamId, product, 'f', 'email'))
-    kb.row()
-    kb.text('✏️ Пароль', apCb('t', teamId, product, 'f', 'password'))
-    kb.text('✏️ Ссылка на чат', apCb('t', teamId, product, 'f', 'chatLink'))
-    kb.row()
-  }
-
   kb.text('⏳ Отметить "на проверке"', apCb('t', teamId, product, 'st', 'pending'))
-  kb.text('🚫 Отклонить', apCb('t', teamId, product, 'st', 'rejected'))
+  // kb.text('🚫 Отклонить', apCb('t', teamId, product, 'st', 'rejected'))
   kb.row()
   kb.text('♻️ Сбросить (нет подписки)', apCb('t', teamId, product, 'rs')).row()
   kb.text('‹ К команде', apCb('t', teamId))
@@ -557,32 +567,43 @@ async function promptSetTeamSubDate(ctx: Context, teamId: string, product: strin
   await render(ctx, 'Введи дату в формате ДД.ММ.ГГГГ (или "-" чтобы очистить):', kb, false)
 }
 
-async function promptSetTeamSubMetaField(
-  ctx: Context,
-  teamId: string,
-  product: string,
-  field: string
-) {
-  getSession(ctx).adminPanelInput = {
-    mode: 'set_team_sub_meta',
-    teamId,
-    product,
-    field,
-  } as ApInput
-  const kb = new InlineKeyboard().text('‹ Назад', apCb('t', teamId, product))
-  await render(ctx, `Введи новое значение для "${field}":`, kb, false)
+async function promptAssignTeamStream(ctx: Context, teamId: string) {
+  getSession(ctx).adminPanelInput = { mode: 'assign_team_stream', teamId } as ApInput
+  const kb = new InlineKeyboard().text('‹ Назад', apCb('t', teamId, 'propresenter'))
+  await render(ctx, 'Введи номер потока (например, 10 или «Поток №10»):', kb, false)
+}
+
+function parseFlowNumberInput(text: string): number {
+  const match = text.trim().match(/^(?:поток\s*)?[#№]?\s*(\d+)$/i)
+  const flowNumber = match ? Number(match[1]) : NaN
+  if (!Number.isSafeInteger(flowNumber) || flowNumber <= 0) {
+    throw new Error('Введи номер потока, например: 10 или «Поток №10»')
+  }
+  return flowNumber
 }
 
 // ==================== ПОТОКИ PROPRESENTER (справочник, не привязан к юзеру) ====================
 
+async function getStreamCounts(flowNumber: number) {
+  const [teamCount, userIds] = await Promise.all([
+    ap.adminGetStreamOccupancy(flowNumber),
+    ap.adminGetUserIdsInStream(flowNumber),
+  ])
+
+  return { teamCount, userCount: userIds.length }
+}
+
 async function showStreamsList(ctx: Context) {
   const streams = await ap.adminGetAllStreams()
+  const streamCounts = await Promise.all(
+    streams.map((stream) => getStreamCounts(stream.flowNumber))
+  )
   const kb = new InlineKeyboard()
-  for (const s of streams) {
+  for (const [index, s] of streams.entries()) {
     const mark = s.status === 'active' ? '🟢' : '🔴'
-    const occ = await ap.adminGetStreamOccupancy(s.flowNumber)
+    const { teamCount, userCount } = streamCounts[index]
     kb.text(
-      `${mark} Поток #${s.flowNumber} · ${occ}/${s.capacity}👥`,
+      `${mark} Поток #${s.flowNumber} · команд: ${teamCount} · пользователей: ${userCount}`,
       apCb('stream', s.flowNumber)
     ).row()
   }
@@ -600,14 +621,15 @@ async function showStreamCard(ctx: Context, flowNumber: number) {
     return
   }
 
-  const occupancy = await ap.adminGetStreamOccupancy(flowNumber)
+  const { teamCount, userCount } = await getStreamCounts(flowNumber)
 
   const text =
     `📡 *Поток #${s.flowNumber}*\n` +
     `Email: \`${escapeMd(s.email)}\`\n` +
     `Пароль: \`${escapeMd(s.password)}\`\n` +
     `Чат: ${s.chatLink || '—'}\n` +
-    `Вместимость: ${occupancy}/${s.capacity}\n` +
+    `Команд в потоке: ${teamCount}\n` +
+    `Пользователей в потоке: ${userCount}\n` +
     `Действует до: ${formatDate(s.expiresAt)}\n` +
     `Статус: ${s.status === 'active' ? '🟢 active' : '🔴 closed'}`
 
@@ -665,22 +687,23 @@ async function showDeleteStreamConfirm(ctx: Context, flowNumber: number) {
 }
 
 async function showStreamTeamsMenu(ctx: Context, flowNumber: number) {
-  const stream = await ap.adminGetStream(flowNumber)
-  const teams = await ap.adminGetTeamsInStream(flowNumber)
+  const [teams, userIds] = await Promise.all([
+    ap.adminGetTeamsInStream(flowNumber),
+    ap.adminGetUserIdsInStream(flowNumber),
+  ])
 
   const kb = new InlineKeyboard()
   for (const t of teams) {
     const owner = await ap.adminGetUser(t.ownerId)
-    const label = `❌ ${t.name} (${owner?.fio || t.ownerId})`
-    kb.text(label.slice(0, 60), apCb('stream', flowNumber, 'rmteam', t._id.toString())).row()
+    const label = `👥 ${t.name} (${owner?.fio || t.ownerId})`
+    kb.text(label.slice(0, 60), apCb('stream', flowNumber, 'team', t._id.toString())).row()
   }
   kb.text('➕ Добавить команду в поток', apCb('stream', flowNumber, 'addteam')).row()
   kb.text('‹ К потоку', apCb('stream', flowNumber))
 
-  const cap = stream?.capacity ?? 30
   const text = teams.length
-    ? `👥 Команды в потоке #${flowNumber}: ${teams.length}/${cap}\n\nНажми на команду, чтобы убрать её из потока.`
-    : `В потоке #${flowNumber} пока нет команд (0/${cap}).`
+    ? `👥 Команды в потоке #${flowNumber}\n\nКоманд: ${teams.length}\nПользователей: ${userIds.length}\n\nНажми на команду, чтобы открыть её карточку.`
+    : `В потоке #${flowNumber} пока нет команд.\nПользователей: 0.`
 
   await render(ctx, text, kb, false)
 }
@@ -703,6 +726,11 @@ async function startNewStream(ctx: Context) {
 export async function handleAdminPanelCallback(ctx: Context, data: string): Promise<boolean> {
   if (!isAdminPanelCallback(data)) return false
   if (!(await guard(ctx))) return true
+
+  // Любая кнопка админ-панели завершает предыдущий режим текстового ввода.
+  // Благодаря этому «Назад» действительно отменяет назначение/редактирование.
+  const session = getSession(ctx)
+  if (session) session.adminPanelInput = undefined
 
   const [scope, ...rest] = parseAdminPanelCallback(data)
 
@@ -751,6 +779,11 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
           await showTeamCard(ctx, teamId)
         } else if (next === 'edit') {
           await promptEditTeamName(ctx, teamId)
+        } else if (next === 'delete') {
+          await showDeleteTeamConfirm(ctx, teamId)
+        } else if (next === 'delete_confirm') {
+          await ap.adminDeleteTeam(teamId)
+          await showTeamList(ctx, 0)
         } else if (next === 'owner') {
           await promptTransferOwnership(ctx, teamId)
         } else if (next === 'mem') {
@@ -766,6 +799,13 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
           const productAction = rest[2]
           if (!productAction) {
             await showTeamProductCard(ctx, teamId, product)
+          } else if (product === 'propresenter' && productAction === 'assign') {
+            await promptAssignTeamStream(ctx, teamId)
+          } else if (product === 'propresenter' && productAction === 'rs') {
+            await ap.adminRemoveTeamFromStream(teamId)
+            await showTeamProductCard(ctx, teamId, product)
+          } else if (product === 'propresenter') {
+            throw new Error('Данные ProPresenter редактируются только в разделе потоков')
           } else if (productAction === 'st') {
             await ap.adminSetTeamSubStatus(teamId, product, rest[3])
             await showTeamProductCard(ctx, teamId, product)
@@ -777,8 +817,6 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
           } else if (productAction === 'rs') {
             await ap.adminResetTeamSub(teamId, product)
             await showTeamProductCard(ctx, teamId, product)
-          } else if (productAction === 'f') {
-            await promptSetTeamSubMetaField(ctx, teamId, product, rest[3])
           }
         }
         break
@@ -829,9 +867,11 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
         } else if (action === 'addteam_pick') {
           await ap.adminAddTeamToStream(rest[2], flowNumber)
           await showStreamTeamsMenu(ctx, flowNumber)
-        } else if (action === 'rmteam') {
-          await ap.adminRemoveTeamFromStream(rest[2])
-          await showStreamTeamsMenu(ctx, flowNumber)
+        } else if (action === 'team' || action === 'rmteam') {
+          await showTeamCard(ctx, rest[2], {
+            label: `‹ К командам потока #${flowNumber}`,
+            callback: apCb('stream', flowNumber, 'teams'),
+          })
         } else if (action === 'delete') {
           await showDeleteStreamConfirm(ctx, flowNumber)
         } else if (action === 'delete_confirm') {
@@ -921,6 +961,9 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
       }
 
       case 'set_team_sub_date': {
+        if (input.product === 'propresenter') {
+          throw new Error('Дата ProPresenter меняется только в разделе потоков')
+        }
         const date = ap.parseDateInput(text)
         await ap.adminSetTeamSubExpiry(input.teamId!, input.product!, date)
         await confirmAdminInput(ctx, '✅ Дата обновлена')
@@ -928,11 +971,16 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
         break
       }
 
-      case 'set_team_sub_meta': {
-        const value = input.field === 'flowNumber' ? Number(text) : text
-        await ap.adminSetTeamSubMetaField(input.teamId!, input.product!, input.field!, value)
-        await confirmAdminInput(ctx, '✅ Обновлено')
-        await showTeamProductCard(replyOnlyCtx(ctx), input.teamId!, input.product!)
+      case 'assign_team_stream': {
+        try {
+          const flowNumber = parseFlowNumberInput(text)
+          await ap.adminAddTeamToStream(input.teamId!, flowNumber)
+          await confirmAdminInput(ctx, `✅ Назначен поток №${flowNumber}`)
+          await showTeamProductCard(replyOnlyCtx(ctx), input.teamId!, 'propresenter')
+        } catch (error) {
+          session.adminPanelInput = input
+          throw error
+        }
         break
       }
 
@@ -1063,7 +1111,12 @@ async function handleStreamCreationStep(ctx: Context, input: ApInput, text: stri
   }
   if (input.step === 'capacity') {
     draft.capacity = text === '-' ? 30 : Number(text)
-    const stream = await ap.adminCreateStream(draft)
+    const stream = await ap.adminCreateStream({
+      email: String(draft.email),
+      password: String(draft.password),
+      chatLink: draft.chatLink ? String(draft.chatLink) : '',
+      capacity: draft.capacity,
+    })
     await ctx.reply(`✅ Поток создан: #${stream.flowNumber}`)
     await showStreamCard(replyOnlyCtx(ctx), stream.flowNumber)
   }

@@ -4,6 +4,8 @@
 
 import { UserModel } from '../models/User.js'
 import { TeamModel } from '../models/Team.js'
+import { CartModel } from '../models/Cart.js'
+import { TeamInviteModel } from '../models/TeamInvite.js'
 import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
 import { ProPresenterWaitlistModel } from '../models/ProPresenterWaitlist.js'
 import { PAGE_SIZE, SUB_STATUSES } from '../constants/admin-panel.js'
@@ -120,6 +122,35 @@ export async function adminUpdateTeamName(teamId: string, name: string) {
   return TeamModel.updateOne({ _id: teamId }, { $set: { name: name.trim() } })
 }
 
+/** Полностью удалить команду и все служебные документы, которые на неё ссылаются. */
+export async function adminDeleteTeam(teamId: string) {
+  const team = await TeamModel.findById(teamId).select({ _id: 1 })
+  if (!team) throw new Error('Команда не найдена')
+
+  const invites = await TeamInviteModel.find({ teamId }).select({ code: 1, _id: 0 }).lean()
+  const inviteCodes = invites.map((invite) => invite.code)
+
+  const cleanup: Promise<unknown>[] = [
+    CartModel.deleteMany({ teamId }).exec(),
+    TeamInviteModel.deleteMany({ teamId }).exec(),
+    ProPresenterWaitlistModel.deleteMany({ teamId }).exec(),
+  ]
+
+  if (inviteCodes.length) {
+    cleanup.push(
+      UserModel.updateMany(
+        { pendingInviteCode: { $in: inviteCodes } },
+        { $set: { pendingInviteCode: null } }
+      ).exec()
+    )
+  }
+
+  await Promise.all(cleanup)
+  const result = await TeamModel.deleteOne({ _id: team._id })
+  if (!result.deletedCount) throw new Error('Не удалось удалить команду')
+  return true
+}
+
 // ---- владелец ----
 
 export async function adminTransferOwnership(teamId: string, newOwnerTelegramId: number) {
@@ -225,24 +256,6 @@ export async function adminResetTeamSub(teamId: string, product: string) {
   return team
 }
 
-/** Правка произвольного поля внутри meta продукта (для propresenter: flowNumber/email/password/chatLink) */
-export async function adminSetTeamSubMetaField(
-  teamId: string,
-  product: string,
-  field: string,
-  value: string | number
-) {
-  const team = await TeamModel.findById(teamId)
-  if (!team) throw new Error('Команда не найдена')
-  const current = toPlainSub(team.subscriptions.get(product)) || { status: 'none' }
-  team.subscriptions.set(product, {
-    ...current,
-    meta: { ...(current.meta || {}), [field]: value },
-  } as any)
-  await saveTeam(team)
-  return team
-}
-
 // ==================== ПОТОКИ PROPRESENTER (справочник — всё из БД) ====================
 
 export async function adminGetAllStreams() {
@@ -263,7 +276,32 @@ export async function adminUpdateStream(
     status: 'active' | 'closed'
   }>
 ) {
-  return ProPresenterStreamModel.findOneAndUpdate({ flowNumber }, { $set: updates }, { new: true })
+  const stream = await ProPresenterStreamModel.findOneAndUpdate(
+    { flowNumber },
+    { $set: updates },
+    { new: true }
+  )
+  if (!stream) return null
+
+  const teamUpdates: Record<string, string> = {}
+  if (updates.email !== undefined) {
+    teamUpdates['subscriptions.propresenter.meta.email'] = updates.email
+  }
+  if (updates.password !== undefined) {
+    teamUpdates['subscriptions.propresenter.meta.password'] = updates.password
+  }
+  if (updates.chatLink !== undefined) {
+    teamUpdates['subscriptions.propresenter.meta.chatLink'] = updates.chatLink
+  }
+
+  if (Object.keys(teamUpdates).length) {
+    await TeamModel.updateMany(
+      { 'subscriptions.propresenter.meta.flowNumber': flowNumber },
+      { $set: teamUpdates }
+    )
+  }
+
+  return stream
 }
 
 export async function adminSetStreamExpiry(flowNumber: number, expiresAt: Date | null) {
@@ -410,16 +448,17 @@ export async function adminAddTeamToStream(teamId: string, flowNumber: number) {
 
   const already = toPlainSub(team.subscriptions.get('propresenter'))
   const alreadyInThisStream =
-    already?.status === 'active' && already?.meta?.flowNumber === flowNumber
-  if (alreadyInThisStream) return team
+    already?.status === 'active' && Number(already?.meta?.flowNumber) === flowNumber
 
-  if (stream.status !== 'active') {
+  if (!alreadyInThisStream && stream.status !== 'active') {
     throw new Error('Поток закрыт — сначала открой его ("🟢 Открыть поток")')
   }
 
-  const occupancy = await adminGetStreamOccupancy(flowNumber)
-  if (occupancy >= (stream.capacity || 30)) {
-    throw new Error(`В потоке уже максимум команд (${stream.capacity})`)
+  if (!alreadyInThisStream) {
+    const occupancy = await adminGetStreamOccupancy(flowNumber)
+    if (occupancy >= (stream.capacity || 30)) {
+      throw new Error(`В потоке уже максимум команд (${stream.capacity})`)
+    }
   }
 
   team.subscriptions.set('propresenter', {
@@ -434,6 +473,10 @@ export async function adminAddTeamToStream(teamId: string, flowNumber: number) {
   } as any)
 
   await saveTeam(team)
+  await ProPresenterWaitlistModel.updateMany(
+    { teamId, status: 'pending' },
+    { $set: { status: 'assigned', assignedFlowNumber: flowNumber } }
+  )
   return team
 }
 
