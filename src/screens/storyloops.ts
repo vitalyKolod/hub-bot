@@ -47,7 +47,7 @@ export async function storyloopsScreen(userId: number, teamId: string): Promise<
     .plain('💰')
     .bold(`Стоимость в год: ${product.priceRub}₽ или ${product.priceUsd}$`)
   return {
-    photo: './public/content.jpg',
+    photo: './public/StoryLoop.png',
     caption: message.caption,
     caption_entities: message.caption_entities,
     keyboard: kb,

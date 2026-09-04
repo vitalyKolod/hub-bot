@@ -15,7 +15,7 @@ export async function contentMenuScreen(userId: number, teamId: string): Promise
   kb.text('Sunday Screens', packCb({ a: 'open', s: 'sunday_screens', p: teamId }))
     .icon('5291749654017381020')
     .row()
-  kb.text('StoryLoops', packCb({ a: 'open', s: 'storyloops', p: teamId }))
+  kb.text('StoryLoop', packCb({ a: 'open', s: 'storyloops', p: teamId }))
     .icon('5190877553887323413')
     .row()
   kb.text('CMG', packCb({ a: 'open', s: 'cmg', p: teamId })).icon('5310127020213043624')
@@ -26,10 +26,6 @@ export async function contentMenuScreen(userId: number, teamId: string): Promise
 
   kb.text('◀️ НАЗАД', packCb({ a: 'back' }))
 
-  // ============================================================
-  // ТЕКСТ
-  // ============================================================
-
   let message = new FormattedString('')
 
   message = message
@@ -37,10 +33,6 @@ export async function contentMenuScreen(userId: number, teamId: string): Promise
     .plain('\n')
     .plain('Выберите нужное направление:')
     .plain('\n\n')
-
-  // ============================================================
-  // СПИСОК НАПРАВЛЕНИЙ
-  // ============================================================
 
   let directions = new FormattedString('')
 
@@ -58,7 +50,7 @@ export async function contentMenuScreen(userId: number, teamId: string): Promise
     .plain(' CGS\n')
 
     .emoji('🎞', '5190877553887323413')
-    .plain(' StoryLoops')
+    .plain(' StoryLoop')
 
   message = message
     .blockquote(directions, true)
@@ -66,7 +58,7 @@ export async function contentMenuScreen(userId: number, teamId: string): Promise
     .plain('Каждое направление можно подключить отдельно.')
 
   return {
-    photo: './public/content.jpg',
+    photo: './public/content.png',
     caption: message.caption,
     caption_entities: message.caption_entities,
     keyboard: kb,

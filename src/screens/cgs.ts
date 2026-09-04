@@ -46,7 +46,7 @@ export async function cgsScreen(userId: number, teamId: string): Promise<ScreenV
     .bold(`Стоимость в год: ${product.priceRub}₽ или ${product.priceUsd}$`)
 
   return {
-    photo: './public/content.jpg',
+    photo: './public/sgc.png',
     caption: message.caption,
     caption_entities: message.caption_entities,
     keyboard: kb,

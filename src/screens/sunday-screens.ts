@@ -52,7 +52,7 @@ export async function SundayScreensScreen(userId: number, teamId: string): Promi
   message = message.plain('Доступ через приватный поток — без ограничений и блокировок.')
 
   return {
-    photo: './public/propres.jpg',
+    photo: './public/sunday-screens.png',
     caption: message.caption,
     caption_entities: message.caption_entities,
     keyboard: kb,
