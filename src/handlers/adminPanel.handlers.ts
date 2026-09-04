@@ -27,6 +27,13 @@ import {
   getPendingBatches,
   PROPRESENTER_BATCH_SIZE,
 } from '../services/proPresenterWaitlist.service.js'
+import {
+  createTeamForUser,
+  generateTeamNameForUser,
+  TeamNameValidationError,
+  TeamOwnerNotFoundError,
+  validateTeamName,
+} from '../services/team.service.js'
 
 // ---------- session helpers ----------
 
@@ -35,6 +42,7 @@ type ApInputMode =
   | 'search_team'
   | 'edit_user_field'
   | 'add_user_to_team'
+  | 'create_team_name'
   | 'edit_team_name'
   | 'set_team_sub_date'
   | 'assign_team_stream'
@@ -55,6 +63,18 @@ type ApInput = {
   flowNumber?: number
   step?: string
   draft?: Record<string, any>
+  sourceChatId?: number
+  sourceMessageId?: number
+}
+
+type MessageTarget = {
+  chatId: number
+  messageId: number
+}
+
+type RenderOptions = {
+  targetMessage?: MessageTarget
+  replaceOnFailure?: boolean
 }
 
 function getSession(ctx: Context): any {
@@ -92,13 +112,32 @@ function escapeMd(text: string): string {
   return String(text ?? '').replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&')
 }
 
+function cleanProfileValue(value: unknown, fallback = '—'): string {
+  const text = String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return text || fallback
+}
+
+function getCallbackMessageTarget(ctx: Context): MessageTarget | undefined {
+  const message = ctx.callbackQuery?.message
+  if (!message || !('chat' in message)) return undefined
+  return { chatId: message.chat.id, messageId: message.message_id }
+}
+
+function isMessageNotModified(error: unknown): boolean {
+  const details = String((error as any)?.description || (error as any)?.message || '')
+  return details.includes('message is not modified')
+}
+
 /** Рендерит экран: если есть callbackQuery — редактирует сообщение, иначе шлёт новое. */
 async function render(
   ctx: Context,
   content: string | FormattedString,
   kb: InlineKeyboard,
-  markdown = true
-) {
+  markdown = true,
+  options: RenderOptions = {}
+): Promise<MessageTarget | undefined> {
   const opts: any = { reply_markup: kb }
   const text = typeof content === 'string' ? content : content.text
 
@@ -108,11 +147,32 @@ async function render(
     opts.entities = content.entities
   }
 
-  if (ctx.callbackQuery) {
-    await ctx.editMessageText(text, opts).catch(() => ctx.reply(text, opts))
-  } else {
-    await ctx.reply(text, opts)
+  const editTarget = options.targetMessage || getCallbackMessageTarget(ctx)
+
+  if (ctx.callbackQuery || options.targetMessage) {
+    try {
+      if (options.targetMessage) {
+        await ctx.api.editMessageText(
+          options.targetMessage.chatId,
+          options.targetMessage.messageId,
+          text,
+          opts
+        )
+      } else {
+        await ctx.editMessageText(text, opts)
+      }
+      return editTarget
+    } catch (error) {
+      if (isMessageNotModified(error)) return editTarget
+
+      if (options.replaceOnFailure && editTarget) {
+        await ctx.api.deleteMessage(editTarget.chatId, editTarget.messageId).catch(() => {})
+      }
+    }
   }
+
+  const sent = await ctx.reply(text, opts)
+  return { chatId: sent.chat.id, messageId: sent.message_id }
 }
 
 function paginationRow(kb: InlineKeyboard, page: number, totalPages: number, base: string) {
@@ -205,7 +265,6 @@ async function showUserList(ctx: Context, page: number) {
   const { users, total, totalPages } = await ap.adminListUsers(page)
 
   const kb = new InlineKeyboard()
-  kb.text('🔍 Поиск', apCb('search_u')).row()
 
   for (const u of users) {
     const label = `${u.fio || 'без имени'} · ${u.telegramId}`
@@ -213,6 +272,7 @@ async function showUserList(ctx: Context, page: number) {
   }
 
   paginationRow(kb, page, totalPages, 'ul')
+  kb.text('🔍 Поиск', apCb('search_u')).row()
   kb.text('‹ Меню', apCb('menu'))
 
   const text = users.length
@@ -244,10 +304,20 @@ async function runUserSearch(ctx: Context, query: string) {
 
 // ==================== КАРТОЧКА ЮЗЕРА ====================
 
-async function showUserCard(ctx: Context, telegramId: number) {
+async function showUserCard(
+  ctx: Context,
+  telegramId: number,
+  renderOptions: RenderOptions = {}
+) {
   const user = await ap.adminGetUser(telegramId)
   if (!user) {
-    await render(ctx, 'Пользователь не найден', new InlineKeyboard().text('‹ Меню', apCb('menu')))
+    await render(
+      ctx,
+      'Пользователь не найден',
+      new InlineKeyboard().text('‹ Меню', apCb('menu')),
+      false,
+      renderOptions
+    )
     return
   }
 
@@ -276,18 +346,152 @@ async function showUserCard(ctx: Context, telegramId: number) {
     kb.text(`👥 ${t.name}`, apCb('t', t._id.toString())).row()
   }
 
+  kb.text('➕ Создать команду', apCb('u', telegramId, 'ct')).row()
   kb.text('➕ Добавить в команду', apCb('u', telegramId, 'addteam')).row()
   if (teams.length) {
     kb.text('➖ Убрать из команды', apCb('u', telegramId, 'rmteam_menu')).row()
   }
   kb.text('‹ К списку', apCb('ul', 0))
 
-  await render(ctx, text, kb)
+  await render(ctx, text, kb, true, renderOptions)
 }
 
 /** Открывает карточку пользователя новым сообщением — используется из топика поддержки. */
 export async function showAdminUserCard(ctx: Context, telegramId: number) {
   await showUserCard(replyOnlyCtx(ctx), telegramId)
+}
+
+async function showCreateTeamScreen(ctx: Context, telegramId: number) {
+  const user = await ap.adminGetUser(telegramId)
+  if (!user) {
+    await showUserCard(ctx, telegramId, { replaceOnFailure: true })
+    return
+  }
+
+  const fio = cleanProfileValue(user.fio)
+  const city = cleanProfileValue(user.city)
+  const church = cleanProfileValue(user.church)
+  const text =
+    '👥 *СОЗДАНИЕ КОМАНДЫ*\n\n' +
+    `Пользователь:\n${escapeMd(fio)}\n\n` +
+    `Город: ${escapeMd(city)}\n` +
+    `Церковь: ${escapeMd(church)}\n\n` +
+    'Как создать название команды?'
+
+  const kb = new InlineKeyboard()
+    .text('✨ Сгенерировать', apCb('u', telegramId, 'ct', 'g'))
+    .row()
+    .text('✏️ Ввести вручную', apCb('u', telegramId, 'ct', 'm'))
+    .row()
+    .text('‹ Назад', apCb('u', telegramId))
+
+  await render(ctx, text, kb, true, { replaceOnFailure: true })
+}
+
+async function promptCreateTeamName(ctx: Context, telegramId: number) {
+  const user = await ap.adminGetUser(telegramId)
+  if (!user) {
+    await showUserCard(ctx, telegramId, { replaceOnFailure: true })
+    return
+  }
+
+  const session = getSession(ctx)
+  const currentTarget = getCallbackMessageTarget(ctx)
+  const input: ApInput = {
+    mode: 'create_team_name',
+    telegramId,
+    sourceChatId: currentTarget?.chatId,
+    sourceMessageId: currentTarget?.messageId,
+  }
+  session.adminPanelInput = input
+
+  const kb = new InlineKeyboard().text('‹ Отмена', apCb('u', telegramId))
+  const target = await render(
+    ctx,
+    '✏️ *СОЗДАНИЕ КОМАНДЫ*\n\n' +
+      `Пользователь: ${escapeMd(cleanProfileValue(user.fio))}\n\n` +
+      'Отправьте название новой команды сообщением.',
+    kb,
+    true,
+    { replaceOnFailure: true }
+  )
+
+  if (target) {
+    input.sourceChatId = target.chatId
+    input.sourceMessageId = target.messageId
+    session.adminPanelInput = input
+  }
+}
+
+async function createAdminTeam(ctx: Context, telegramId: number, name: unknown) {
+  const user = await ap.adminGetUser(telegramId)
+  if (!user) throw new TeamOwnerNotFoundError()
+
+  const team = await createTeamForUser({
+    userId: telegramId,
+    name,
+    createdByAdminId: ctx.from!.id,
+  })
+  const teamId = team?._id?.toString()
+  if (!teamId || !(await ap.adminGetTeam(teamId))) {
+    throw new Error('Created team could not be reloaded')
+  }
+  return team
+}
+
+function logAdminTeamCreationError(ctx: Context, telegramId: number, error: unknown) {
+  console.error('Admin team creation failed:', {
+    adminTelegramId: ctx.from?.id,
+    targetUserId: telegramId,
+    error,
+  })
+}
+
+async function showAdminTeamCreationError(ctx: Context, message: string) {
+  if (ctx.callbackQuery) {
+    await ctx.answerCallbackQuery({ text: message, show_alert: true }).catch(() => {})
+    return
+  }
+  await ctx.reply(`❌ ${message}`)
+}
+
+async function createGeneratedTeam(ctx: Context, telegramId: number) {
+  try {
+    const user = await ap.adminGetUser(telegramId)
+    if (!user) throw new TeamOwnerNotFoundError()
+
+    const name = generateTeamNameForUser(user)
+    await createAdminTeam(ctx, telegramId, name)
+    await showUserCard(ctx, telegramId, { replaceOnFailure: true })
+  } catch (error) {
+    if (error instanceof TeamOwnerNotFoundError) {
+      try {
+        await showUserCard(ctx, telegramId, { replaceOnFailure: true })
+      } catch (renderError) {
+        logAdminTeamCreationError(ctx, telegramId, renderError)
+        await showAdminTeamCreationError(ctx, 'Пользователь не найден.')
+      }
+      return
+    }
+
+    logAdminTeamCreationError(ctx, telegramId, error)
+    const message =
+      error instanceof TeamNameValidationError
+        ? error.message
+        : 'Не удалось создать команду. Попробуйте ещё раз.'
+    await showAdminTeamCreationError(ctx, message)
+  }
+}
+
+async function handleCreateTeamCallback(ctx: Context, telegramId: number, method?: string) {
+  try {
+    if (!method) await showCreateTeamScreen(ctx, telegramId)
+    else if (method === 'g') await createGeneratedTeam(ctx, telegramId)
+    else if (method === 'm') await promptCreateTeamName(ctx, telegramId)
+  } catch (error) {
+    logAdminTeamCreationError(ctx, telegramId, error)
+    await showAdminTeamCreationError(ctx, 'Не удалось открыть создание команды. Попробуйте ещё раз.')
+  }
 }
 
 async function promptEditUserField(ctx: Context, telegramId: number, field: string) {
@@ -750,8 +954,17 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
       case 'u': {
         const telegramId = Number(rest[0])
         const action = rest[1]
-        if (!action) await showUserCard(ctx, telegramId)
+        if (!Number.isSafeInteger(telegramId) || telegramId <= 0) {
+          await render(
+            ctx,
+            'Некорректный идентификатор пользователя',
+            new InlineKeyboard().text('‹ К списку', apCb('ul', 0)),
+            false,
+            { replaceOnFailure: true }
+          )
+        } else if (!action) await showUserCard(ctx, telegramId)
         else if (action === 'edit') await promptEditUserField(ctx, telegramId, rest[2])
+        else if (action === 'ct') await handleCreateTeamCallback(ctx, telegramId, rest[2])
         else if (action === 'addteam') await promptAddUserToTeam(ctx, telegramId)
         else if (action === 'rmteam_menu') await showRemoveUserFromTeamMenu(ctx, telegramId)
         else if (action === 'rmteam') {
@@ -920,6 +1133,60 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
         await confirmAdminInput(ctx, '✅ Обновлено')
         await showUserCard(replyOnlyCtx(ctx), input.telegramId!)
         break
+
+      case 'create_team_name': {
+        const telegramId = input.telegramId
+        const targetMessage =
+          input.sourceChatId !== undefined && input.sourceMessageId !== undefined
+            ? { chatId: input.sourceChatId, messageId: input.sourceMessageId }
+            : undefined
+
+        if (!telegramId || !Number.isSafeInteger(telegramId)) {
+          await ctx.reply('❌ Пользователь не найден')
+          break
+        }
+
+        try {
+          const name = validateTeamName(text)
+          await createAdminTeam(ctx, telegramId, name)
+
+          if (isSupportTopic(ctx)) {
+            await ctx.react('👍').catch(() => {})
+            await ctx.deleteMessage().catch(() => {})
+          }
+
+          await showUserCard(ctx, telegramId, {
+            targetMessage,
+            replaceOnFailure: true,
+          })
+        } catch (error) {
+          if (error instanceof TeamNameValidationError) {
+            session.adminPanelInput = input
+            await showAdminTeamCreationError(ctx, error.message)
+            return true
+          }
+
+          if (error instanceof TeamOwnerNotFoundError) {
+            try {
+              await showUserCard(ctx, telegramId, {
+                targetMessage,
+                replaceOnFailure: true,
+              })
+            } catch (renderError) {
+              logAdminTeamCreationError(ctx, telegramId, renderError)
+              await showAdminTeamCreationError(ctx, 'Пользователь не найден.')
+            }
+            break
+          }
+
+          logAdminTeamCreationError(ctx, telegramId, error)
+          await showAdminTeamCreationError(
+            ctx,
+            'Не удалось создать команду. Попробуйте ещё раз.'
+          )
+        }
+        break
+      }
 
       case 'add_user_to_team': {
         const teams = await ap.adminSearchTeams(text)

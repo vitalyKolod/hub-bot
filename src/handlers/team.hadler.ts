@@ -3,7 +3,12 @@ import { setInputMode, clearInputMode, getOrCreateUser } from '../services/user.
 import { INPUT_MODES } from '../constants/input-modes.js'
 import { goTo, goHome } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
-import { createTeam, addMemberToTeam } from '../services/team.service.js'
+import {
+  addMemberToTeam,
+  createTeam,
+  normalizeTeamName,
+  TEAM_NAME_MAX_LENGTH,
+} from '../services/team.service.js'
 import { validateInvite, consumeInvite, restoreInvite } from '../services/teamInvite.service.js'
 import { UserModel } from '../models/User.js'
 import type { MyContext } from '../types/context.js'
@@ -15,14 +20,14 @@ export async function handleCreateTeamStart(ctx: MyContext, userId: number) {
 }
 
 export async function handleCreateTeamText(ctx: MyContext, userId: number) {
-  const teamName = ctx.message!.text!.trim()
+  const teamName = normalizeTeamName(ctx.message!.text)
 
   if (teamName.length < 3) {
     await ctx.reply('Название команды должно содержать минимум 3 символа.')
     return
   }
 
-  if (teamName.length > 50) {
+  if (teamName.length > TEAM_NAME_MAX_LENGTH) {
     await ctx.reply('Название команды слишком длинное.')
     return
   }

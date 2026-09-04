@@ -245,9 +245,9 @@ async function showBroadcastAudience(ctx: MyContext) {
     .text('📡 Отдельному потоку', 'admin:broadcast:streams')
     .row()
     .text('‹ В админку', 'admin:broadcast:cancel')
-  await ctx.editMessageText('📢 Кому отправить рассылку?', { reply_markup: kb }).catch(() =>
-    ctx.reply('📢 Кому отправить рассылку?', { reply_markup: kb })
-  )
+  await ctx
+    .editMessageText('📢 Кому отправить рассылку?', { reply_markup: kb })
+    .catch(() => ctx.reply('📢 Кому отправить рассылку?', { reply_markup: kb }))
 }
 
 async function showBroadcastStreams(ctx: MyContext) {
@@ -257,12 +257,11 @@ async function showBroadcastStreams(ctx: MyContext) {
     kb.text(`Поток #${stream.flowNumber}`, `admin:broadcast:stream:${stream.flowNumber}`).row()
   }
   kb.text('‹ Назад', 'admin:broadcast').text('✖️ Отмена', 'admin:broadcast:cancel')
-  await ctx.editMessageText(
-    streams.length ? 'Выбери поток:' : 'Потоков пока нет.',
-    { reply_markup: kb }
-  ).catch(() =>
-    ctx.reply(streams.length ? 'Выбери поток:' : 'Потоков пока нет.', { reply_markup: kb })
-  )
+  await ctx
+    .editMessageText(streams.length ? 'Выбери поток:' : 'Потоков пока нет.', { reply_markup: kb })
+    .catch(() =>
+      ctx.reply(streams.length ? 'Выбери поток:' : 'Потоков пока нет.', { reply_markup: kb })
+    )
 }
 
 async function promptBroadcastMessage(
@@ -275,9 +274,9 @@ async function promptBroadcastMessage(
   const text =
     `📢 Получатели: ${broadcastAudienceLabel(ctx.session.broadcastDraft)}.\n\n` +
     'Пришли сообщение для черновика. Поддерживаются текст, фото, альбомы, видео, аудио, голосовые, документы, анимации, стикеры и подписи с форматированием.'
-  await ctx.editMessageText(text, { reply_markup: broadcastCancelKeyboard() }).catch(() =>
-    ctx.reply(text, { reply_markup: broadcastCancelKeyboard() })
-  )
+  await ctx
+    .editMessageText(text, { reply_markup: broadcastCancelKeyboard() })
+    .catch(() => ctx.reply(text, { reply_markup: broadcastCancelKeyboard() }))
 }
 
 async function showBroadcastDraftControls(ctx: MyContext) {
@@ -350,7 +349,9 @@ async function handleBroadcastCallback(ctx: MyContext, data: string) {
       .row()
       .text('✏️ Заменить', 'admin:broadcast:edit')
       .text('✖️ Отмена', 'admin:broadcast:cancel')
-    await ctx.reply(`Получатели: ${broadcastAudienceLabel(draft)} — ${recipients.length}.`, { reply_markup: kb })
+    await ctx.reply(`Получатели: ${broadcastAudienceLabel(draft)} — ${recipients.length}.`, {
+      reply_markup: kb,
+    })
     return
   }
   if (data === 'admin:broadcast:send') {
@@ -542,8 +543,14 @@ export function registerHandlers(bot: Bot<MyContext>) {
       if (kind === 'f') {
         const flowNumber = Number(parts[2])
         const stream = await getStreamByNumber(flowNumber)
-        if (!stream?.expiresAt || stream.expiresAt.toISOString().slice(0, 10).replaceAll('-', '') !== expectedToken) {
-          await ctx.answerCallbackQuery({ text: 'Уже продлено или дата изменена', show_alert: true })
+        if (
+          !stream?.expiresAt ||
+          stream.expiresAt.toISOString().slice(0, 10).replaceAll('-', '') !== expectedToken
+        ) {
+          await ctx.answerCallbackQuery({
+            text: 'Уже продлено или дата изменена',
+            show_alert: true,
+          })
           return
         }
         newExpiry = new Date(stream.expiresAt > new Date() ? stream.expiresAt : new Date())
@@ -562,7 +569,10 @@ export function registerHandlers(bot: Bot<MyContext>) {
           !subscription?.expiresAt ||
           subscription.expiresAt.toISOString().slice(0, 10).replaceAll('-', '') !== expectedToken
         ) {
-          await ctx.answerCallbackQuery({ text: 'Уже продлено или дата изменена', show_alert: true })
+          await ctx.answerCallbackQuery({
+            text: 'Уже продлено или дата изменена',
+            show_alert: true,
+          })
           return
         }
         newExpiry = await adminExtendTeamSub(teamId, productId)
@@ -1219,7 +1229,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
       }
       return
     }
-
   })
 
   // ========== ЧЕК (фото / документ) — ВЫСОКИЙ ПРИОРИТЕТ===========
@@ -1320,6 +1329,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
     await runReminders(bot).catch((error) => console.error('Ошибка проверки подписок:', error))
   }
   void checkSubscriptions()
-  setInterval(checkSubscriptions, 1000 * 60 * 60 * 24)
+  setInterval(checkSubscriptions, 1000 * 60 * 60) // каждые 60 минут
 }
 console.log('✅ Бот запущен')

@@ -1,6 +1,78 @@
 import { TeamModel } from '../models/Team.js'
+import { UserModel } from '../models/User.js'
 
 const RENEWAL_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
+
+export const TEAM_NAME_MAX_LENGTH = 50
+
+export class TeamNameValidationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'TeamNameValidationError'
+  }
+}
+
+export class TeamOwnerNotFoundError extends Error {
+  constructor() {
+    super('Пользователь не найден')
+    this.name = 'TeamOwnerNotFoundError'
+  }
+}
+
+export function normalizeTeamName(value: unknown): string {
+  return String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export function validateTeamName(value: unknown, minLength = 1): string {
+  const name = normalizeTeamName(value)
+
+  if (name.length < minLength) {
+    throw new TeamNameValidationError(
+      minLength > 1
+        ? `Название команды должно содержать минимум ${minLength} символа.`
+        : 'Название команды не может быть пустым.'
+    )
+  }
+
+  if (name.length > TEAM_NAME_MAX_LENGTH) {
+    throw new TeamNameValidationError(
+      `Название команды не должно быть длиннее ${TEAM_NAME_MAX_LENGTH} символов.`
+    )
+  }
+
+  return name
+}
+
+function fitGeneratedTeamName(value: string): string {
+  const name = normalizeTeamName(value)
+  return name.length > TEAM_NAME_MAX_LENGTH
+    ? name.slice(0, TEAM_NAME_MAX_LENGTH).trimEnd()
+    : name
+}
+
+export function generateTeamNameForUser(user: {
+  church?: unknown
+  city?: unknown
+  fio?: unknown
+}): string {
+  const church = normalizeTeamName(user.church)
+  const city = normalizeTeamName(user.city)
+  const fio = normalizeTeamName(user.fio)
+
+  if (church && city) return fitGeneratedTeamName(`${church} · ${city}`)
+  if (church) return fitGeneratedTeamName(church)
+  if (city) return fitGeneratedTeamName(`Команда · ${city}`)
+  if (fio) return fitGeneratedTeamName(`Команда ${fio}`)
+  return 'Новая команда'
+}
+
+export type CreateTeamForUserInput = {
+  userId: number
+  name: unknown
+  createdByAdminId?: number
+}
 
 /** В команде есть хотя бы одна действующая подписка. */
 export function hasActiveTeamSubscription(team: {
@@ -33,24 +105,49 @@ export async function isTeamProductPurchaseLocked(teamId: string, productId: str
 }
 
 /**
- * Создать команду
+ * Создать обычную команду для пользователя. Единственная точка, которая
+ * формирует owner/member-инвариант как для самостоятельного, так и для
+ * административного сценария.
  */
-export async function createTeam(ownerId: number, name: string) {
-  const cleanName = name.trim()
+export async function createTeamForUser({
+  userId,
+  name,
+  createdByAdminId,
+}: CreateTeamForUserInput) {
+  const cleanName = validateTeamName(name)
 
-  return TeamModel.create({
+  if (!Number.isSafeInteger(userId) || !(await UserModel.exists({ telegramId: userId }))) {
+    throw new TeamOwnerNotFoundError()
+  }
+
+  const team = await TeamModel.create({
     name: cleanName,
-
-    ownerId,
-
+    ownerId: userId,
     members: [
       {
-        telegramId: ownerId,
+        telegramId: userId,
         role: 'owner',
         status: 'active',
       },
     ],
   })
+
+  if (createdByAdminId !== undefined) {
+    console.info('admin_created_team', {
+      adminTelegramId: createdByAdminId,
+      targetUserId: userId,
+      teamId: team._id.toString(),
+      teamName: team.name,
+      createdAt: (team as any).createdAt || new Date(),
+    })
+  }
+
+  return team
+}
+
+/** Обратная совместимость для обычного пользовательского flow. */
+export async function createTeam(ownerId: number, name: string) {
+  return createTeamForUser({ userId: ownerId, name })
 }
 
 /**

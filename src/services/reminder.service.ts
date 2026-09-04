@@ -5,7 +5,7 @@ import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
 import { TeamModel } from '../models/Team.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
-const REMINDER_DAYS = new Set([14, 11, 8, 5, 3, 2, 1])
+const REMINDER_DAYS = new Set([14, 10, 7, 5, 4, 3, 2, 1])
 
 function expiryToken(expiresAt: Date) {
   return expiresAt.toISOString().slice(0, 10).replaceAll('-', '')
@@ -96,7 +96,9 @@ async function removeExpiredGroupAccess(bot: Bot<any>, team: any, productId: str
     await bot.api
       .banChatMember(groupId, member.telegramId)
       .then(() => bot.api.unbanChatMember(groupId, member.telegramId))
-      .catch((error) => console.error(`Group access removal failed for ${member.telegramId}:`, error))
+      .catch((error) =>
+        console.error(`Group access removal failed for ${member.telegramId}:`, error)
+      )
   }
 }
 
@@ -122,7 +124,8 @@ export async function runReminders(bot: Bot<any>) {
       // Поток является источником правды для всех команд в нём.
       if (
         productId === 'propresenter' &&
-        (!subscription.expiresAt || new Date(subscription.expiresAt).getTime() !== expiresAt.getTime())
+        (!subscription.expiresAt ||
+          new Date(subscription.expiresAt).getTime() !== expiresAt.getTime())
       ) {
         subscription.expiresAt = expiresAt
         team.subscriptions.set(productId, subscription)
