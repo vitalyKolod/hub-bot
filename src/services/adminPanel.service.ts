@@ -8,6 +8,7 @@ import { CartModel } from '../models/Cart.js'
 import { TeamInviteModel } from '../models/TeamInvite.js'
 import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
 import { ProPresenterWaitlistModel } from '../models/ProPresenterWaitlist.js'
+import { SupportTicketModel } from '../models/SupportTicket.js'
 import { PAGE_SIZE, SUB_STATUSES } from '../constants/admin-panel.js'
 
 function escapeRegex(str: string) {
@@ -112,6 +113,108 @@ export async function adminGetTeamsForUser(telegramId: number) {
   })
 }
 
+/**
+ * Полностью удалить профиль пользователя из доменной модели.
+ * Его собственные команды удаляются тем же путём, что и из карточки команды;
+ * из чужих команд пользователь только исключается.
+ */
+export async function adminDeleteUser(telegramId: number) {
+  const user = await UserModel.findOne({ telegramId }).select({ _id: 1 })
+  if (!user) return null
+
+  const ownedTeams = await TeamModel.find({ ownerId: telegramId }).select({ _id: 1 })
+  for (const team of ownedTeams) {
+    await adminDeleteTeam(team._id.toString())
+  }
+
+  // После передачи владения приглашения и место в очереди принадлежат команде,
+  // а не прежнему владельцу. Сохраняем эти данные и перепривязываем к текущему owner.
+  const invitesToReassign = await TeamInviteModel.find({ createdBy: telegramId }).select({
+    _id: 1,
+    teamId: 1,
+    code: 1,
+  })
+  const waitlistToReassign = await ProPresenterWaitlistModel.find({
+    requestedBy: telegramId,
+  }).select({ _id: 1, teamId: 1 })
+  const orphanInviteCodes: string[] = []
+  let invitesReassigned = 0
+  let waitlistEntriesReassigned = 0
+
+  for (const invite of invitesToReassign) {
+    const team = await TeamModel.findById(invite.teamId).select({ ownerId: 1 })
+    if (team) {
+      await TeamInviteModel.updateOne({ _id: invite._id }, { $set: { createdBy: team.ownerId } })
+      invitesReassigned += 1
+    } else {
+      orphanInviteCodes.push(invite.code)
+      await TeamInviteModel.deleteOne({ _id: invite._id })
+    }
+  }
+
+  for (const entry of waitlistToReassign) {
+    const team = await TeamModel.findById(entry.teamId).select({ ownerId: 1 })
+    if (team) {
+      await ProPresenterWaitlistModel.updateOne(
+        { _id: entry._id },
+        { $set: { requestedBy: team.ownerId } }
+      )
+      waitlistEntriesReassigned += 1
+    } else {
+      await ProPresenterWaitlistModel.deleteOne({ _id: entry._id })
+    }
+  }
+
+  if (orphanInviteCodes.length) {
+    await UserModel.updateMany(
+      { pendingInviteCode: { $in: orphanInviteCodes } },
+      { $set: { pendingInviteCode: null } }
+    )
+  }
+
+  const [memberships, inviteHistory, supportTickets] = await Promise.all([
+    TeamModel.updateMany(
+      { 'members.telegramId': telegramId },
+      { $pull: { members: { telegramId } } }
+    ),
+    TeamInviteModel.updateMany({ usedBy: telegramId }, { $set: { usedBy: null } }),
+    SupportTicketModel.deleteMany({ userId: telegramId }),
+  ])
+
+  // В старых документах User встречались ссылки на волонтёров, которых уже нет
+  // в текущей схеме. Raw collection нужен, потому что strict Mongoose их отбрасывает.
+  await Promise.all([
+    UserModel.collection.updateMany(
+      { telegramId: { $ne: telegramId } },
+      {
+        $pull: {
+          volunteers: telegramId,
+          'subscriptions.volunteers': { telegramId },
+        },
+      } as any
+    ),
+    UserModel.collection.updateMany(
+      {
+        telegramId: { $ne: telegramId },
+        $or: [{ 'volunteer.ownerId': telegramId }, { ownerId: telegramId }],
+      },
+      { $unset: { volunteer: '', ownerId: '' }, $set: { isVolunteer: false } } as any
+    ),
+  ])
+
+  const deletedUser = await UserModel.deleteOne({ _id: user._id })
+  if (!deletedUser.deletedCount) return null
+
+  return {
+    ownedTeamsDeleted: ownedTeams.length,
+    teamMembershipsRemoved: memberships.modifiedCount,
+    invitesReassigned,
+    inviteHistoryAnonymized: inviteHistory.modifiedCount,
+    waitlistEntriesReassigned,
+    supportTicketsDeleted: supportTickets.deletedCount,
+  }
+}
+
 // ==================== КОМАНДА: базовые поля ====================
 
 export async function adminGetTeam(teamId: string) {
@@ -156,6 +259,9 @@ export async function adminDeleteTeam(teamId: string) {
 export async function adminTransferOwnership(teamId: string, newOwnerTelegramId: number) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
+  if (!(await UserModel.exists({ telegramId: newOwnerTelegramId }))) {
+    throw new Error('Пользователь не найден')
+  }
 
   const isMember = team.members.some((m: any) => m.telegramId === newOwnerTelegramId)
   if (!isMember) {
@@ -179,6 +285,7 @@ export async function adminTransferOwnership(teamId: string, newOwnerTelegramId:
 export async function adminAddTeamMember(teamId: string, telegramId: number) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
+  if (!(await UserModel.exists({ telegramId }))) throw new Error('Пользователь не найден')
 
   const already = team.members.some((m: any) => m.telegramId === telegramId)
   if (already) return team

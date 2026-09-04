@@ -261,7 +261,7 @@ async function startWaitlistStream(ctx: Context, flowNumber: number) {
 
 // ==================== ЮЗЕРЫ: список / поиск ====================
 
-async function showUserList(ctx: Context, page: number) {
+async function showUserList(ctx: Context, page: number, renderOptions: RenderOptions = {}) {
   const { users, total, totalPages } = await ap.adminListUsers(page)
 
   const kb = new InlineKeyboard()
@@ -278,7 +278,7 @@ async function showUserList(ctx: Context, page: number) {
   const text = users.length
     ? `👥 Юзеры: ${total} всего (стр. ${page + 1}/${totalPages}, по ${PAGE_SIZE} на странице)`
     : 'Юзеров пока нет.'
-  await render(ctx, text, kb, false)
+  await render(ctx, text, kb, false, renderOptions)
 }
 
 async function promptSearchUsers(ctx: Context) {
@@ -341,6 +341,8 @@ async function showUserCard(
     .row()
     .text('✏️ Церковь', apCb('u', telegramId, 'edit', 'church'))
     .row()
+    .url('✉️ Написать юзеру', `tg://user?id=${telegramId}`)
+    .row()
 
   for (const t of teams) {
     kb.text(`👥 ${t.name}`, apCb('t', t._id.toString())).row()
@@ -351,6 +353,7 @@ async function showUserCard(
   if (teams.length) {
     kb.text('➖ Убрать из команды', apCb('u', telegramId, 'rmteam_menu')).row()
   }
+  kb.text('🗑 Удалить юзера', apCb('u', telegramId, 'del')).row()
   kb.text('‹ К списку', apCb('ul', 0))
 
   await render(ctx, text, kb, true, renderOptions)
@@ -433,9 +436,7 @@ async function createAdminTeam(ctx: Context, telegramId: number, name: unknown) 
     createdByAdminId: ctx.from!.id,
   })
   const teamId = team?._id?.toString()
-  if (!teamId || !(await ap.adminGetTeam(teamId))) {
-    throw new Error('Created team could not be reloaded')
-  }
+  if (!teamId) throw new Error('Created team has no identifier')
   return team
 }
 
@@ -447,7 +448,7 @@ function logAdminTeamCreationError(ctx: Context, telegramId: number, error: unkn
   })
 }
 
-async function showAdminTeamCreationError(ctx: Context, message: string) {
+async function showAdminActionError(ctx: Context, message: string) {
   if (ctx.callbackQuery) {
     await ctx.answerCallbackQuery({ text: message, show_alert: true }).catch(() => {})
     return
@@ -469,7 +470,7 @@ async function createGeneratedTeam(ctx: Context, telegramId: number) {
         await showUserCard(ctx, telegramId, { replaceOnFailure: true })
       } catch (renderError) {
         logAdminTeamCreationError(ctx, telegramId, renderError)
-        await showAdminTeamCreationError(ctx, 'Пользователь не найден.')
+        await showAdminActionError(ctx, 'Пользователь не найден.')
       }
       return
     }
@@ -479,7 +480,7 @@ async function createGeneratedTeam(ctx: Context, telegramId: number) {
       error instanceof TeamNameValidationError
         ? error.message
         : 'Не удалось создать команду. Попробуйте ещё раз.'
-    await showAdminTeamCreationError(ctx, message)
+    await showAdminActionError(ctx, message)
   }
 }
 
@@ -490,7 +491,74 @@ async function handleCreateTeamCallback(ctx: Context, telegramId: number, method
     else if (method === 'm') await promptCreateTeamName(ctx, telegramId)
   } catch (error) {
     logAdminTeamCreationError(ctx, telegramId, error)
-    await showAdminTeamCreationError(ctx, 'Не удалось открыть создание команды. Попробуйте ещё раз.')
+    await showAdminActionError(ctx, 'Не удалось открыть создание команды. Попробуйте ещё раз.')
+  }
+}
+
+async function showDeleteUserConfirm(ctx: Context, telegramId: number) {
+  const user = await ap.adminGetUser(telegramId)
+  if (!user) {
+    await showUserCard(ctx, telegramId, { replaceOnFailure: true })
+    return
+  }
+
+  const teams = await ap.adminGetTeamsForUser(telegramId)
+  const ownedTeamsCount = teams.filter((team) => team.ownerId === telegramId).length
+  const membershipsCount = teams.length - ownedTeamsCount
+  const text =
+    '🗑 *УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ*\n\n' +
+    `Пользователь: *${escapeMd(cleanProfileValue(user.fio, 'без имени'))}*\n` +
+    `ID: \`${telegramId}\`\n\n` +
+    'Будут удалены профиль пользователя, его обращения и связанные приглашения.\n' +
+    `Собственные команды: ${ownedTeamsCount} — будут удалены вместе с данными и подписками в базе.\n` +
+    `Участие в чужих командах: ${membershipsCount} — пользователь будет исключён.\n\n` +
+    'Это не бан: если пользователь снова запустит бота, профиль создастся заново.\n\n' +
+    '*Это действие нельзя отменить.*'
+
+  const kb = new InlineKeyboard()
+    .text('✅ Да, удалить полностью', apCb('u', telegramId, 'del', 'yes'))
+    .row()
+    .text('‹ Отмена', apCb('u', telegramId))
+
+  await render(ctx, text, kb, true, { replaceOnFailure: true })
+}
+
+async function deleteUserFromAdmin(ctx: Context, telegramId: number) {
+  try {
+    const result = await ap.adminDeleteUser(telegramId)
+    if (!result) {
+      await showUserCard(ctx, telegramId, { replaceOnFailure: true })
+      return
+    }
+
+    console.info('admin_deleted_user', {
+      adminTelegramId: ctx.from?.id,
+      targetUserId: telegramId,
+      ...result,
+      deletedAt: new Date(),
+    })
+    await showUserList(ctx, 0, { replaceOnFailure: true })
+  } catch (error) {
+    console.error('Admin user deletion failed:', {
+      adminTelegramId: ctx.from?.id,
+      targetUserId: telegramId,
+      error,
+    })
+    await showAdminActionError(ctx, 'Не удалось удалить пользователя. Попробуйте ещё раз.')
+  }
+}
+
+async function handleDeleteUserCallback(ctx: Context, telegramId: number, confirmed: boolean) {
+  try {
+    if (confirmed) await deleteUserFromAdmin(ctx, telegramId)
+    else await showDeleteUserConfirm(ctx, telegramId)
+  } catch (error) {
+    console.error('Admin user deletion screen failed:', {
+      adminTelegramId: ctx.from?.id,
+      targetUserId: telegramId,
+      error,
+    })
+    await showAdminActionError(ctx, 'Не удалось открыть удаление пользователя.')
   }
 }
 
@@ -965,7 +1033,9 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
         } else if (!action) await showUserCard(ctx, telegramId)
         else if (action === 'edit') await promptEditUserField(ctx, telegramId, rest[2])
         else if (action === 'ct') await handleCreateTeamCallback(ctx, telegramId, rest[2])
-        else if (action === 'addteam') await promptAddUserToTeam(ctx, telegramId)
+        else if (action === 'del') {
+          await handleDeleteUserCallback(ctx, telegramId, rest[2] === 'yes')
+        } else if (action === 'addteam') await promptAddUserToTeam(ctx, telegramId)
         else if (action === 'rmteam_menu') await showRemoveUserFromTeamMenu(ctx, telegramId)
         else if (action === 'rmteam') {
           await ap.adminRemoveTeamMember(rest[2], telegramId)
@@ -1162,7 +1232,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
         } catch (error) {
           if (error instanceof TeamNameValidationError) {
             session.adminPanelInput = input
-            await showAdminTeamCreationError(ctx, error.message)
+            await showAdminActionError(ctx, error.message)
             return true
           }
 
@@ -1174,16 +1244,13 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
               })
             } catch (renderError) {
               logAdminTeamCreationError(ctx, telegramId, renderError)
-              await showAdminTeamCreationError(ctx, 'Пользователь не найден.')
+              await showAdminActionError(ctx, 'Пользователь не найден.')
             }
             break
           }
 
           logAdminTeamCreationError(ctx, telegramId, error)
-          await showAdminTeamCreationError(
-            ctx,
-            'Не удалось создать команду. Попробуйте ещё раз.'
-          )
+          await showAdminActionError(ctx, 'Не удалось создать команду. Попробуйте ещё раз.')
         }
         break
       }

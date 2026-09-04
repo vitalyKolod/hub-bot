@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "tsx index.ts",
-    "dev": "nodemon --exec npx tsx index.ts"
+    "dev": "nodemon --exec npx tsx index.ts",
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "keywords": [],
   "author": "",
