@@ -23,6 +23,7 @@ import { SundayScreensScreen } from './sunday-screens.js'
 import { addVolunteerScreen } from './volunteer-add.js'
 import { teamListScreen } from './team-list.js'
 import { createTeamInfoScreen } from './create-team-info.js'
+import { teamAboutScreen } from './team-about.js'
 import { createTeamNameScreen } from './create-team-name.js'
 import { teamScreen } from './team.js'
 import { cartScreen } from './cart.js'
@@ -93,6 +94,7 @@ export function initScreens() {
     cart: cartScreen,
 
     create_team_info: createTeamInfoScreen,
+    team_about: teamAboutScreen,
 
     create_team_name: createTeamNameScreen,
 

@@ -1,7 +1,34 @@
 import { ProPresenterWaitlistModel } from '../models/ProPresenterWaitlist.js'
 import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
+import { ProPresenterRequestBatchModel } from '../models/ProPresenterRequestBatch.js'
+import { auditLogService } from './auditLog.service.js'
 
 export const PROPRESENTER_BATCH_SIZE = 20
+export const REQUEST_BATCH_TITLE_MAX_LENGTH = 100
+
+export function defaultRequestBatchTitle(flowNumber: number) {
+  return `Заявки на поток №${flowNumber}`
+}
+
+export async function getRequestBatchTitle(flowNumber: number) {
+  const batch = await ProPresenterRequestBatchModel.findOne({ flowNumber }).lean()
+  return batch?.title?.trim() || defaultRequestBatchTitle(flowNumber)
+}
+
+export async function renameRequestBatch(flowNumber: number, rawTitle: string, actorId: number) {
+  const title = rawTitle.replace(/\s+/g, ' ').trim()
+  if (!title) throw new Error('Название не должно быть пустым')
+  if (title.length > REQUEST_BATCH_TITLE_MAX_LENGTH) throw new Error(`Название не должно быть длиннее ${REQUEST_BATCH_TITLE_MAX_LENGTH} символов`)
+  const previousTitle = await getRequestBatchTitle(flowNumber)
+  const batch = await ProPresenterRequestBatchModel.findOneAndUpdate(
+    { flowNumber }, { $set: { title } }, { upsert: true, new: true, runValidators: true }
+  )
+  await auditLogService.createLog({
+    type: 'propresenter.request_title_changed', actorType: 'admin', actorTelegramId: actorId,
+    metadata: { flowNumber, oldTitle: previousTitle, newTitle: title },
+  })
+  return batch
+}
 
 async function assignLegacyPendingEntries() {
   const legacyEntries = await ProPresenterWaitlistModel.find({
@@ -90,11 +117,14 @@ export async function getPendingBatch(flowNumber: number) {
 
 export async function getPendingBatches() {
   await assignLegacyPendingEntries()
-  return ProPresenterWaitlistModel.aggregate<{ _id: number; count: number }>([
+  const batches = await ProPresenterWaitlistModel.aggregate<{ _id: number; count: number }>([
     { $match: { status: 'pending', assignedFlowNumber: { $ne: null } } },
     { $group: { _id: '$assignedFlowNumber', count: { $sum: 1 } } },
     { $sort: { _id: 1 } },
   ])
+  const metadata = await ProPresenterRequestBatchModel.find({ flowNumber: { $in: batches.map((batch) => batch._id) } }).lean()
+  const titles = new Map(metadata.map((batch) => [batch.flowNumber, batch.title]))
+  return batches.map((batch) => ({ ...batch, title: titles.get(batch._id)?.trim() || defaultRequestBatchTitle(batch._id) }))
 }
 
 /** Атомарно помечает заполненную партию, чтобы уведомление админу ушло только один раз. */

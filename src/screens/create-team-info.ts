@@ -6,7 +6,7 @@ export function createTeamInfoScreen(): ScreenView {
   const kb = new InlineKeyboard()
 
   kb.text(
-    '✅ СОЗДАТЬ КОМАНДУ',
+    'СОЗДАТЬ КОМАНДУ ✅',
     packCb({
       a: 'create_team',
     })

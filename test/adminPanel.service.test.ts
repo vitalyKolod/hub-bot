@@ -8,6 +8,7 @@ import { TeamModel } from '../src/models/Team.js'
 import { TeamInviteModel } from '../src/models/TeamInvite.js'
 import { UserModel } from '../src/models/User.js'
 import { adminDeleteUser } from '../src/services/adminPanel.service.js'
+import { AuditLogModel } from '../src/models/AuditLog.js'
 
 function execQuery(result: any) {
   const promise = Promise.resolve(result)
@@ -23,6 +24,10 @@ test('adminDeleteUser removes owned data while preserving surviving-team resourc
   const events: string[] = []
   const inviteUpdates: any[] = []
   const waitlistUpdates: any[] = []
+  t.mock.method(AuditLogModel as any, 'create', async (payload: any) => ({
+    ...payload,
+    createdAt: new Date(),
+  }))
 
   t.mock.method(UserModel as any, 'findOne', () => ({
     select: async () => ({ _id: 'user-doc' }),

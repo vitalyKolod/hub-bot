@@ -3,6 +3,7 @@ import { getProduct } from '../config/products.js'
 import { packCb } from '../core/callback.js'
 import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
 import { TeamModel } from '../models/Team.js'
+import { auditLogService, buildSubscriptionTargetId } from './auditLog.service.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const REMINDER_DAYS = new Set([14, 10, 7, 5, 4, 3, 2, 1])
@@ -136,6 +137,19 @@ export async function runReminders(bot: Bot<any>) {
         subscription.expiresAt = expiresAt
         team.subscriptions.set(productId, subscription)
         await team.save()
+        await auditLogService.createLog({
+          type: 'subscription.expired',
+          actorType: 'system',
+          targetUserId: team.ownerId,
+          targetTeamId: team._id.toString(),
+          targetSubscriptionId: buildSubscriptionTargetId(team._id.toString(), productId),
+          metadata: {
+            teamName: team.name,
+            productId,
+            productName: getProduct(productId)?.name || productId,
+            expiresAt,
+          },
+        })
         await removeExpiredGroupAccess(bot, team, productId)
         await notifyMembers(
           bot,

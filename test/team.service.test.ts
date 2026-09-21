@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import { TeamModel } from '../src/models/Team.js'
 import { UserModel } from '../src/models/User.js'
+import { AuditLogModel } from '../src/models/AuditLog.js'
 import {
   createTeam,
   createTeamForUser,
@@ -50,8 +51,9 @@ test('createTeamForUser persists the target as the active owner and emits the au
       createdAt: new Date('2026-09-04T12:00:00.000Z'),
     }
   })
-  t.mock.method(console, 'info', (event: string, payload: any) => {
-    auditEvent = { event, payload }
+  t.mock.method(AuditLogModel as any, 'create', async (payload: any) => {
+    auditEvent = payload
+    return { ...payload, createdAt: new Date('2026-09-04T12:00:00.000Z') }
   })
 
   const team = await createTeamForUser({
@@ -67,10 +69,11 @@ test('createTeamForUser persists the target as the active owner and emits the au
   })
   assert.equal('createdByAdminId' in createPayload, false)
   assert.equal(team.name, 'Media Team')
-  assert.equal(auditEvent.event, 'admin_created_team')
-  assert.equal(auditEvent.payload.adminTelegramId, 100)
-  assert.equal(auditEvent.payload.targetUserId, 200)
-  assert.equal(auditEvent.payload.teamId, 'team-id')
+  assert.equal(auditEvent.type, 'team.created')
+  assert.equal(auditEvent.actorType, 'admin')
+  assert.equal(auditEvent.actorTelegramId, 100)
+  assert.equal(auditEvent.targetUserId, 200)
+  assert.equal(auditEvent.targetTeamId, 'team-id')
 })
 
 test('ordinary createTeam remains a wrapper over the same owner/member invariant', async (t) => {
@@ -80,6 +83,10 @@ test('ordinary createTeam remains a wrapper over the same owner/member invariant
     createPayload = payload
     return { _id: { toString: () => 'team-id' }, ...payload }
   })
+  t.mock.method(AuditLogModel as any, 'create', async (payload: any) => ({
+    ...payload,
+    createdAt: new Date(),
+  }))
 
   await createTeam(300, '  Worship   Team ')
 

@@ -34,7 +34,7 @@ export function getPendingItems(cart: any) {
 export function getCartTotal(cart: any, currency: Currency = 'rub'): number {
   const items = getPendingItems(cart)
 
-  return items.reduce((total, item) => {
+  return items.reduce((total: number, item: any) => {
     const product = getProduct(item.product)
 
     if (!product) {

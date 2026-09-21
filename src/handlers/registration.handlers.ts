@@ -6,6 +6,7 @@ import { goHome, goTo } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
 import type { MyContext } from '../types/context.js'
 import { computeDaysLeft } from '../state/profile.js'
+import { auditLogService } from '../services/auditLog.service.js'
 
 export async function handleEditRegistration(ctx: MyContext) {
   const kb = new InlineKeyboard()
@@ -62,6 +63,19 @@ export async function handleConfirmRegistration(ctx: MyContext, userId: number) 
 
   const profile = await getOrCreateUser(userId)
 
+  await auditLogService.createLog({
+    type: 'user.registered',
+    actorType: 'user',
+    actorTelegramId: userId,
+    targetUserId: userId,
+    metadata: {
+      userName: profile.fio,
+      username: profile.username,
+      city: profile.city,
+      church: profile.church,
+    },
+  })
+
   if (profile.pendingInviteCode) {
     goTo(userId, 'team_invite')
     await renderScreen(ctx, userId, 'team_invite', profile.pendingInviteCode, {
@@ -109,6 +123,23 @@ export async function handleEditingFieldText(ctx: MyContext, userId: number) {
   }
 
   await UserModel.updateOne({ telegramId: userId }, { $set: update })
+
+  const changedField = field as string | undefined
+  if (changedField && Object.keys(update).length) {
+    const profile = await getOrCreateUser(userId)
+    await auditLogService.createLog({
+      type: 'user.profile_updated',
+      actorType: 'user',
+      actorTelegramId: userId,
+      targetUserId: userId,
+      metadata: {
+        userName: profile.fio,
+        field: changedField,
+        newValue: value,
+        change: `${changedField}: изменено`,
+      },
+    })
+  }
 
   ctx.session.editingField = undefined
 

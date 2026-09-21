@@ -4,6 +4,14 @@
 
 export const AP_PREFIX = 'ap:'
 
+export const ADMIN_MANAGEMENT_ICONS = {
+  users: '5440764424820377609',
+  teams: '5296533616224906961',
+  streams: '5251272469175631339',
+  requests: '6323602795123443087',
+  admins: '5836690092306992715',
+} as const
+
 export function isAdminPanelCallback(data: string): boolean {
   return data.startsWith(AP_PREFIX)
 }

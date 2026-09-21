@@ -10,6 +10,22 @@ import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
 import { ProPresenterWaitlistModel } from '../models/ProPresenterWaitlist.js'
 import { SupportTicketModel } from '../models/SupportTicket.js'
 import { PAGE_SIZE, SUB_STATUSES } from '../constants/admin-panel.js'
+import { getProduct } from '../config/products.js'
+import {
+  auditLogService,
+  buildSubscriptionTargetId,
+  type AuditActor,
+} from './auditLog.service.js'
+import { getRequestBatchTitle, renameRequestBatch } from './proPresenterWaitlist.service.js'
+
+export const adminGetRequestBatchTitle = getRequestBatchTitle
+export const adminRenameRequestBatch = renameRequestBatch
+
+function adminAuditActor(adminTelegramId?: number): AuditActor {
+  return adminTelegramId
+    ? { actorType: 'admin', actorTelegramId: adminTelegramId }
+    : { actorType: 'system' }
+}
 
 function escapeRegex(str: string) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -102,9 +118,26 @@ export async function adminGetUser(telegramId: number) {
 export async function adminUpdateUserField(
   telegramId: number,
   field: 'fio' | 'city' | 'church' | 'username',
-  value: string
+  value: string,
+  adminTelegramId?: number
 ) {
-  return UserModel.updateOne({ telegramId }, { $set: { [field]: value } })
+  const user = await UserModel.findOne({ telegramId }).select({ [field]: 1, fio: 1 })
+  const result = await UserModel.updateOne({ telegramId }, { $set: { [field]: value } })
+  if (result.matchedCount) {
+    await auditLogService.createLog({
+      type: 'user.profile_updated',
+      ...adminAuditActor(adminTelegramId),
+      targetUserId: telegramId,
+      metadata: {
+        userName: user?.fio,
+        field,
+        previousValue: (user as any)?.[field],
+        newValue: value,
+        change: `${field}: изменено`,
+      },
+    })
+  }
+  return result
 }
 
 export async function adminGetTeamsForUser(telegramId: number) {
@@ -118,13 +151,17 @@ export async function adminGetTeamsForUser(telegramId: number) {
  * Его собственные команды удаляются тем же путём, что и из карточки команды;
  * из чужих команд пользователь только исключается.
  */
-export async function adminDeleteUser(telegramId: number) {
-  const user = await UserModel.findOne({ telegramId }).select({ _id: 1 })
+export async function adminDeleteUser(telegramId: number, adminTelegramId?: number) {
+  const user = await UserModel.findOne({ telegramId }).select({ _id: 1, fio: 1, username: 1 })
   if (!user) return null
 
   const ownedTeams = await TeamModel.find({ ownerId: telegramId }).select({ _id: 1 })
+  const memberTeams = await TeamModel.find({
+    ownerId: { $ne: telegramId },
+    'members.telegramId': telegramId,
+  }).select({ _id: 1, name: 1, ownerId: 1 })
   for (const team of ownedTeams) {
-    await adminDeleteTeam(team._id.toString())
+    await adminDeleteTeam(team._id.toString(), adminTelegramId)
   }
 
   // После передачи владения приглашения и место в очереди принадлежат команде,
@@ -205,6 +242,28 @@ export async function adminDeleteUser(telegramId: number) {
   const deletedUser = await UserModel.deleteOne({ _id: user._id })
   if (!deletedUser.deletedCount) return null
 
+  for (const team of memberTeams) {
+    await auditLogService.createLog({
+      type: 'team.member_removed',
+      ...adminAuditActor(adminTelegramId),
+      targetUserId: telegramId,
+      targetTeamId: team._id.toString(),
+      metadata: { teamName: team.name, memberTelegramId: telegramId, reason: 'user_deleted' },
+    })
+  }
+
+  await auditLogService.createLog({
+    type: 'user.deleted',
+    ...adminAuditActor(adminTelegramId),
+    targetUserId: telegramId,
+    metadata: {
+      userName: user.fio,
+      username: user.username,
+      ownedTeamsDeleted: ownedTeams.length,
+      teamMembershipsRemoved: memberships.modifiedCount,
+    },
+  })
+
   return {
     ownedTeamsDeleted: ownedTeams.length,
     teamMembershipsRemoved: memberships.modifiedCount,
@@ -221,13 +280,36 @@ export async function adminGetTeam(teamId: string) {
   return TeamModel.findById(teamId)
 }
 
-export async function adminUpdateTeamName(teamId: string, name: string) {
-  return TeamModel.updateOne({ _id: teamId }, { $set: { name: name.trim() } })
+export async function adminUpdateTeamName(teamId: string, name: string, adminTelegramId?: number) {
+  const team = await TeamModel.findById(teamId).select({ name: 1, ownerId: 1 })
+  const nextName = name.trim()
+  const result = await TeamModel.updateOne({ _id: teamId }, { $set: { name: nextName } })
+  if (result.matchedCount) {
+    await auditLogService.createLog({
+      type: 'team.updated',
+      ...adminAuditActor(adminTelegramId),
+      targetUserId: team?.ownerId,
+      targetTeamId: teamId,
+      metadata: {
+        teamName: nextName,
+        field: 'name',
+        previousValue: team?.name,
+        newValue: nextName,
+        change: 'название изменено',
+      },
+    })
+  }
+  return result
 }
 
 /** Полностью удалить команду и все служебные документы, которые на неё ссылаются. */
-export async function adminDeleteTeam(teamId: string) {
-  const team = await TeamModel.findById(teamId).select({ _id: 1 })
+export async function adminDeleteTeam(teamId: string, adminTelegramId?: number) {
+  const team = await TeamModel.findById(teamId).select({
+    _id: 1,
+    name: 1,
+    ownerId: 1,
+    subscriptions: 1,
+  })
   if (!team) throw new Error('Команда не найдена')
 
   const invites = await TeamInviteModel.find({ teamId }).select({ code: 1, _id: 0 }).lean()
@@ -251,18 +333,50 @@ export async function adminDeleteTeam(teamId: string) {
   await Promise.all(cleanup)
   const result = await TeamModel.deleteOne({ _id: team._id })
   if (!result.deletedCount) throw new Error('Не удалось удалить команду')
+  if (team.subscriptions) {
+    for (const [product, sub] of team.subscriptions.entries()) {
+      if (!sub || sub.status === 'none') continue
+      await auditLogService.createLog({
+        type: 'subscription.disabled',
+        ...adminAuditActor(adminTelegramId),
+        targetUserId: team.ownerId,
+        targetTeamId: teamId,
+        targetSubscriptionId: buildSubscriptionTargetId(teamId, product),
+        metadata: {
+          teamName: team.name,
+          productId: product,
+          productName: getProduct(product)?.name || product,
+          previousStatus: sub.status,
+          status: 'none',
+          reason: 'team_deleted',
+        },
+      })
+    }
+  }
+  await auditLogService.createLog({
+    type: 'team.deleted',
+    ...adminAuditActor(adminTelegramId),
+    targetUserId: team.ownerId,
+    targetTeamId: teamId,
+    metadata: { teamName: team.name, ownerTelegramId: team.ownerId },
+  })
   return true
 }
 
 // ---- владелец ----
 
-export async function adminTransferOwnership(teamId: string, newOwnerTelegramId: number) {
+export async function adminTransferOwnership(
+  teamId: string,
+  newOwnerTelegramId: number,
+  adminTelegramId?: number
+) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
   if (!(await UserModel.exists({ telegramId: newOwnerTelegramId }))) {
     throw new Error('Пользователь не найден')
   }
 
+  const previousOwnerTelegramId = team.ownerId
   const isMember = team.members.some((m: any) => m.telegramId === newOwnerTelegramId)
   if (!isMember) {
     team.members.push({ telegramId: newOwnerTelegramId, role: 'owner', status: 'active' } as any)
@@ -277,12 +391,38 @@ export async function adminTransferOwnership(teamId: string, newOwnerTelegramId:
 
   team.ownerId = newOwnerTelegramId
   await saveTeam(team)
+  if (!isMember) {
+    await auditLogService.createLog({
+      type: 'team.member_added',
+      ...adminAuditActor(adminTelegramId),
+      targetUserId: newOwnerTelegramId,
+      targetTeamId: teamId,
+      metadata: { teamName: team.name, memberTelegramId: newOwnerTelegramId },
+    })
+  }
+  await auditLogService.createLog({
+    type: 'team.updated',
+    ...adminAuditActor(adminTelegramId),
+    targetUserId: newOwnerTelegramId,
+    targetTeamId: teamId,
+    metadata: {
+      teamName: team.name,
+      field: 'ownerId',
+      previousOwnerTelegramId,
+      newOwnerTelegramId,
+      change: 'владелец изменён',
+    },
+  })
   return team
 }
 
 // ---- участники ----
 
-export async function adminAddTeamMember(teamId: string, telegramId: number) {
+export async function adminAddTeamMember(
+  teamId: string,
+  telegramId: number,
+  adminTelegramId?: number
+) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
   if (!(await UserModel.exists({ telegramId }))) throw new Error('Пользователь не найден')
@@ -292,10 +432,21 @@ export async function adminAddTeamMember(teamId: string, telegramId: number) {
 
   team.members.push({ telegramId, role: 'member', status: 'active' } as any)
   await saveTeam(team)
+  await auditLogService.createLog({
+    type: 'team.member_added',
+    ...adminAuditActor(adminTelegramId),
+    targetUserId: telegramId,
+    targetTeamId: teamId,
+    metadata: { teamName: team.name, memberTelegramId: telegramId },
+  })
   return team
 }
 
-export async function adminRemoveTeamMember(teamId: string, telegramId: number) {
+export async function adminRemoveTeamMember(
+  teamId: string,
+  telegramId: number,
+  adminTelegramId?: number
+) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
 
@@ -303,36 +454,98 @@ export async function adminRemoveTeamMember(teamId: string, telegramId: number) 
     throw new Error('Нельзя удалить владельца — сначала передай владение другому участнику')
   }
 
+  const wasMember = team.members.some((m: any) => m.telegramId === telegramId)
   team.members = team.members.filter((m: any) => m.telegramId !== telegramId) as any
   await saveTeam(team)
+  if (wasMember) {
+    await auditLogService.createLog({
+      type: 'team.member_removed',
+      ...adminAuditActor(adminTelegramId),
+      targetUserId: telegramId,
+      targetTeamId: teamId,
+      metadata: { teamName: team.name, memberTelegramId: telegramId },
+    })
+  }
   return team
 }
 
 // ---- подписки команды: subscriptions — Map<productId, {status, expiresAt, meta}> ----
 
-export async function adminSetTeamSubStatus(teamId: string, product: string, status: string) {
+export async function adminSetTeamSubStatus(
+  teamId: string,
+  product: string,
+  status: string,
+  adminTelegramId?: number
+) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
+  const hadCurrent = team.subscriptions.has(product)
   const current = toPlainSub(team.subscriptions.get(product)) || { meta: {} }
   team.subscriptions.set(product, { ...current, status } as any)
   await saveTeam(team)
+  const base = {
+    ...adminAuditActor(adminTelegramId),
+    targetUserId: team.ownerId,
+    targetTeamId: teamId,
+    targetSubscriptionId: buildSubscriptionTargetId(teamId, product),
+    metadata: {
+      teamName: team.name,
+      productId: product,
+      productName: getProduct(product)?.name || product,
+      previousStatus: current.status || 'none',
+      status,
+    },
+  }
+  if ((!hadCurrent || !current.status) && status !== 'none') {
+    await auditLogService.createLog({ type: 'subscription.created', ...base })
+  }
+  if (status === 'active' && current.status !== 'active') {
+    await auditLogService.createLog({ type: 'subscription.activated', ...base })
+  } else if (status === 'expired' && current.status !== 'expired') {
+    await auditLogService.createLog({ type: 'subscription.expired', ...base })
+  } else if (['none', 'rejected'].includes(status) && current.status !== status) {
+    await auditLogService.createLog({ type: 'subscription.disabled', ...base })
+  }
   return team
 }
 
 export async function adminSetTeamSubExpiry(
   teamId: string,
   product: string,
-  expiresAt: Date | null
+  expiresAt: Date | null,
+  adminTelegramId?: number
 ) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
   const current = toPlainSub(team.subscriptions.get(product)) || { status: 'none', meta: {} }
   team.subscriptions.set(product, { ...current, expiresAt } as any)
   await saveTeam(team)
+  const previousExpiry = current.expiresAt ? new Date(current.expiresAt) : null
+  if (expiresAt && (!previousExpiry || expiresAt > previousExpiry)) {
+    await auditLogService.createLog({
+      type: 'subscription.renewed',
+      ...adminAuditActor(adminTelegramId),
+      targetUserId: team.ownerId,
+      targetTeamId: teamId,
+      targetSubscriptionId: buildSubscriptionTargetId(teamId, product),
+      metadata: {
+        teamName: team.name,
+        productId: product,
+        productName: getProduct(product)?.name || product,
+        previousExpiresAt: previousExpiry,
+        expiresAt,
+      },
+    })
+  }
   return team
 }
 
-export async function adminExtendTeamSub(teamId: string, product: string, years = 1) {
+export async function adminExtendTeamSub(
+  teamId: string,
+  product: string,
+  years = 1,
+  adminTelegramId?: number
+) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
 
@@ -341,8 +554,8 @@ export async function adminExtendTeamSub(teamId: string, product: string, years 
   const wasActive =
     !!current && current.status === 'active' && current.expiresAt && current.expiresAt > now
 
-  const base = wasActive ? current.expiresAt : now
-  const expiresAt = new Date(base)
+  const dateBase = wasActive ? current.expiresAt : now
+  const expiresAt = new Date(dateBase)
   expiresAt.setFullYear(expiresAt.getFullYear() + years)
 
   team.subscriptions.set(product, {
@@ -352,14 +565,50 @@ export async function adminExtendTeamSub(teamId: string, product: string, years 
   } as any)
 
   await saveTeam(team)
+  const auditBase = {
+    ...adminAuditActor(adminTelegramId),
+    targetUserId: team.ownerId,
+    targetTeamId: teamId,
+    targetSubscriptionId: buildSubscriptionTargetId(teamId, product),
+    metadata: {
+      teamName: team.name,
+      productId: product,
+      productName: getProduct(product)?.name || product,
+      previousExpiresAt: current?.expiresAt || null,
+      expiresAt,
+    },
+  }
+  if (!current || ['none', 'rejected'].includes(current.status)) {
+    await auditLogService.createLog({ type: 'subscription.created', ...auditBase })
+    await auditLogService.createLog({ type: 'subscription.activated', ...auditBase })
+  } else {
+    await auditLogService.createLog({ type: 'subscription.renewed', ...auditBase })
+  }
   return expiresAt
 }
 
-export async function adminResetTeamSub(teamId: string, product: string) {
+export async function adminResetTeamSub(teamId: string, product: string, adminTelegramId?: number) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
+  const current = toPlainSub(team.subscriptions.get(product))
   team.subscriptions.set(product, { status: 'none', expiresAt: null, meta: {} } as any)
   await saveTeam(team)
+  if (current?.status && current.status !== 'none') {
+    await auditLogService.createLog({
+      type: 'subscription.disabled',
+      ...adminAuditActor(adminTelegramId),
+      targetUserId: team.ownerId,
+      targetTeamId: teamId,
+      targetSubscriptionId: buildSubscriptionTargetId(teamId, product),
+      metadata: {
+        teamName: team.name,
+        productId: product,
+        productName: getProduct(product)?.name || product,
+        previousStatus: current.status,
+        status: 'none',
+      },
+    })
+  }
   return team
 }
 
@@ -411,7 +660,12 @@ export async function adminUpdateStream(
   return stream
 }
 
-export async function adminSetStreamExpiry(flowNumber: number, expiresAt: Date | null) {
+export async function adminSetStreamExpiry(
+  flowNumber: number,
+  expiresAt: Date | null,
+  adminTelegramId?: number
+) {
+  const previous = await ProPresenterStreamModel.findOne({ flowNumber }).select({ expiresAt: 1 })
   const stream = await ProPresenterStreamModel.findOneAndUpdate(
     { flowNumber },
     { $set: { expiresAt } },
@@ -432,6 +686,18 @@ export async function adminSetStreamExpiry(flowNumber: number, expiresAt: Date |
       },
     }
   )
+  if (stream) {
+    await auditLogService.createLog({
+      type: 'propresenter.stream_date_changed',
+      ...adminAuditActor(adminTelegramId),
+      metadata: {
+        flowNumber,
+        previousExpiresAt: previous?.expiresAt || null,
+        expiresAt,
+        change: 'дата окончания изменена',
+      },
+    })
+  }
   return stream
 }
 
@@ -440,10 +706,11 @@ export async function adminCreateStream(data: {
   password: string
   chatLink?: string
   capacity?: number
+  adminTelegramId?: number
 }) {
   const last = await ProPresenterStreamModel.findOne().sort({ flowNumber: -1 })
   const flowNumber = (last?.flowNumber || 0) + 1
-  return ProPresenterStreamModel.create({
+  const stream = await ProPresenterStreamModel.create({
     flowNumber,
     email: data.email,
     password: data.password,
@@ -451,6 +718,12 @@ export async function adminCreateStream(data: {
     capacity: data.capacity || 30,
     status: 'active',
   })
+  await auditLogService.createLog({
+    type: 'propresenter.stream_created',
+    ...adminAuditActor(data.adminTelegramId),
+    metadata: { flowNumber, capacity: stream.capacity },
+  })
+  return stream
 }
 
 export async function adminCreateStreamFromWaitlist(data: {
@@ -459,6 +732,7 @@ export async function adminCreateStreamFromWaitlist(data: {
   password: string
   chatLink?: string
   expiresAt: Date
+  adminTelegramId?: number
 }) {
   const existing = await ProPresenterStreamModel.findOne({ flowNumber: data.flowNumber })
   if (existing) throw new Error(`Поток #${data.flowNumber} уже существует`)
@@ -479,6 +753,12 @@ export async function adminCreateStreamFromWaitlist(data: {
     expiresAt: data.expiresAt,
   })
 
+  await auditLogService.createLog({
+    type: 'propresenter.stream_created',
+    ...adminAuditActor(data.adminTelegramId),
+    metadata: { flowNumber: data.flowNumber, capacity: 20, expiresAt: data.expiresAt },
+  })
+
   for (const entry of entries) {
     const team = await TeamModel.findById(entry.teamId)
     if (!team) continue
@@ -493,6 +773,22 @@ export async function adminCreateStreamFromWaitlist(data: {
       },
     } as any)
     await saveTeam(team)
+    const subBase = {
+      ...adminAuditActor(data.adminTelegramId),
+      targetUserId: team.ownerId,
+      targetTeamId: team._id.toString(),
+      targetSubscriptionId: buildSubscriptionTargetId(team._id.toString(), 'propresenter'),
+      metadata: {
+        teamName: team.name,
+        productId: 'propresenter',
+        productName: getProduct('propresenter')?.name || 'ProPresenter',
+        flowNumber: data.flowNumber,
+        expiresAt: data.expiresAt,
+      },
+    }
+    await auditLogService.createLog({ type: 'subscription.created', ...subBase })
+    await auditLogService.createLog({ type: 'subscription.activated', ...subBase })
+    await auditLogService.createLog({ type: 'propresenter.team_added', ...subBase })
   }
 
   await ProPresenterWaitlistModel.updateMany(
@@ -546,7 +842,11 @@ export async function adminGetStreamOccupancy(flowNumber: number): Promise<numbe
 }
 
 /** Посадить команду в поток: копирует email/password/chatLink/дату из справочника потоков */
-export async function adminAddTeamToStream(teamId: string, flowNumber: number) {
+export async function adminAddTeamToStream(
+  teamId: string,
+  flowNumber: number,
+  adminTelegramId?: number
+) {
   const stream = await ProPresenterStreamModel.findOne({ flowNumber })
   if (!stream) throw new Error('Поток не найден')
 
@@ -584,15 +884,48 @@ export async function adminAddTeamToStream(teamId: string, flowNumber: number) {
     { teamId, status: 'pending' },
     { $set: { status: 'assigned', assignedFlowNumber: flowNumber } }
   )
+  if (!alreadyInThisStream) {
+    const subBase = {
+      ...adminAuditActor(adminTelegramId),
+      targetUserId: team.ownerId,
+      targetTeamId: teamId,
+      targetSubscriptionId: buildSubscriptionTargetId(teamId, 'propresenter'),
+      metadata: {
+        teamName: team.name,
+        productId: 'propresenter',
+        productName: getProduct('propresenter')?.name || 'ProPresenter',
+        flowNumber,
+        expiresAt: stream.expiresAt,
+      },
+    }
+    if (!already || ['none', 'rejected'].includes(already.status)) {
+      await auditLogService.createLog({ type: 'subscription.created', ...subBase })
+    }
+    await auditLogService.createLog({ type: 'subscription.activated', ...subBase })
+    await auditLogService.createLog({ type: 'propresenter.team_added', ...subBase })
+  }
   return team
 }
 
 /** Убрать команду из потока (сбрасывает её подписку propresenter в "нет подписки") */
-export async function adminRemoveTeamFromStream(teamId: string) {
+export async function adminRemoveTeamFromStream(teamId: string, adminTelegramId?: number) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Команда не найдена')
   team.subscriptions.set('propresenter', { status: 'none', expiresAt: null, meta: {} } as any)
   await saveTeam(team)
+  await auditLogService.createLog({
+    type: 'subscription.disabled',
+    ...adminAuditActor(adminTelegramId),
+    targetUserId: team.ownerId,
+    targetTeamId: teamId,
+    targetSubscriptionId: buildSubscriptionTargetId(teamId, 'propresenter'),
+    metadata: {
+      teamName: team.name,
+      productId: 'propresenter',
+      productName: getProduct('propresenter')?.name || 'ProPresenter',
+      status: 'none',
+    },
+  })
   return team
 }
 

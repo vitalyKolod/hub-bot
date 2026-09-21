@@ -18,6 +18,20 @@ import {
   setCartItemStatus,
 } from '../services/cart.service.js'
 import type { MyContext } from '../types/context.js'
+import { auditLogService, buildSubscriptionTargetId } from '../services/auditLog.service.js'
+import { acceptPayment, getPayment, rejectPayment } from '../services/payment.service.js'
+import { deliverAcceptedPayment, deliverRejectedPayment } from '../adapters/telegram/paymentDelivery.js'
+
+function callbackCaptionValue(ctx: MyContext, label: string): string | undefined {
+  const message = ctx.callbackQuery?.message
+  const caption = message && 'caption' in message ? message.caption || '' : ''
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return caption
+    .match(new RegExp(`${escapedLabel}:\\*?\\s*([^\\n]+)`, 'i'))?.[1]
+    ?.replaceAll('*', '')
+    .replaceAll('`', '')
+    .trim()
+}
 
 export async function handleAddToCart(
   ctx: MyContext,
@@ -74,6 +88,28 @@ export async function handleCheckoutCart(ctx: MyContext, userId: number, teamId:
   }
 
   ctx.session.payment = { product: 'cart', teamId, method: null }
+  const team = await getTeamById(teamId)
+  for (const item of items) {
+    const currentSubscription = team?.subscriptions.get(item.product)
+    await auditLogService.createLog({
+      type: 'payment.created',
+      actorType: 'user',
+      actorTelegramId: userId,
+      targetUserId: userId,
+      targetTeamId: teamId,
+      targetPaymentId: item._id.toString(),
+      metadata: {
+        teamName: team?.name,
+        productId: item.product,
+        productName: getProduct(item.product)?.name || item.product,
+        operation:
+          currentSubscription?.expiresAt &&
+          ['active', 'expired'].includes(currentSubscription.status)
+            ? 'Продление'
+            : 'Новая подписка',
+      },
+    })
+  }
   goTo(userId, 'payment')
   await renderScreen(ctx, userId, 'payment')
 }
@@ -125,6 +161,18 @@ async function updateCartAdminMessage(ctx: MyContext, itemId: string, statusLabe
 // ===== Приём/отклонение позиций корзины =====
 
 export async function handleCartAccept(ctx: MyContext, itemId: string) {
+  const persistentPayment = await getPayment(itemId)
+  if (persistentPayment) {
+    const decision = await acceptPayment(itemId, ctx.from!.id)
+    if (!decision.applied) {
+      await ctx.answerCallbackQuery({ text: decision.payment.status === 'accepted' ? 'Уже принято' : `Статус: ${decision.payment.status}`, show_alert: true })
+      return
+    }
+    await deliverAcceptedPayment(ctx.api, decision, ctx.me.username)
+    await updateCartAdminMessage(ctx, itemId, '✅')
+    await ctx.answerCallbackQuery({ text: 'Принято ✓' })
+    return
+  }
   const { cart, item } = await findCartItemByItemId(itemId)
 
   if (!cart || !item) {
@@ -143,8 +191,27 @@ export async function handleCartAccept(ctx: MyContext, itemId: string) {
     return
   }
 
-  const { isExtension } = await activateTeamSubscription(teamId, item.product)
+  const { isExtension } = await activateTeamSubscription(teamId, item.product, 1, {
+    actorType: 'admin',
+    actorTelegramId: ctx.from?.id,
+  })
   await setCartItemStatus(teamId, itemId, 'active')
+  await auditLogService.createLog({
+    type: 'payment.approved',
+    actorType: 'admin',
+    actorTelegramId: ctx.from?.id,
+    targetUserId: team?.ownerId,
+    targetTeamId: teamId,
+    targetSubscriptionId: buildSubscriptionTargetId(teamId, item.product),
+    targetPaymentId: itemId,
+    metadata: {
+      teamName: team?.name,
+      productId: item.product,
+      productName: product?.name || item.product,
+      method: callbackCaptionValue(ctx, 'Способ оплаты'),
+      operation: callbackCaptionValue(ctx, 'Тип операции'),
+    },
+  })
 
   if (product?.groupId) {
     try {
@@ -171,6 +238,18 @@ export async function handleCartAccept(ctx: MyContext, itemId: string) {
 }
 
 export async function handleCartReject(ctx: MyContext, itemId: string) {
+  const persistentPayment = await getPayment(itemId)
+  if (persistentPayment) {
+    const decision = await rejectPayment(itemId, ctx.from!.id)
+    if (!decision.applied) {
+      await ctx.answerCallbackQuery({ text: decision.payment.status === 'rejected' ? 'Уже отклонено' : `Статус: ${decision.payment.status}`, show_alert: true })
+      return
+    }
+    await deliverRejectedPayment(ctx.api, decision)
+    await updateCartAdminMessage(ctx, itemId, '❌')
+    await ctx.answerCallbackQuery({ text: 'Отклонено ✗' })
+    return
+  }
   const { cart, item } = await findCartItemByItemId(itemId)
 
   if (!cart || !item) {
@@ -182,8 +261,26 @@ export async function handleCartReject(ctx: MyContext, itemId: string) {
   const team = await getTeamById(teamId)
   const product = getProduct(item.product)
 
-  await rejectTeamSubscription(teamId, item.product)
+  await rejectTeamSubscription(teamId, item.product, {
+    actorType: 'admin',
+    actorTelegramId: ctx.from?.id,
+  })
   await setCartItemStatus(teamId, itemId, 'rejected')
+  await auditLogService.createLog({
+    type: 'payment.rejected',
+    actorType: 'admin',
+    actorTelegramId: ctx.from?.id,
+    targetUserId: team?.ownerId,
+    targetTeamId: teamId,
+    targetPaymentId: itemId,
+    metadata: {
+      teamName: team?.name,
+      productId: item.product,
+      productName: product?.name || item.product,
+      method: callbackCaptionValue(ctx, 'Способ оплаты'),
+      operation: callbackCaptionValue(ctx, 'Тип операции'),
+    },
+  })
 
   await ctx.api.sendMessage(
     team!.ownerId,

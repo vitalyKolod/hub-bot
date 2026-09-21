@@ -5,7 +5,12 @@
   "type": "module",
   "scripts": {
     "start": "tsx index.ts",
+    "start:api": "tsx api.ts",
     "dev": "nodemon --exec npx tsx index.ts",
+    "dev:api": "nodemon --exec npx tsx api.ts",
+    "dev:stack": "node scripts/dev-stack.mjs",
+    "build": "tsc --noEmit --noCheck",
+    "typecheck:api": "tsc -p tsconfig.api.json",
     "test": "node --import tsx --test test/*.test.ts"
   },
   "keywords": [],

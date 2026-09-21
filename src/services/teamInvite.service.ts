@@ -12,7 +12,14 @@ function generateCode(): string {
  * Создать новое приглашение для команды.
  * createdBy — обычно владелец, который только что оплатил слот.
  */
-export async function createTeamInvite(teamId: string, createdBy: number) {
+export async function createTeamInvite(teamId: string, createdBy: number, paymentId?: string) {
+  if (paymentId) {
+    return TeamInviteModel.findOneAndUpdate(
+      { paymentId },
+      { $setOnInsert: { teamId, code: generateCode(), status: 'active', createdBy, usedBy: null, paymentId } },
+      { upsert: true, new: true, runValidators: true }
+    )
+  }
   const code = generateCode()
 
   const invite = await TeamInviteModel.create({

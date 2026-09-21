@@ -1,17 +1,21 @@
 import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
 import { TeamModel } from '../models/Team.js'
+import { auditLogService, type AuditActor } from './auditLog.service.js'
 
 /**
  * Создать новый поток
  */
-export async function createStream(data: {
-  flowNumber: number
-  email: string
-  password: string
-  chatLink?: string
-  capacity?: number
-}) {
-  return ProPresenterStreamModel.create({
+export async function createStream(
+  data: {
+    flowNumber: number
+    email: string
+    password: string
+    chatLink?: string
+    capacity?: number
+  },
+  actor: AuditActor = { actorType: 'system' }
+) {
+  const stream = await ProPresenterStreamModel.create({
     flowNumber: data.flowNumber,
     email: data.email,
     password: data.password,
@@ -19,6 +23,12 @@ export async function createStream(data: {
     capacity: data.capacity || 30,
     status: 'active',
   })
+  await auditLogService.createLog({
+    type: 'propresenter.stream_created',
+    ...actor,
+    metadata: { flowNumber: stream.flowNumber, capacity: stream.capacity },
+  })
+  return stream
 }
 
 /**

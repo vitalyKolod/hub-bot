@@ -6,6 +6,7 @@ export type ScreenId =
   | 'team_list'
   | 'team'
   | 'create_team_info'
+  | 'team_about'
   | 'create_team_name'
   | 'add_subscription'
   | 'propresenter'

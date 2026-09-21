@@ -17,6 +17,7 @@ import {
   PROP_STREAM_VERIFY_THREAD_ID,
 } from '../config/env.js'
 import type { MyContext } from '../types/context.js'
+import { auditLogService, buildSubscriptionTargetId } from '../services/auditLog.service.js'
 
 // ===== Навигация (просто переходы между экранами) =====
 
@@ -210,6 +211,26 @@ export async function handlePropVerifyAccept(
   } as any)
 
   await team.save()
+
+  const auditBase = {
+    actorType: 'admin' as const,
+    actorTelegramId: ctx.from?.id,
+    targetUserId: team.ownerId,
+    targetTeamId: teamId,
+    targetSubscriptionId: buildSubscriptionTargetId(teamId, 'propresenter'),
+    metadata: {
+      teamName: team.name,
+      productId: 'propresenter',
+      productName: 'Pro Presenter',
+      flowNumber,
+      expiresAt: stream.expiresAt,
+    },
+  }
+  if (!existing || ['none', 'rejected'].includes(existing.status)) {
+    await auditLogService.createLog({ type: 'subscription.created', ...auditBase })
+  }
+  await auditLogService.createLog({ type: 'subscription.activated', ...auditBase })
+  await auditLogService.createLog({ type: 'propresenter.team_added', ...auditBase })
 
   await ctx.api.sendMessage(
     team.ownerId,

@@ -2,6 +2,7 @@ import type { Context, SessionFlavor } from 'grammy'
 
 export type SessionData = {
   payment: null | {
+    paymentId?: string
     product: string
     teamId?: string
     method: string | null

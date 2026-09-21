@@ -32,6 +32,7 @@ import { runReminders } from './services/reminder.service.js'
 dotenv.config()
 import { escapeUnderscore } from './utils/escape.js'
 import { isAdmin } from './config/admin.js'
+import { isAdmin as hasAdminAccess, hasAdminPermission } from './services/adminAccess.service.js'
 import { handleSubscribeCheck, showSubscribeScreen } from './flows/subscribe/index.js'
 import { INPUT_MODES } from './constants/input-modes.js'
 import { createTeam } from './services/team.service.js'
@@ -120,7 +121,10 @@ import {
   closeSupportTicket,
   relayAdminMessage,
   sendUserMessageToSupport,
+  autoCloseInactiveSupportTickets,
+  reopenSupportTicket,
 } from './services/support.service.js'
+import { auditLogService } from './services/auditLog.service.js'
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const CONTENT_GROUP_ID = Number(process.env.CONTENT_GROUP_ID)
@@ -161,7 +165,9 @@ console.log(`🆘 Группа поддержки: ${SUPPORT_GROUP_ID}`)
 type MyContext = Context &
   SessionFlavor<{
     payment: null | {
+      paymentId?: string
       product: string
+      teamId?: string
       method: string | null
       volunteerId?: number
       rubMethod?: string | null
@@ -203,16 +209,8 @@ async function showAdminRootMenu(ctx: MyContext, editCurrent = false) {
   ctx.session.adminMode = undefined
   ctx.session.adminPanelInput = undefined
 
-  const batches = await getPendingBatches()
-  const nextBatch = batches[0]
   const kb = new InlineKeyboard()
     .text('📢 Рассылка', 'admin:broadcast')
-    .row()
-    .text('📡 Потоки', apCb('streams'))
-    .text(
-      nextBatch ? `📋 Заявки №${nextBatch._id} (${nextBatch.count}/20)` : '📋 Заявки',
-      apCb('wait')
-    )
     .row()
     .text('✏️ Управление', apCb('menu'))
 
@@ -383,6 +381,7 @@ async function handleBroadcastCallback(ctx: MyContext, data: string) {
 }
 
 export function registerHandlers(bot: Bot<MyContext>) {
+  auditLogService.setTelegramApi(bot.api)
   initScreens()
 
   bot.use(
@@ -506,7 +505,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
   })
 
   bot.command('admin', async (ctx) => {
-    if (!isAdmin(ctx.from.id)) return
+    if (!(await hasAdminAccess(ctx.from.id))) return
     await showAdminRootMenu(ctx)
   })
 
@@ -555,7 +554,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
         }
         newExpiry = new Date(stream.expiresAt > new Date() ? stream.expiresAt : new Date())
         newExpiry.setFullYear(newExpiry.getFullYear() + 1)
-        await adminSetStreamExpiry(flowNumber, newExpiry)
+        await adminSetStreamExpiry(flowNumber, newExpiry, userId)
         label = `ProPresenter, поток №${flowNumber}`
       } else if (kind === 't') {
         const [, , teamId, productId] = parts
@@ -575,7 +574,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
           })
           return
         }
-        newExpiry = await adminExtendTeamSub(teamId, productId)
+        newExpiry = await adminExtendTeamSub(teamId, productId, 1, userId)
         label = `${getProduct(productId)?.name || productId}, команда «${team.name}»`
       } else {
         await ctx.answerCallbackQuery({ text: 'Неверная кнопка', show_alert: true })
@@ -638,7 +637,10 @@ export function registerHandlers(bot: Bot<MyContext>) {
     }
 
     if (data.startsWith('support:close:')) {
-      if (ctx.chat?.id !== SUPPORT_GROUP_ID) {
+      if (
+        ctx.chat?.id !== SUPPORT_GROUP_ID ||
+        !(await hasAdminPermission(userId, 'support.reply'))
+      ) {
         await ctx.answerCallbackQuery({ text: 'Недостаточно прав', show_alert: true })
         return
       }
@@ -651,11 +653,25 @@ export function registerHandlers(bot: Bot<MyContext>) {
           .catch(() => {})
         ctx.session.supportPanelMessageId = undefined
       }
-      if (ticket && message) {
-        try {
-          await ctx.editMessageReplyMarkup({ reply_markup: undefined })
-        } catch {}
+      return
+    }
+
+    if (data.startsWith('support:reopen:')) {
+      if (
+        ctx.chat?.id !== SUPPORT_GROUP_ID ||
+        !(await hasAdminPermission(userId, 'support.reply'))
+      ) {
+        await ctx.answerCallbackQuery({
+          text: '⛔ Недостаточно прав для выполнения этого действия.',
+          show_alert: true,
+        })
+        return
       }
+      const ticketId = data.slice('support:reopen:'.length)
+      const ticket = await reopenSupportTicket(ctx.api, ticketId, userId)
+      await ctx.answerCallbackQuery({
+        text: ticket ? 'Обращение возобновлено' : 'Обращение уже открыто',
+      })
       return
     }
 
@@ -680,7 +696,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
     }
 
     if (data === 'admin:root') {
-      if (!isAdmin(userId)) {
+      if (!(await hasAdminAccess(userId))) {
         await ctx.answerCallbackQuery({ text: 'Нет доступа', show_alert: true })
         return
       }
@@ -690,7 +706,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
     }
 
     if (data === 'admin:broadcast') {
-      if (!isAdmin(userId)) {
+      if (!(await hasAdminPermission(userId, 'broadcasts.send'))) {
         await ctx.answerCallbackQuery({ text: 'Нет доступа', show_alert: true })
         return
       }
@@ -1330,5 +1346,12 @@ export function registerHandlers(bot: Bot<MyContext>) {
   }
   void checkSubscriptions()
   setInterval(checkSubscriptions, 1000 * 60 * 60) // каждые 60 минут
+  const checkInactiveSupport = async () => {
+    await autoCloseInactiveSupportTickets(bot.api).catch((error) =>
+      console.error('Ошибка auto-close поддержки:', error)
+    )
+  }
+  void checkInactiveSupport()
+  setInterval(checkInactiveSupport, 1000 * 60 * 10)
 }
 console.log('✅ Бот запущен')

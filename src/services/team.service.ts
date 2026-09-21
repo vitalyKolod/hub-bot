@@ -1,5 +1,11 @@
 import { TeamModel } from '../models/Team.js'
 import { UserModel } from '../models/User.js'
+import { getProduct } from '../config/products.js'
+import {
+  auditLogService,
+  buildSubscriptionTargetId,
+  type AuditActor,
+} from './auditLog.service.js'
 
 const RENEWAL_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
 
@@ -133,12 +139,22 @@ export async function createTeamForUser({
   })
 
   if (createdByAdminId !== undefined) {
-    console.info('admin_created_team', {
-      adminTelegramId: createdByAdminId,
+    await auditLogService.createLog({
+      type: 'team.created',
+      actorType: 'admin',
+      actorTelegramId: createdByAdminId,
       targetUserId: userId,
-      teamId: team._id.toString(),
-      teamName: team.name,
-      createdAt: (team as any).createdAt || new Date(),
+      targetTeamId: team._id.toString(),
+      metadata: { teamName: team.name, ownerTelegramId: userId },
+    })
+  } else {
+    await auditLogService.createLog({
+      type: 'team.created',
+      actorType: 'user',
+      actorTelegramId: userId,
+      targetUserId: userId,
+      targetTeamId: team._id.toString(),
+      metadata: { teamName: team.name, ownerTelegramId: userId },
     })
   }
 
@@ -222,11 +238,23 @@ export async function getActiveProPresenterFlowNumber(teamId: string) {
     : null
 }
 
-export async function activateTeamSubscription(teamId: string, productId: string, extendYears = 1) {
+export async function activateTeamSubscription(
+  teamId: string,
+  productId: string,
+  extendYears = 1,
+  actor: AuditActor = { actorType: 'system' },
+  idempotencyKey?: string
+) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Team not found')
 
   const current = team.subscriptions.get(productId)
+  const appliedPaymentIds = Array.isArray((current?.meta as any)?.appliedPaymentIds)
+    ? (current!.meta as any).appliedPaymentIds as string[]
+    : []
+  if (idempotencyKey && appliedPaymentIds.includes(idempotencyKey)) {
+    return { team, isExtension: false, alreadyApplied: true }
+  }
   const now = new Date()
   const wasActive =
     !!current && current.status === 'active' && current.expiresAt && current.expiresAt > now
@@ -238,22 +266,74 @@ export async function activateTeamSubscription(teamId: string, productId: string
   team.subscriptions.set(productId, {
     status: 'active',
     expiresAt,
-    meta: current?.meta || {},
+    meta: {
+      ...(current?.meta || {}),
+      ...(idempotencyKey ? { appliedPaymentIds: [...appliedPaymentIds, idempotencyKey] } : {}),
+    },
   } as any)
 
   await team.save()
-  return { team, isExtension: wasActive }
+
+  const auditBase = {
+    ...actor,
+    targetUserId: team.ownerId,
+    targetTeamId: teamId,
+    targetSubscriptionId: buildSubscriptionTargetId(teamId, productId),
+    metadata: {
+      teamName: team.name,
+      productId,
+      productName: getProduct(productId)?.name || productId,
+      expiresAt,
+    },
+  }
+  if (!current || ['none', 'rejected'].includes(current.status)) {
+    await auditLogService.createLog({ type: 'subscription.created', ...auditBase })
+  }
+  await auditLogService.createLog({
+    type: wasActive || current?.status === 'expired' ? 'subscription.renewed' : 'subscription.activated',
+    ...auditBase,
+  })
+  return { team, isExtension: wasActive, alreadyApplied: false }
 }
 
-export async function rejectTeamSubscription(teamId: string, productId: string) {
+export async function rejectTeamSubscription(
+  teamId: string,
+  productId: string,
+  actor: AuditActor = { actorType: 'system' }
+) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Team not found')
+  const current = team.subscriptions.get(productId)
   team.subscriptions.set(productId, { status: 'rejected', meta: {} } as any)
   await team.save()
+  const auditBase = {
+    ...actor,
+    targetUserId: team.ownerId,
+    targetTeamId: teamId,
+    targetSubscriptionId: buildSubscriptionTargetId(teamId, productId),
+    metadata: {
+      teamName: team.name,
+      productId,
+      productName: getProduct(productId)?.name || productId,
+      previousStatus: current?.status || 'none',
+      status: 'rejected',
+    },
+  }
+  if (!current) {
+    await auditLogService.createLog({ type: 'subscription.created', ...auditBase })
+  }
+  await auditLogService.createLog({
+    type: 'subscription.disabled',
+    ...auditBase,
+  })
   return team
 }
 
-export async function addMemberToTeam(teamId: string, telegramId: number) {
+export async function addMemberToTeam(
+  teamId: string,
+  telegramId: number,
+  actor: AuditActor = { actorType: 'user', actorTelegramId: telegramId }
+) {
   const team = await TeamModel.findById(teamId)
   if (!team) throw new Error('Team not found')
 
@@ -269,5 +349,12 @@ export async function addMemberToTeam(teamId: string, telegramId: number) {
   } as any)
 
   await team.save()
+  await auditLogService.createLog({
+    type: 'team.member_added',
+    ...actor,
+    targetUserId: telegramId,
+    targetTeamId: teamId,
+    metadata: { teamName: team.name, memberTelegramId: telegramId },
+  })
   return team
 }

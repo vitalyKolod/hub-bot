@@ -5,6 +5,9 @@ import type { ScreenView } from '../core/render.js'
 
 export function mainScreen(userId: number): ScreenView {
   const keyboard = new InlineKeyboard()
+  const miniAppUrl = process.env.MINI_APP_URL
+  if (miniAppUrl) keyboard.webApp('🚀 Открыть HUB', miniAppUrl).row()
+  keyboard
     .text('МОИ КОМАНДЫ', packCb({ a: 'open', s: 'team_list' }))
     .icon('5258513401784573443')
     .row()

@@ -4,6 +4,9 @@ import test from 'node:test'
 import { TeamModel } from '../src/models/Team.js'
 import { UserModel } from '../src/models/User.js'
 import { apCb } from '../src/constants/admin-panel.js'
+import { AuditLogModel } from '../src/models/AuditLog.js'
+import { ProPresenterWaitlistModel } from '../src/models/ProPresenterWaitlist.js'
+import { ProPresenterRequestBatchModel } from '../src/models/ProPresenterRequestBatch.js'
 
 process.env.ADMIN_IDS = '111,222'
 process.env.ADMIN_GROUP_ID ||= '-100000000001'
@@ -13,9 +16,30 @@ process.env.SUNDAY_SCREENS_GROUP_ID ||= '-100000000004'
 process.env.PROP_WAITLIST_THREAD_ID ||= '10'
 process.env.PROP_STREAM_VERIFY_THREAD_ID ||= '11'
 
-const { handleAdminPanelCallback, handleAdminPanelText } = await import(
+const { handleAdminPanelCallback, handleAdminPanelText, showAdminPanelMenu, showAdminUserCard } = await import(
   '../src/handlers/adminPanel.handlers.js'
 )
+
+test('management menu uses only the configured custom icons on section buttons', async (t) => {
+  t.mock.method(ProPresenterWaitlistModel as any, 'find', () => ({ sort: async () => [] }))
+  t.mock.method(ProPresenterWaitlistModel as any, 'aggregate', async () => [{ _id: 21, count: 2 }])
+  t.mock.method(ProPresenterRequestBatchModel as any, 'find', () => ({ lean: async () => [] }))
+  const { ctx, edits } = callbackContext(111, apCb('menu'))
+  await showAdminPanelMenu(ctx)
+  const buttons = keyboardButtons(edits[0])
+  const expected = new Map([
+    ['Юзеры', '5440764424820377609'],
+    ['Команды', '5296533616224906961'],
+    ['Потоки ProPresenter', '5251272469175631339'],
+    ['Заявки на поток №21 (2/20)', '6323602795123443087'],
+    ['Администраторы', '5836690092306992715'],
+  ])
+  for (const [label, icon] of expected) {
+    const button: any = buttons.find((item) => item.text === label)
+    assert.equal(button?.icon_custom_emoji_id, icon)
+    assert.doesNotMatch(label, /^[👥🏘📡📋👮]/u)
+  }
+})
 
 type RecordedEdit = {
   chatId?: number
@@ -199,6 +223,10 @@ test('manual create state remains isolated for two admins and refreshes the orig
     )
   })
   t.mock.method(console, 'info', () => {})
+  t.mock.method(AuditLogModel as any, 'create', async (payload: any) => ({
+    ...payload,
+    createdAt: new Date(),
+  }))
 
   const sessionA: Record<string, any> = {}
   const sessionB: Record<string, any> = {}
@@ -281,4 +309,43 @@ test('non-admin callbacks are consumed and denied before any database access', a
   const { ctx, answers } = callbackContext(999, apCb('u', 700, 'del'))
   assert.equal(await handleAdminPanelCallback(ctx, ctx.callbackQuery.data), true)
   assert.deepEqual(answers[0], { text: 'Нет доступа' })
+})
+
+test('support user card is sent separately and keeps the source audit message intact', async (t) => {
+  t.mock.method(UserModel as any, 'findOne', async () => ({
+    telegramId: 700,
+    fio: 'Иван Иванов',
+    username: 'ivan',
+    city: 'Москва',
+    church: 'ХАБ',
+    reg: 'done',
+  }))
+  t.mock.method(TeamModel as any, 'find', async () => [])
+
+  const { ctx, edits, replies } = callbackContext(111, 'support:profile:700')
+  await showAdminUserCard(ctx, 700)
+
+  assert.equal(edits.length, 0)
+  assert.equal(replies.length, 1)
+  assert.match(replies[0].text, /Иван Иванов/)
+})
+
+test('legacy ap callback in an existing audit message also opens a separate card', async (t) => {
+  t.mock.method(UserModel as any, 'findOne', async () => ({
+    telegramId: 700,
+    fio: 'Иван Иванов',
+    reg: 'done',
+  }))
+  t.mock.method(TeamModel as any, 'find', async () => [])
+
+  const { ctx, edits, replies } = callbackContext(111, apCb('u', 700))
+  ctx.chat.id = Number(process.env.SUPPORT_GROUP_ID)
+  ctx.callbackQuery.message.message_thread_id = 390
+  ctx.callbackQuery.message.reply_markup = {
+    inline_keyboard: [[{ text: '👤 Пользователь', callback_data: apCb('u', 700) }]],
+  }
+
+  assert.equal(await handleAdminPanelCallback(ctx, ctx.callbackQuery.data), true)
+  assert.equal(edits.length, 0)
+  assert.equal(replies.length, 1)
 })

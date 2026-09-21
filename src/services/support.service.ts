@@ -1,8 +1,151 @@
 import { InlineKeyboard, type Api, type Context } from 'grammy'
+import { Types } from 'mongoose'
 import { SUPPORT_GROUP_ID } from '../config/env.js'
 import { SupportTicketModel } from '../models/SupportTicket.js'
+import { SupportMessageModel } from '../models/SupportMessage.js'
 import { TeamModel } from '../models/Team.js'
-import { getOrCreateUser } from './user.service.js'
+import { UserModel } from '../models/User.js'
+import { auditLogService } from './auditLog.service.js'
+
+export const SUPPORT_AUTO_CLOSE_HOURS = Math.max(
+  1,
+  Number(process.env.SUPPORT_AUTO_CLOSE_HOURS || 1) || 1
+)
+
+function messagePayload(ctx: Context) {
+  const message: any = ctx.message
+  const attachments: Array<{
+    type: 'image' | 'document' | 'video'
+    telegramFileId: string
+    fileName?: string
+    mimeType?: string
+  }> = []
+  if (message?.photo?.length)
+    attachments.push({ type: 'image', telegramFileId: message.photo.at(-1).file_id })
+  if (message?.document)
+    attachments.push({
+      type: 'document',
+      telegramFileId: message.document.file_id,
+      fileName: message.document.file_name,
+      mimeType: message.document.mime_type,
+    })
+  if (message?.video)
+    attachments.push({
+      type: 'video',
+      telegramFileId: message.video.file_id,
+      fileName: message.video.file_name,
+      mimeType: message.video.mime_type,
+    })
+  return { text: message?.text || message?.caption || null, attachments }
+}
+
+export function buildSupportTopicKeyboard(input: {
+  ticketId: string
+  userId: number
+  status: 'open' | 'closed'
+  teams: Array<{ id?: string; _id?: unknown; name: string }>
+}) {
+  const keyboard = new InlineKeyboard()
+    .text('👤 Профиль и управление', `support:profile:${input.userId}`)
+    .row()
+  for (const team of input.teams) {
+    keyboard
+      .text(
+        `👥 Открыть команду «${team.name}»`.slice(0, 60),
+        `support:team:${team.id || String(team._id)}`
+      )
+      .row()
+  }
+  keyboard
+    .url('✉️ Открыть Telegram-профиль', `tg://user?id=${input.userId}`)
+    .row()
+    .text(
+      input.status === 'open' ? '✅ Завершить обращение' : '🔓 Возобновить обращение',
+      input.status === 'open'
+        ? `support:close:${input.ticketId}`
+        : `support:reopen:${input.ticketId}`
+    )
+  return keyboard
+}
+
+async function updateSupportTopicKeyboard(api: Api, ticket: any, status: 'open' | 'closed') {
+  if (!ticket.cardMessageId) return false
+  const teams = await TeamModel.find({
+    $or: [{ ownerId: ticket.userId }, { 'members.telegramId': ticket.userId }],
+  }).select('name')
+  await api.editMessageReplyMarkup(SUPPORT_GROUP_ID, ticket.cardMessageId, {
+    reply_markup: buildSupportTopicKeyboard({
+      ticketId: ticket.id,
+      userId: ticket.userId,
+      status,
+      teams,
+    }),
+  })
+  return true
+}
+
+export async function saveSupportMessage(input: {
+  ticketId: string
+  senderType: 'user' | 'admin' | 'system'
+  senderId?: number
+  text?: string | null
+  attachments?: Array<{
+    type: 'image' | 'document' | 'video'
+    telegramFileId: string
+    fileName?: string
+    mimeType?: string
+  }>
+  source: 'telegram' | 'web'
+  telegramSourceMessageId?: number
+  telegramDestinationMessageId?: number
+}) {
+  const message = await SupportMessageModel.findOneAndUpdate(
+    input.telegramSourceMessageId
+      ? {
+          ticketId: input.ticketId,
+          source: input.source,
+          telegramSourceMessageId: input.telegramSourceMessageId,
+          senderType: input.senderType,
+        }
+      : { _id: new Types.ObjectId() },
+    { $setOnInsert: input },
+    { upsert: true, new: true, runValidators: true }
+  )
+  const activityAt = new Date()
+  await SupportTicketModel.updateOne(
+    { _id: input.ticketId, status: 'open' },
+    { $set: { updatedAt: activityAt, lastActivityAt: activityAt } }
+  )
+  await auditLogService.createLog({
+    type: input.senderType === 'admin' ? 'support.message_admin' : 'support.message_user',
+    actorType: input.senderType === 'admin' ? 'admin' : 'user',
+    actorTelegramId: input.senderId,
+    metadata: {
+      ticketId: input.ticketId,
+      source: input.source,
+      hasAttachments: Boolean(input.attachments?.length),
+    },
+  })
+  return message
+}
+
+export function listSupportTicketsForUser(userId: number) {
+  return SupportTicketModel.find({ userId }).sort({ updatedAt: -1 })
+}
+
+export function listAllSupportTickets() {
+  return SupportTicketModel.find().sort({ updatedAt: -1 })
+}
+
+export async function getSupportTicketWithMessages(ticketId: string, ownerId?: number) {
+  const ticket = await SupportTicketModel.findOne({
+    _id: ticketId,
+    ...(ownerId === undefined ? {} : { userId: ownerId }),
+  })
+  if (!ticket) return null
+  const messages = await SupportMessageModel.find({ ticketId: ticket._id }).sort({ createdAt: 1 })
+  return { ticket, messages }
+}
 
 async function setDeliveryReaction(ctx: Context, delivered: boolean) {
   try {
@@ -17,92 +160,126 @@ export async function getOpenSupportTicket(userId: number) {
   return SupportTicketModel.findOne({ userId, status: 'open' }).sort({ createdAt: -1 })
 }
 
-export async function createSupportTicket(ctx: Context, userId: number) {
+const ticketCreationLocks = new Map<number, Promise<any>>()
+
+export async function createSupportTicketForUser(
+  api: Api,
+  userId: number,
+  telegramProfile?: { username?: string }
+) {
   const existing = await getOpenSupportTicket(userId)
   if (existing) return existing
+  const inflight = ticketCreationLocks.get(userId)
+  if (inflight) return inflight
 
-  const profile = await getOrCreateUser(userId)
-  const teams = await TeamModel.find({
-    $or: [{ ownerId: userId }, { 'members.telegramId': userId }],
-  }).select('name ownerId members')
-  const username = ctx.from?.username ? `@${ctx.from.username}` : `ID ${userId}`
-  const titleName = (profile.fio || username).slice(0, 70)
-  const topic = await ctx.api.createForumTopic(SUPPORT_GROUP_ID, `🆘 ${titleName}`)
-
-  const ticket = await SupportTicketModel.create({
-    userId,
-    threadId: topic.message_thread_id,
-  })
-
-  const teamDetails = teams.length
-    ? teams.map((team) => {
-        const role = team.ownerId === userId ? 'владелец' : 'участник'
-        return `• ${team.name} — ${role} (${team.members.length}/5)`
+  const creation = (async () => {
+    const rechecked = await getOpenSupportTicket(userId)
+    if (rechecked) return rechecked
+    const profile =
+      (await UserModel.findOne({ telegramId: userId })) ||
+      (await UserModel.create({ telegramId: userId, reg: 'none', regStep: 'fio' }))
+    const teams = await TeamModel.find({
+      $or: [{ ownerId: userId }, { 'members.telegramId': userId }],
+    }).select('name ownerId members')
+    const username = telegramProfile?.username ? `@${telegramProfile.username}` : `ID ${userId}`
+    const topic = await api.createForumTopic(
+      SUPPORT_GROUP_ID,
+      `🆘 ${(profile.fio || username).slice(0, 70)}`
+    )
+    try {
+      const ticket = await SupportTicketModel.create({
+        userId,
+        threadId: topic.message_thread_id,
+        lastActivityAt: new Date(),
       })
-    : ['• Не состоит в команде']
+      const details = [
+        '🆘 Новое обращение',
+        `👤 ${profile.fio || 'Имя не указано'}`,
+        telegramProfile?.username ? `🔗 @${telegramProfile.username}` : null,
+        `🆔 ID: ${userId}`,
+        `🏙 Город: ${profile.city || 'не указан'}`,
+        `⛪ Церковь: ${profile.church || 'не указана'}`,
+        '',
+        '👥 Команды:',
+        ...(teams.length
+          ? teams.map(
+              (team) =>
+                `• ${team.name} — ${team.ownerId === userId ? 'владелец' : 'участник'} (${team.members.length}/5)`
+            )
+          : ['• Не состоит в команде']),
+        '',
+        '💬 Чтобы ответить пользователю, просто отправьте сообщение в этом топике.',
+      ]
+        .filter(Boolean)
+        .join('\n')
+      const keyboard = buildSupportTopicKeyboard({
+        ticketId: ticket.id,
+        userId,
+        status: 'open',
+        teams,
+      })
+      const card = await api.sendMessage(SUPPORT_GROUP_ID, details, {
+        message_thread_id: ticket.threadId,
+        reply_markup: keyboard,
+      })
+      ticket.cardMessageId = card.message_id
+      await ticket.save()
+      return ticket
+    } catch (error: any) {
+      await api.closeForumTopic(SUPPORT_GROUP_ID, topic.message_thread_id).catch(() => {})
+      if (error?.code === 11000) {
+        const winner = await getOpenSupportTicket(userId)
+        if (winner) return winner
+      }
+      throw error
+    }
+  })().finally(() => ticketCreationLocks.delete(userId))
+  ticketCreationLocks.set(userId, creation)
+  return creation
+}
 
-  const details = [
-    '🆘 Новое обращение',
-    `👤 ${profile.fio || 'Имя не указано'}`,
-    ctx.from?.username ? `🔗 @${ctx.from.username}` : null,
-    `🆔 ID: ${userId}`,
-    `🏙 Город: ${profile.city || 'не указан'}`,
-    `⛪ Церковь: ${profile.church || 'не указана'}`,
-    `📋 Регистрация: ${profile.reg === 'done' ? 'завершена' : 'не завершена'}`,
-    '',
-    '👥 Команды:',
-    ...teamDetails,
-    '',
-    '💬 Чтобы ответить пользователю, просто отправьте сообщение в этом топике.',
-  ]
-    .filter(Boolean)
-    .join('\n')
-
-  const keyboard = new InlineKeyboard()
-    .text('👤 Профиль и управление', `support:profile:${userId}`)
-    .row()
-
-  for (const team of teams) {
-    keyboard
-      .text(`👥 Открыть команду «${team.name}»`.slice(0, 60), `support:team:${team.id}`)
-      .row()
-  }
-
-  keyboard
-    .url('✉️ Открыть Telegram-профиль', `tg://user?id=${userId}`)
-    .row()
-    .text('✅ Завершить обращение', `support:close:${ticket.id}`)
-  await ctx.api.sendMessage(SUPPORT_GROUP_ID, details, {
-    message_thread_id: ticket.threadId,
-    reply_markup: keyboard,
-  })
-
-  return ticket
+export async function createSupportTicket(ctx: Context, userId: number) {
+  return createSupportTicketForUser(ctx.api, userId, { username: ctx.from?.username })
 }
 
 export async function sendUserMessageToSupport(ctx: Context, userId: number) {
   const ticket = await createSupportTicket(ctx, userId)
-  await ctx.api.copyMessage(SUPPORT_GROUP_ID, ctx.chat!.id, ctx.message!.message_id, {
-    message_thread_id: ticket.threadId,
+  const delivered = await ctx.api.copyMessage(
+    SUPPORT_GROUP_ID,
+    ctx.chat!.id,
+    ctx.message!.message_id,
+    {
+      message_thread_id: ticket.threadId,
+    }
+  )
+  const payload = messagePayload(ctx)
+  await saveSupportMessage({
+    ticketId: ticket.id,
+    senderType: 'user',
+    senderId: userId,
+    source: 'telegram',
+    telegramSourceMessageId: ctx.message!.message_id,
+    telegramDestinationMessageId: delivered.message_id,
+    ...payload,
   })
   return ticket
 }
 
-export async function closeSupportTicket(
-  api: Api,
-  ticketId: string,
-  closedBy: 'user' | 'admin'
-) {
+export async function closeSupportTicket(api: Api, ticketId: string, closedBy: 'user' | 'admin') {
   const ticket = await SupportTicketModel.findOneAndUpdate(
     { _id: ticketId, status: 'open' },
-    { status: 'closed', closedBy, closedAt: new Date() },
+    { status: 'closed', closedBy, closeReason: 'manual', closedAt: new Date() },
     { new: true }
   )
   if (!ticket) return null
 
+  await updateSupportTopicKeyboard(api, ticket, 'closed').catch((error) =>
+    console.error('Не удалось обновить клавиатуру support-карточки:', error)
+  )
+
   const notification =
     closedBy === 'admin'
-      ? '✅ Специалист завершил обращение. Если понадобится помощь, создайте новое.'
+      ? '🔒 Обращение завершено\n\nВаше обращение было завершено службой поддержки.\n\nЕсли потребуется помощь снова —\nвы всегда можете создать новое обращение.'
       : '✅ Пользователь завершил обращение.'
 
   if (closedBy === 'admin') await api.sendMessage(ticket.userId, notification)
@@ -116,6 +293,113 @@ export async function closeSupportTicket(
     console.error('Не удалось закрыть тему поддержки:', error)
   }
   return ticket
+}
+
+export async function reopenSupportTicket(api: Api, ticketId: string, adminTelegramId: number) {
+  const now = new Date()
+  const ticket = await SupportTicketModel.findOneAndUpdate(
+    { _id: ticketId, status: 'closed' },
+    {
+      $set: {
+        status: 'open',
+        reopenedAt: now,
+        reopenedBy: adminTelegramId,
+        lastActivityAt: now,
+      },
+      $unset: { closedAt: '', closedBy: '', closeReason: '' },
+    },
+    { new: true }
+  )
+  if (!ticket) return null
+
+  await api.reopenForumTopic(SUPPORT_GROUP_ID, ticket.threadId).catch((error) =>
+    console.error('Не удалось открыть тему поддержки:', error)
+  )
+  await updateSupportTopicKeyboard(api, ticket, 'open').catch((error) =>
+    console.error('Не удалось обновить клавиатуру support-карточки:', error)
+  )
+
+  let userNotified = true
+  await api
+    .sendMessage(
+      ticket.userId,
+      '🔓 Ваше обращение снова открыто\n\nВы можете продолжить общение с поддержкой.'
+    )
+    .catch(() => {
+      userNotified = false
+    })
+  await api.sendMessage(
+    SUPPORT_GROUP_ID,
+    `🔓 Обращение возобновлено\n\nАдминистратор снова открыл обращение.${
+      userNotified ? '' : '\n\n⚠️ Не удалось доставить уведомление пользователю.'
+    }`,
+    { message_thread_id: ticket.threadId }
+  )
+  return ticket
+}
+
+/** Атомарно забирает только ещё открытые просроченные обращения. Поэтому
+ * параллельные/повторные worker runs не дублируют закрытие и уведомления. */
+export async function autoCloseInactiveSupportTickets(api: Api, now = new Date()) {
+  const cutoff = new Date(now.getTime() - SUPPORT_AUTO_CLOSE_HOURS * 60 * 60 * 1000)
+  const candidates = await SupportTicketModel.find({
+    status: 'open',
+    $or: [
+      { lastActivityAt: { $lte: cutoff } },
+      { lastActivityAt: null, updatedAt: { $lte: cutoff } },
+      { lastActivityAt: { $exists: false }, updatedAt: { $lte: cutoff } },
+      { lastActivityAt: null, updatedAt: null, createdAt: { $lte: cutoff } },
+    ],
+  }).select({ _id: 1 })
+
+  let closed = 0
+  for (const candidate of candidates) {
+    const ticket = await SupportTicketModel.findOneAndUpdate(
+      { _id: candidate._id, status: 'open' },
+      { $set: { status: 'closed', closedBy: 'system', closeReason: 'inactivity', closedAt: now } },
+      { new: true }
+    )
+    if (!ticket) continue
+    closed += 1
+    await updateSupportTopicKeyboard(api, ticket, 'closed').catch((error) =>
+      console.error('Не удалось обновить клавиатуру support-карточки:', error)
+    )
+    let userNotified = true
+    await api
+      .sendMessage(
+        ticket.userId,
+        '🔒 Обращение закрыто автоматически\n\nВ чате не было активности больше часа,\nпоэтому обращение было закрыто.\n\nЕсли помощь понадобится снова —\nпросто напишите нам или обратитесь в поддержку ещё раз.'
+      )
+      .catch((error) => {
+        userNotified = false
+        console.error('Не удалось уведомить пользователя об auto-close:', error)
+      })
+    await api
+      .sendMessage(
+        SUPPORT_GROUP_ID,
+        `🔒 Обращение закрыто автоматически\n\nПричина:\nнет активности более 1 часа.\n\n${
+          userNotified
+            ? 'Пользователь уведомлён.'
+            : '⚠️ Не удалось доставить уведомление пользователю.'
+        }`,
+        { message_thread_id: ticket.threadId }
+      )
+      .catch((error) => console.error('Не удалось уведомить support topic об auto-close:', error))
+    await api
+      .closeForumTopic(SUPPORT_GROUP_ID, ticket.threadId)
+      .catch((error) => console.error('Не удалось закрыть тему поддержки:', error))
+    await auditLogService.createLog({
+      type: 'support.auto_closed',
+      actorType: 'system',
+      targetUserId: ticket.userId,
+      metadata: {
+        ticketId: ticket.id,
+        threadId: ticket.threadId,
+        inactivityHours: SUPPORT_AUTO_CLOSE_HOURS,
+      },
+    })
+  }
+  return closed
 }
 
 export async function closeOpenTicketForUser(api: Api, userId: number) {
@@ -135,7 +419,21 @@ export async function relayAdminMessage(ctx: Context) {
   if (!ticket) return true
 
   try {
-    await ctx.api.copyMessage(ticket.userId, SUPPORT_GROUP_ID, ctx.message.message_id)
+    const delivered = await ctx.api.copyMessage(
+      ticket.userId,
+      SUPPORT_GROUP_ID,
+      ctx.message.message_id
+    )
+    const payload = messagePayload(ctx)
+    await saveSupportMessage({
+      ticketId: ticket.id,
+      senderType: 'admin',
+      senderId: ctx.from.id,
+      source: 'telegram',
+      telegramSourceMessageId: ctx.message.message_id,
+      telegramDestinationMessageId: delivered.message_id,
+      ...payload,
+    })
     await setDeliveryReaction(ctx, true)
   } catch (error) {
     console.error('Не удалось доставить ответ поддержки:', error)

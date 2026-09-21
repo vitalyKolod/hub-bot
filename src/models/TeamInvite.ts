@@ -37,8 +37,14 @@ const teamInviteSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    paymentId: { type: String, default: null },
   },
   { timestamps: true }
+)
+
+teamInviteSchema.index(
+  { paymentId: 1 },
+  { unique: true, partialFilterExpression: { paymentId: { $type: 'string' } } }
 )
 
 export const TeamInviteModel = mongoose.model('TeamInvite', teamInviteSchema)

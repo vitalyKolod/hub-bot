@@ -1,6 +1,8 @@
 export type ProductConfig = {
   id: string
   name: string
+  description: string
+  cover: string
 
   priceRub: number | null
   priceUsd: number | null
@@ -13,6 +15,8 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   procontent: {
     id: 'procontent',
     name: 'ProContent',
+    description: 'Готовый медиаконтент для церковных экранов и служений.',
+    cover: '/media/procontent.png',
 
     priceRub: 500,
     priceUsd: 5,
@@ -24,6 +28,8 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   propresenter: {
     id: 'propresenter',
     name: 'Pro Presenter',
+    description: 'Доступ к ProPresenter для подготовки и проведения служений.',
+    cover: '/media/propres.jpg',
 
     priceRub: 2000,
     priceUsd: 20,
@@ -34,6 +40,8 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   cmg: {
     id: 'cmg',
     name: 'CMG',
+    description: 'Коллекция визуальных материалов Church Motion Graphics.',
+    cover: '/media/cmg.png',
 
     priceRub: 500,
     priceUsd: 5,
@@ -45,6 +53,8 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   sunday_screens: {
     id: 'sunday_screens',
     name: 'Sunday Screens',
+    description: 'Современные фоны и визуальные материалы для воскресных служений.',
+    cover: '/media/sunday-screens.png',
 
     priceRub: 1600,
     priceUsd: 16,
@@ -56,6 +66,8 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   cgs: {
     id: 'cgs',
     name: 'CGS',
+    description: 'Медиаресурсы Church Graphics Studio для вашей команды.',
+    cover: '/media/sgc.png',
 
     priceRub: 350,
     priceUsd: 3.5,
@@ -67,6 +79,8 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   storyloops: {
     id: 'storyloops',
     name: 'StoryLoops',
+    description: 'Анимированные фоны и видеолоопы для экранов.',
+    cover: '/media/StoryLoop.png',
 
     priceRub: 725,
     priceUsd: 7.25,
@@ -78,6 +92,8 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   other: {
     id: 'other',
     name: 'Другое',
+    description: 'Другие продукты и помощь команды HUB.',
+    cover: '/media/others.jpg',
 
     priceRub: null,
     priceUsd: null,
@@ -88,6 +104,8 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   add_member: {
     id: 'add_member',
     name: 'Добавление участника',
+    description: 'Дополнительное место для участника вашей команды.',
+    cover: '/media/add-volunteer.png',
 
     priceRub: 250,
     priceUsd: 2.5,

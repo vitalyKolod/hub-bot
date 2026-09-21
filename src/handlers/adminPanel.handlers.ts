@@ -5,6 +5,15 @@
 import { InlineKeyboard, type Context } from 'grammy'
 import { FormattedString } from '@grammyjs/parse-mode'
 import { isAdmin } from '../config/admin.js'
+import {
+  ADMIN_PERMISSIONS, disableAdminAccess, isAdmin as hasAdminAccess,
+  getAdminAccess, hasAdminPermission, isSuperAdmin, listAdminAccess, requireAdminPermission,
+  setAdminPermission, upsertAdminAccess,
+} from '../services/adminAccess.service.js'
+import {
+  ADMIN_PERMISSION_CATEGORIES, ADMIN_PERMISSION_META, ADMIN_ROLE_META,
+  getAdminRoleDisplay, type AdminPermissionCategory, type AdminPermissionKey, type AdminRole,
+} from '../constants/admin-access.js'
 import { getProduct } from '../config/products.js'
 import {
   apCb,
@@ -19,6 +28,7 @@ import {
   PRODUCT_EMOJI,
   PRODUCT_CUSTOM_EMOJI_IDS,
   PAGE_SIZE,
+  ADMIN_MANAGEMENT_ICONS,
 } from '../constants/admin-panel.js'
 import * as ap from '../services/adminPanel.service.js'
 import { SUPPORT_GROUP_ID } from '../config/env.js'
@@ -34,6 +44,8 @@ import {
   TeamOwnerNotFoundError,
   validateTeamName,
 } from '../services/team.service.js'
+
+const AUDIT_LOG_THREAD_ID = Number(process.env.AUDIT_LOG_THREAD_ID || 390)
 
 // ---------- session helpers ----------
 
@@ -53,6 +65,8 @@ type ApInputMode =
   | 'stream_new'
   | 'waitlist_stream_new'
   | 'add_team_to_stream'
+  | 'request_batch_title'
+  | 'admin_access_id'
 
 type ApInput = {
   mode: ApInputMode
@@ -75,6 +89,7 @@ type MessageTarget = {
 type RenderOptions = {
   targetMessage?: MessageTarget
   replaceOnFailure?: boolean
+  forceNew?: boolean
 }
 
 function getSession(ctx: Context): any {
@@ -97,7 +112,7 @@ async function confirmAdminInput(ctx: Context, text: string) {
 }
 
 async function guard(ctx: Context): Promise<boolean> {
-  if (!ctx.from || !isAdmin(ctx.from.id)) {
+  if (!ctx.from || !(await hasAdminAccess(ctx.from.id))) {
     await ctx.answerCallbackQuery?.({ text: 'Нет доступа' }).catch(() => {})
     return false
   }
@@ -125,6 +140,31 @@ function getCallbackMessageTarget(ctx: Context): MessageTarget | undefined {
   return { chatId: message.chat.id, messageId: message.message_id }
 }
 
+/** Старые audit-сообщения уже содержат ap:* callbacks. Отличаем их от карточек,
+ * чтобы обновление роутера сохранило и ранее отправленную историю. */
+function isAuditShortcutMessage(ctx: Context): boolean {
+  const message = ctx.callbackQuery?.message
+  if (
+    !message ||
+    !('chat' in message) ||
+    message.chat.id !== SUPPORT_GROUP_ID ||
+    message.message_thread_id !== AUDIT_LOG_THREAD_ID
+  ) {
+    return false
+  }
+
+  const buttons = message.reply_markup?.inline_keyboard.flat() || []
+  return (
+    buttons.length > 0 &&
+    buttons.length <= 2 &&
+    buttons.every(
+      (button) =>
+        'callback_data' in button &&
+        (button.callback_data.startsWith('ap:u:') || button.callback_data.startsWith('ap:t:'))
+    )
+  )
+}
+
 function isMessageNotModified(error: unknown): boolean {
   const details = String((error as any)?.description || (error as any)?.message || '')
   return details.includes('message is not modified')
@@ -147,9 +187,11 @@ async function render(
     opts.entities = content.entities
   }
 
-  const editTarget = options.targetMessage || getCallbackMessageTarget(ctx)
+  const editTarget = options.forceNew
+    ? undefined
+    : options.targetMessage || getCallbackMessageTarget(ctx)
 
-  if (ctx.callbackQuery || options.targetMessage) {
+  if (!options.forceNew && (ctx.callbackQuery || options.targetMessage)) {
     try {
       if (options.targetMessage) {
         await ctx.api.editMessageText(
@@ -185,24 +227,187 @@ function paginationRow(kb: InlineKeyboard, page: number, totalPages: number, bas
   kb.row()
 }
 
+function callbackPermission(scope: string, rest: string[]) {
+  if (scope === 'ul' || scope === 'search_u') return 'users.view' as const
+  if (scope === 'u') return rest[1] ? 'users.edit' as const : 'users.view' as const
+  if (scope === 'tl' || scope === 'search_t') return 'teams.view' as const
+  if (scope === 't') return rest[1] ? 'teams.edit' as const : 'teams.view' as const
+  if (scope === 'streams') return 'streams.view' as const
+  if (scope === 'stream_new') return 'streams.edit' as const
+  if (scope === 'stream') return rest[1] ? 'streams.edit' as const : 'streams.view' as const
+  if (scope === 'wait') return ['edit', 'rename', 'create'].includes(rest[1]) ? 'requests.edit' as const : 'requests.view' as const
+  if (scope === 'wt') return 'requests.view' as const
+  if (scope === 'admins') return rest[0] === 'add' ? 'admins.manage' as const : 'admins.view' as const
+  if (scope === 'admin') return !rest[1] || ['rights', 'pc'].includes(rest[1]) ? 'admins.view' as const : 'admins.manage' as const
+  return undefined
+}
+
+function inputPermission(mode: ApInputMode) {
+  if (mode === 'search_user') return 'users.view' as const
+  if (['edit_user_field', 'add_user_to_team', 'create_team_name'].includes(mode)) return 'users.edit' as const
+  if (mode === 'search_team') return 'teams.view' as const
+  if (['edit_team_name', 'set_team_sub_date', 'assign_team_stream', 'add_team_member', 'transfer_ownership'].includes(mode)) return 'teams.edit' as const
+  if (['stream_field', 'stream_date', 'stream_new', 'waitlist_stream_new', 'add_team_to_stream'].includes(mode)) return 'streams.edit' as const
+  if (mode === 'request_batch_title') return 'requests.edit' as const
+  if (mode === 'admin_access_id') return 'admins.manage' as const
+  return undefined
+}
+
 // ==================== ГЛАВНОЕ МЕНЮ ====================
 
 export async function showAdminPanelMenu(ctx: Context) {
   const batches = await getPendingBatches()
   const nextBatch = batches[0]
   const kb = new InlineKeyboard()
-    .text('👥 Юзеры', apCb('ul', 0))
-    .text('🏘 Команды', apCb('tl', 0))
+    .text('Юзеры', apCb('ul', 0))
+    .icon(ADMIN_MANAGEMENT_ICONS.users)
+    .text('Команды', apCb('tl', 0))
+    .icon(ADMIN_MANAGEMENT_ICONS.teams)
     .row()
-    .text('📡 Потоки ProPresenter', apCb('streams'))
+    .text('Потоки ProPresenter', apCb('streams'))
+    .icon(ADMIN_MANAGEMENT_ICONS.streams)
     .text(
-      nextBatch ? `📋 Заявки №${nextBatch._id} (${nextBatch.count}/20)` : '📋 Заявки на поток',
+      nextBatch ? `${nextBatch.title} (${nextBatch.count}/20)` : 'Заявки на поток',
       apCb('wait')
     )
+    .icon(ADMIN_MANAGEMENT_ICONS.requests)
     .row()
-    .text('‹ Назад', 'admin:root')
+  if (ctx.from && await hasAdminPermission(ctx.from.id, 'admins.view')) {
+    kb.text('Администраторы', apCb('admins')).icon(ADMIN_MANAGEMENT_ICONS.admins).row()
+  }
+  kb.text('‹ Назад', 'admin:root')
 
   await render(ctx, '🛠 *Панель управления*\n\nВыбери раздел.', kb)
+}
+
+async function showAdmins(ctx: Context) {
+  await requireAdminPermission(ctx.from!.id, 'admins.view')
+  const admins = await listAdminAccess()
+  const kb = new InlineKeyboard()
+  for (const admin of admins) {
+    const user = await ap.adminGetUser(admin.telegramId)
+    const meta = getAdminRoleDisplay(admin.role)
+    const identity = user?.username ? `@${user.username.replace(/^@/, '')}` : user?.fio || String(admin.telegramId)
+    const state = admin.active ? '' : ' · отключён'
+    kb.text(`${meta.fallbackEmoji} ${meta.label} · ${identity}${state}`.slice(0, 60), apCb('admin', admin.telegramId)).row()
+  }
+  if (await hasAdminPermission(ctx.from!.id, 'admins.manage')) kb.text('➕ Добавить', apCb('admins', 'add')).row()
+  kb.text('← Назад', apCb('menu'))
+  await render(ctx, '👮 Администраторы', kb, false)
+}
+
+async function showAdminAccessCard(ctx: Context, telegramId: number) {
+  await requireAdminPermission(ctx.from!.id, 'admins.view')
+  const access = (await listAdminAccess()).find((item) => item.telegramId === telegramId)
+  if (!access) throw new Error('Администратор не найден')
+  const user = await ap.adminGetUser(telegramId)
+  const meta = getAdminRoleDisplay(access.role)
+  const canManage = await hasAdminPermission(ctx.from!.id, 'admins.manage')
+  const actorIsSuper = await isSuperAdmin(ctx.from!.id)
+  const kb = new InlineKeyboard()
+  if (access.role === 'superadmin') kb.text('ℹ️ Права доступа', apCb('admin', telegramId, 'rights')).row()
+  else if (access.role === 'admin') kb.text('🔐 Права доступа', apCb('admin', telegramId, 'rights')).row()
+  if (canManage && !access.bootstrap && (access.role !== 'superadmin' || actorIsSuper)) {
+    kb.text('🔄 Изменить роль', apCb('admin', telegramId, 'roles')).row()
+    kb.text('🚫 Отключить доступ', apCb('admin', telegramId, 'disable')).row()
+  }
+  kb.text('← Назад', apCb('admins'))
+  let text = new FormattedString('').emoji(meta.fallbackEmoji, meta.customEmojiId).plain(` ${meta.title}\n\n`)
+  if (user?.fio) text = text.plain(`${user.fio}\n`)
+  if (user?.username) text = text.plain(`@${user.username.replace(/^@/, '')}\n`)
+  text = text.plain(`ID: ${telegramId}\n\nРоль: `).emoji(meta.fallbackEmoji, meta.customEmojiId).plain(` ${meta.label}\nСтатус: ${access.bootstrap ? '🔒 Системный суперадмин' : access.active ? '🟢 Активен' : '🔴 Отключён'}\n\nДоступ:\n`)
+  text = text.plain(access.role === 'superadmin' ? '✅ Полный доступ' : access.role === 'consultant' ? '👁 Только просмотр' : `🔐 Настраиваемые права\nАктивно: ${access.permissions.length} из ${ADMIN_PERMISSIONS.length} разрешений`)
+  if (access.role === 'consultant') text = text.plain('\n\n👁 Режим просмотра\nИзменения недоступны для этой роли.')
+  await render(ctx, text, kb, false)
+}
+
+async function promptAddAdmin(ctx: Context) {
+  await requireAdminPermission(ctx.from!.id, 'admins.manage')
+  const kb = new InlineKeyboard()
+  if (await isSuperAdmin(ctx.from!.id)) kb.text('👑 Суперадмин', apCb('admins', 'add', 'superadmin')).row()
+  kb.text('🛡️ Администратор', apCb('admins', 'add', 'admin')).row()
+    .text('👁 Консультант', apCb('admins', 'add', 'consultant')).row()
+    .text('← Назад', apCb('admins'))
+  await render(ctx, '👮 ДОБАВЛЕНИЕ АДМИНИСТРАТОРА\n\nВыберите роль:', kb, false)
+}
+
+async function promptAdminId(ctx: Context, role: AdminRole) {
+  if (!ADMIN_ROLE_META[role]) throw new Error('Неизвестная роль администратора')
+  if (role === 'superadmin' && !(await isSuperAdmin(ctx.from!.id))) throw new Error('Недостаточно прав для выполнения этого действия.')
+  const meta = getAdminRoleDisplay(role)
+  getSession(ctx).adminPanelInput = { mode: 'admin_access_id', draft: { role } } as ApInput
+  const text = new FormattedString('').emoji(meta.fallbackEmoji, meta.customEmojiId).plain(` ${meta.addTitle}\n\nОтправьте Telegram ID пользователя.`)
+  await render(ctx, text, new InlineKeyboard().text('← Назад', apCb('admins', 'add')), false)
+}
+
+async function showAddAdminConfirm(ctx: Context, telegramId: number, role: AdminRole) {
+  if (role === 'superadmin' && !(await isSuperAdmin(ctx.from!.id))) throw new Error('Недостаточно прав для выполнения этого действия.')
+  const user = await ap.adminGetUser(telegramId)
+  const meta = getAdminRoleDisplay(role)
+  let text = new FormattedString('').emoji(meta.fallbackEmoji, meta.customEmojiId).plain(` ${meta.confirmTitle}\n\n`)
+  if (user?.fio) text = text.plain(`Имя: ${user.fio}\n`)
+  if (user?.username) text = text.plain(`Username: @${user.username.replace(/^@/, '')}\n`)
+  text = text.plain(`Telegram ID: ${telegramId}\n\nРоль: ${meta.fallbackEmoji} ${meta.label}`)
+  if (role === 'superadmin') text = text.plain('\n\nСуперадмин получит полный доступ\nко всем функциям HUB.\n\n⚠️ Это максимальный уровень доступа.')
+  const kb = new InlineKeyboard().text('✅ Подтвердить', apCb('admin', telegramId, 'add', role)).row().text('❌ Отмена', apCb('admins'))
+  await render(ctx, text, kb, false)
+}
+
+async function showAdminAdded(ctx: Context, telegramId: number, role: AdminRole) {
+  const user = await ap.adminGetUser(telegramId)
+  const meta = getAdminRoleDisplay(role)
+  let text = new FormattedString('').plain(`✅ ${meta.label} добавлен\n\n`).emoji(meta.fallbackEmoji, meta.customEmojiId).plain(` ${user?.fio || (user?.username ? '@' + user.username.replace(/^@/, '') : telegramId)}`)
+  if (role === 'admin') text = text.plain('\n\nТеперь настройте его права доступа.')
+  if (role === 'consultant') text = text.plain('\n\nДоступ:\n👁 Только просмотр')
+  if (role === 'superadmin') text = text.plain('\n\nДоступ:\n✅ Полный доступ')
+  const kb = new InlineKeyboard()
+  if (role === 'admin') kb.text('🔐 Настроить права', apCb('admin', telegramId, 'rights')).row()
+  kb.text('← К администраторам', apCb('admins'))
+  await render(ctx, text, kb, false)
+}
+
+async function showAdminRolePicker(ctx: Context, telegramId: number) {
+  const access = (await listAdminAccess()).find((item) => item.telegramId === telegramId)
+  if (!access || access.bootstrap) throw new Error('Роль системного суперадмина изменить нельзя')
+  const kb = new InlineKeyboard()
+  if (await isSuperAdmin(ctx.from!.id)) kb.text('👑 Суперадмин', apCb('admin', telegramId, 'setrole', 'superadmin')).row()
+  kb.text('🛡️ Администратор', apCb('admin', telegramId, 'setrole', 'admin')).row()
+    .text('👁 Консультант', apCb('admin', telegramId, 'setrole', 'consultant')).row()
+    .text('← Назад', apCb('admin', telegramId))
+  const meta = getAdminRoleDisplay(access.role)
+  await render(ctx, `🔄 ИЗМЕНЕНИЕ РОЛИ\n\nТекущая роль:\n${meta.fallbackEmoji} ${meta.label}\n\nВыберите новую:`, kb, false)
+}
+
+async function showAdminPermissions(ctx: Context, telegramId: number) {
+  const access = (await listAdminAccess()).find((item) => item.telegramId === telegramId)
+  if (!access) throw new Error('Администратор не найден')
+  if (access.role === 'superadmin') {
+    const meta = ADMIN_ROLE_META.superadmin
+    const text = new FormattedString('').emoji(meta.fallbackEmoji, meta.customEmojiId).plain(' СУПЕРАДМИН\n\nСуперадмин имеет полный доступ\nко всем функциям HUB.\n\nПрава этой роли не настраиваются вручную.')
+    return render(ctx, text, new InlineKeyboard().text('← Назад', apCb('admin', telegramId)), false)
+  }
+  if (access.role === 'consultant') return showAdminAccessCard(ctx, telegramId)
+  const user = await ap.adminGetUser(telegramId)
+  const kb = new InlineKeyboard()
+  for (const [key, category] of Object.entries(ADMIN_PERMISSION_CATEGORIES)) kb.text(`${category.emoji} ${category.label}`, apCb('admin', telegramId, 'pc', key)).row()
+  kb.text('← Назад', apCb('admin', telegramId))
+  await render(ctx, `🔐 ПРАВА АДМИНИСТРАТОРА\n\nАдминистратор:\n${user?.fio || (user?.username ? '@' + user.username.replace(/^@/, '') : telegramId)}\n\nВыберите раздел:`, kb, false)
+}
+
+async function showPermissionCategory(ctx: Context, telegramId: number, categoryKey: AdminPermissionCategory) {
+  const access = (await listAdminAccess()).find((item) => item.telegramId === telegramId)
+  if (!access || access.role !== 'admin') throw new Error('Права доступны только для администратора')
+  const category = ADMIN_PERMISSION_CATEGORIES[categoryKey]
+  if (!category) throw new Error('Раздел прав не найден')
+  const permissions = ADMIN_PERMISSIONS.filter((key) => ADMIN_PERMISSION_META[key].category === categoryKey)
+  const kb = new InlineKeyboard()
+  for (const permission of permissions) {
+    const enabled = access.permissions.includes(permission)
+    kb.text(`${enabled ? '✅' : '❌'} ${ADMIN_PERMISSION_META[permission].shortLabel}`, apCb('admin', telegramId, 'pt', permission)).row()
+  }
+  kb.text('← Права доступа', apCb('admin', telegramId, 'rights'))
+  const lines = permissions.map((permission) => `${access.permissions.includes(permission) ? '✅' : '❌'} ${ADMIN_PERMISSION_META[permission].label}`)
+  await render(ctx, `${category.emoji} ${category.label.toUpperCase()}\n\nПрава администратора:\n\n${lines.join('\n')}`, kb, false)
 }
 
 async function showWaitlistBatches(ctx: Context) {
@@ -210,7 +415,7 @@ async function showWaitlistBatches(ctx: Context) {
   const kb = new InlineKeyboard()
   for (const batch of batches) {
     kb.text(
-      `Поток №${batch._id} · ${batch.count}/${PROPRESENTER_BATCH_SIZE}`,
+      `${batch.title} · ${batch.count}/${PROPRESENTER_BATCH_SIZE}`.slice(0, 60),
       apCb('wait', batch._id)
     ).row()
   }
@@ -220,6 +425,8 @@ async function showWaitlistBatches(ctx: Context) {
 
 async function showWaitlistBatch(ctx: Context, flowNumber: number) {
   const entries = await getPendingBatch(flowNumber)
+  const title = await ap.adminGetRequestBatchTitle(flowNumber)
+  const canEdit = Boolean(ctx.from && await hasAdminPermission(ctx.from.id, 'requests.edit'))
   const kb = new InlineKeyboard()
   let position = 0
   for (const entry of entries) {
@@ -232,12 +439,27 @@ async function showWaitlistBatch(ctx: Context, flowNumber: number) {
   if (entries.length >= PROPRESENTER_BATCH_SIZE) {
     kb.text(`✅ Поток №${flowNumber} создал`, apCb('wait', flowNumber, 'create')).row()
   }
+  if (canEdit) kb.text('✏️ Редактировать', apCb('wait', flowNumber, 'edit')).row()
   kb.text('‹ К заявкам', apCb('wait'))
   const text =
-    `📋 Заявки на поток №${flowNumber}\n\n` +
+    `📋 ${title}\n\n` +
     `Заполнено: ${entries.length}/${PROPRESENTER_BATCH_SIZE}\n` +
     (entries.length ? 'Нажми на команду, чтобы открыть её профиль.' : 'Заявок пока нет.')
   await render(ctx, text, kb, false)
+}
+
+async function showWaitlistEdit(ctx: Context, flowNumber: number) {
+  await requireAdminPermission(ctx.from!.id, 'requests.edit')
+  const kb = new InlineKeyboard()
+    .text('✏️ Изменить название', apCb('wait', flowNumber, 'rename')).row()
+    .text('← Назад', apCb('wait', flowNumber))
+  await render(ctx, '✏️ Редактирование заявок', kb, false)
+}
+
+async function promptWaitlistTitle(ctx: Context, flowNumber: number) {
+  await requireAdminPermission(ctx.from!.id, 'requests.edit')
+  getSession(ctx).adminPanelInput = { mode: 'request_batch_title', flowNumber } as ApInput
+  await render(ctx, 'Введите новое название:', new InlineKeyboard().text('← Назад', apCb('wait', flowNumber, 'edit')), false)
 }
 
 async function startWaitlistStream(ctx: Context, flowNumber: number) {
@@ -361,7 +583,7 @@ async function showUserCard(
 
 /** Открывает карточку пользователя новым сообщением — используется из топика поддержки. */
 export async function showAdminUserCard(ctx: Context, telegramId: number) {
-  await showUserCard(replyOnlyCtx(ctx), telegramId)
+  await showUserCard(ctx, telegramId, { forceNew: true })
 }
 
 async function showCreateTeamScreen(ctx: Context, telegramId: number) {
@@ -525,7 +747,7 @@ async function showDeleteUserConfirm(ctx: Context, telegramId: number) {
 
 async function deleteUserFromAdmin(ctx: Context, telegramId: number) {
   try {
-    const result = await ap.adminDeleteUser(telegramId)
+    const result = await ap.adminDeleteUser(telegramId, ctx.from?.id)
     if (!result) {
       await showUserCard(ctx, telegramId, { replaceOnFailure: true })
       return
@@ -590,11 +812,11 @@ async function showTeamList(ctx: Context, page: number) {
   const { teams, total, totalPages } = await ap.adminListTeams(page)
 
   const kb = new InlineKeyboard()
-  kb.text('🔍 Поиск', apCb('search_t')).row()
-
   for (const t of teams) {
     kb.text(`${t.name} · ${t.members.length}👤`.slice(0, 60), apCb('t', t._id.toString())).row()
   }
+
+  kb.text('🔎 Поиск', apCb('search_t')).row()
 
   paginationRow(kb, page, totalPages, 'tl')
   kb.text('‹ Меню', apCb('menu'))
@@ -630,7 +852,8 @@ async function runTeamSearch(ctx: Context, query: string) {
 async function showTeamCard(
   ctx: Context,
   teamId: string,
-  back?: { label: string; callback: string }
+  back?: { label: string; callback: string },
+  renderOptions: RenderOptions = {}
 ) {
   const team = await ap.adminGetTeam(teamId)
   if (!team) {
@@ -638,7 +861,8 @@ async function showTeamCard(
       ctx,
       'Команда не найдена. Возможно, она была удалена после подачи заявки.',
       new InlineKeyboard().text(back?.label || '‹ Меню', back?.callback || apCb('menu')),
-      false
+      false,
+      renderOptions
     )
     return
   }
@@ -719,12 +943,12 @@ async function showTeamCard(
   kb.text('🗑 Удалить команду', apCb('t', teamId, 'delete')).row()
   kb.text(back?.label || '‹ К списку', back?.callback || apCb('tl', 0))
 
-  await render(ctx, text, kb)
+  await render(ctx, text, kb, true, renderOptions)
 }
 
 /** Открывает карточку команды новым сообщением — используется из топика поддержки. */
 export async function showAdminTeamCard(ctx: Context, teamId: string) {
-  await showTeamCard(replyOnlyCtx(ctx), teamId)
+  await showTeamCard(ctx, teamId, undefined, { forceNew: true })
 }
 
 async function promptEditTeamName(ctx: Context, teamId: string) {
@@ -1005,12 +1229,55 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
   if (session) session.adminPanelInput = undefined
 
   const [scope, ...rest] = parseAdminPanelCallback(data)
+  const permission = callbackPermission(scope, rest)
+  if (permission) {
+    try {
+      await requireAdminPermission(ctx.from!.id, permission)
+    } catch {
+      await ctx.answerCallbackQuery({ text: '⛔ Недостаточно прав для выполнения этого действия.', show_alert: true }).catch(() => {})
+      return true
+    }
+  }
+  const openSeparately = isAuditShortcutMessage(ctx)
 
   try {
     switch (scope) {
       case 'menu':
         await showAdminPanelMenu(ctx)
         break
+      case 'admins':
+        if (rest[0] === 'add' && rest[1]) await promptAdminId(ctx, rest[1] as AdminRole)
+        else if (rest[0] === 'add') await promptAddAdmin(ctx)
+        else await showAdmins(ctx)
+        break
+      case 'admin': {
+        const telegramId = Number(rest[0])
+        if (rest[1] === 'add') {
+          const role = rest[2] as AdminRole
+          await upsertAdminAccess({ telegramId, role, permissions: [], actorId: ctx.from!.id })
+          await showAdminAdded(ctx, telegramId, role)
+        } else if (rest[1] === 'roles') {
+          await showAdminRolePicker(ctx, telegramId)
+        } else if (rest[1] === 'setrole') {
+          await upsertAdminAccess({ telegramId, role: rest[2] as AdminRole, permissions: [], actorId: ctx.from!.id })
+          await showAdminAccessCard(ctx, telegramId)
+        } else if (rest[1] === 'rights') {
+          await showAdminPermissions(ctx, telegramId)
+        } else if (rest[1] === 'pc') {
+          await showPermissionCategory(ctx, telegramId, rest[2] as AdminPermissionCategory)
+        } else if (rest[1] === 'pt') {
+          const permission = rest[2] as AdminPermissionKey
+          const current = (await listAdminAccess()).find((item) => item.telegramId === telegramId)
+          await setAdminPermission({ telegramId, permission, enabled: !current?.permissions.includes(permission), actorId: ctx.from!.id })
+          await showPermissionCategory(ctx, telegramId, ADMIN_PERMISSION_META[permission].category)
+        } else if (rest[1] === 'disable') {
+          await disableAdminAccess(telegramId, ctx.from!.id)
+          await showAdmins(ctx)
+        } else {
+          await showAdminAccessCard(ctx, telegramId)
+        }
+        break
+      }
 
       // ---- юзеры ----
       case 'ul':
@@ -1030,7 +1297,9 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
             false,
             { replaceOnFailure: true }
           )
-        } else if (!action) await showUserCard(ctx, telegramId)
+        } else if (!action) {
+          await showUserCard(ctx, telegramId, openSeparately ? { forceNew: true } : {})
+        }
         else if (action === 'edit') await promptEditUserField(ctx, telegramId, rest[2])
         else if (action === 'ct') await handleCreateTeamCallback(ctx, telegramId, rest[2])
         else if (action === 'del') {
@@ -1038,10 +1307,10 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
         } else if (action === 'addteam') await promptAddUserToTeam(ctx, telegramId)
         else if (action === 'rmteam_menu') await showRemoveUserFromTeamMenu(ctx, telegramId)
         else if (action === 'rmteam') {
-          await ap.adminRemoveTeamMember(rest[2], telegramId)
+          await ap.adminRemoveTeamMember(rest[2], telegramId, ctx.from?.id)
           await showUserCard(ctx, telegramId)
         } else if (action === 'addteam_pick') {
-          await ap.adminAddTeamMember(rest[2], telegramId)
+          await ap.adminAddTeamMember(rest[2], telegramId, ctx.from?.id)
           await showUserCard(ctx, telegramId)
         }
         break
@@ -1059,13 +1328,13 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
         const next = rest[1]
 
         if (!next) {
-          await showTeamCard(ctx, teamId)
+          await showTeamCard(ctx, teamId, undefined, openSeparately ? { forceNew: true } : {})
         } else if (next === 'edit') {
           await promptEditTeamName(ctx, teamId)
         } else if (next === 'delete') {
           await showDeleteTeamConfirm(ctx, teamId)
         } else if (next === 'delete_confirm') {
-          await ap.adminDeleteTeam(teamId)
+          await ap.adminDeleteTeam(teamId, ctx.from?.id)
           await showTeamList(ctx, 0)
         } else if (next === 'owner') {
           await promptTransferOwnership(ctx, teamId)
@@ -1074,7 +1343,7 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
           if (memberAction === 'add') await promptAddTeamMember(ctx, teamId)
           else if (memberAction === 'rmmenu') await showRemoveMemberMenu(ctx, teamId)
           else if (memberAction === 'rm') {
-            await ap.adminRemoveTeamMember(teamId, Number(rest[3]))
+            await ap.adminRemoveTeamMember(teamId, Number(rest[3]), ctx.from?.id)
             await showTeamCard(ctx, teamId)
           }
         } else if ((TEAM_PRODUCT_IDS as readonly string[]).includes(next)) {
@@ -1085,20 +1354,20 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
           } else if (product === 'propresenter' && productAction === 'assign') {
             await promptAssignTeamStream(ctx, teamId)
           } else if (product === 'propresenter' && productAction === 'rs') {
-            await ap.adminRemoveTeamFromStream(teamId)
+            await ap.adminRemoveTeamFromStream(teamId, ctx.from?.id)
             await showTeamProductCard(ctx, teamId, product)
           } else if (product === 'propresenter') {
             throw new Error('Данные ProPresenter редактируются только в разделе потоков')
           } else if (productAction === 'st') {
-            await ap.adminSetTeamSubStatus(teamId, product, rest[3])
+            await ap.adminSetTeamSubStatus(teamId, product, rest[3], ctx.from?.id)
             await showTeamProductCard(ctx, teamId, product)
           } else if (productAction === 'dt') {
             await promptSetTeamSubDate(ctx, teamId, product)
           } else if (productAction === 'ex') {
-            await ap.adminExtendTeamSub(teamId, product)
+            await ap.adminExtendTeamSub(teamId, product, 1, ctx.from?.id)
             await showTeamProductCard(ctx, teamId, product)
           } else if (productAction === 'rs') {
-            await ap.adminResetTeamSub(teamId, product)
+            await ap.adminResetTeamSub(teamId, product, ctx.from?.id)
             await showTeamProductCard(ctx, teamId, product)
           }
         }
@@ -1116,6 +1385,8 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
         const flowNumber = Number(rest[0])
         if (!flowNumber) await showWaitlistBatches(ctx)
         else if (rest[1] === 'create') await startWaitlistStream(ctx, flowNumber)
+        else if (rest[1] === 'edit') await showWaitlistEdit(ctx, flowNumber)
+        else if (rest[1] === 'rename') await promptWaitlistTitle(ctx, flowNumber)
         else await showWaitlistBatch(ctx, flowNumber)
         break
       }
@@ -1148,7 +1419,7 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
         } else if (action === 'addteam') {
           await promptAddTeamToStream(ctx, flowNumber)
         } else if (action === 'addteam_pick') {
-          await ap.adminAddTeamToStream(rest[2], flowNumber)
+          await ap.adminAddTeamToStream(rest[2], flowNumber, ctx.from?.id)
           await showStreamTeamsMenu(ctx, flowNumber)
         } else if (action === 'team' || action === 'rmteam') {
           await showTeamCard(ctx, rest[2], {
@@ -1181,7 +1452,14 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
   const session = getSession(ctx)
   const input: ApInput | undefined = session?.adminPanelInput
   if (!input) return false
-  if (!ctx.from || !isAdmin(ctx.from.id)) return false
+  if (!ctx.from || !(await hasAdminAccess(ctx.from.id))) return false
+
+  const permission = inputPermission(input.mode)
+  if (permission && !(await hasAdminPermission(ctx.from.id, permission))) {
+    session.adminPanelInput = undefined
+    await ctx.reply('⛔ Недостаточно прав для выполнения этого действия.')
+    return true
+  }
 
   const text = ctx.message?.text?.trim()
   if (text === undefined) return false
@@ -1198,8 +1476,25 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
         await runTeamSearch(ctx, text)
         break
 
+      case 'request_batch_title':
+        await requireAdminPermission(ctx.from.id, 'requests.edit')
+        await ap.adminRenameRequestBatch(input.flowNumber!, text, ctx.from.id)
+        await confirmAdminInput(ctx, '✅ Название обновлено')
+        await showWaitlistBatch(replyOnlyCtx(ctx), input.flowNumber!)
+        break
+
+      case 'admin_access_id': {
+        await requireAdminPermission(ctx.from.id, 'admins.manage')
+        const telegramId = Number(text)
+        if (!Number.isSafeInteger(telegramId) || telegramId <= 0) throw new Error('Telegram ID должен быть положительным числом')
+        const role = input.draft?.role as AdminRole
+        if (!ADMIN_ROLE_META[role]) throw new Error('Выбранная роль не найдена. Начните добавление заново.')
+        await showAddAdminConfirm(replyOnlyCtx(ctx), telegramId, role)
+        break
+      }
+
       case 'edit_user_field':
-        await ap.adminUpdateUserField(input.telegramId!, input.field as any, text)
+        await ap.adminUpdateUserField(input.telegramId!, input.field as any, text, ctx.from?.id)
         await confirmAdminInput(ctx, '✅ Обновлено')
         await showUserCard(replyOnlyCtx(ctx), input.telegramId!)
         break
@@ -1271,7 +1566,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
       }
 
       case 'edit_team_name':
-        await ap.adminUpdateTeamName(input.teamId!, text)
+        await ap.adminUpdateTeamName(input.teamId!, text, ctx.from?.id)
         await confirmAdminInput(ctx, '✅ Название обновлено')
         await showTeamCard(replyOnlyCtx(ctx), input.teamId!)
         break
@@ -1279,7 +1574,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
       case 'transfer_ownership': {
         const newOwnerId = Number(text)
         if (!Number.isFinite(newOwnerId)) throw new Error('ID должен быть числом')
-        await ap.adminTransferOwnership(input.teamId!, newOwnerId)
+        await ap.adminTransferOwnership(input.teamId!, newOwnerId, ctx.from?.id)
         await confirmAdminInput(ctx, '✅ Владение передано')
         await showTeamCard(replyOnlyCtx(ctx), input.teamId!)
         break
@@ -1288,7 +1583,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
       case 'add_team_member': {
         const telegramId = Number(text)
         if (!Number.isFinite(telegramId)) throw new Error('ID должен быть числом')
-        await ap.adminAddTeamMember(input.teamId!, telegramId)
+        await ap.adminAddTeamMember(input.teamId!, telegramId, ctx.from?.id)
         await confirmAdminInput(ctx, '✅ Участник добавлен')
         await showTeamCard(replyOnlyCtx(ctx), input.teamId!)
         break
@@ -1299,7 +1594,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
           throw new Error('Дата ProPresenter меняется только в разделе потоков')
         }
         const date = ap.parseDateInput(text)
-        await ap.adminSetTeamSubExpiry(input.teamId!, input.product!, date)
+        await ap.adminSetTeamSubExpiry(input.teamId!, input.product!, date, ctx.from?.id)
         await confirmAdminInput(ctx, '✅ Дата обновлена')
         await showTeamProductCard(replyOnlyCtx(ctx), input.teamId!, input.product!)
         break
@@ -1308,7 +1603,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
       case 'assign_team_stream': {
         try {
           const flowNumber = parseFlowNumberInput(text)
-          await ap.adminAddTeamToStream(input.teamId!, flowNumber)
+          await ap.adminAddTeamToStream(input.teamId!, flowNumber, ctx.from?.id)
           await confirmAdminInput(ctx, `✅ Назначен поток №${flowNumber}`)
           await showTeamProductCard(replyOnlyCtx(ctx), input.teamId!, 'propresenter')
         } catch (error) {
@@ -1328,7 +1623,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
 
       case 'stream_date': {
         const date = ap.parseDateInput(text)
-        await ap.adminSetStreamExpiry(input.flowNumber!, date)
+        await ap.adminSetStreamExpiry(input.flowNumber!, date, ctx.from?.id)
         await confirmAdminInput(ctx, '✅ Дата обновлена')
         await showStreamCard(replyOnlyCtx(ctx), input.flowNumber!)
         break
@@ -1399,6 +1694,7 @@ async function handleWaitlistStreamCreationStep(ctx: Context, input: ApInput, te
       password: draft.password,
       chatLink: draft.chatLink,
       expiresAt,
+      adminTelegramId: ctx.from?.id,
     })
 
     const recipients = [...new Set(entries.map((entry: any) => entry.requestedBy as number))]
@@ -1450,6 +1746,7 @@ async function handleStreamCreationStep(ctx: Context, input: ApInput, text: stri
       password: String(draft.password),
       chatLink: draft.chatLink ? String(draft.chatLink) : '',
       capacity: draft.capacity,
+      adminTelegramId: ctx.from?.id,
     })
     await ctx.reply(`✅ Поток создан: #${stream.flowNumber}`)
     await showStreamCard(replyOnlyCtx(ctx), stream.flowNumber)
