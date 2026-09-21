@@ -1,0 +1,10 @@
+'use client'
+import Image from 'next/image'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
+import { CheckCircle2 } from 'lucide-react'
+import { api } from '@/lib/api'
+import type { Product } from '@/lib/types'
+import { ErrorState, PageSkeleton } from '@/components/ui'
+export default function ProductPage(){const {id}=useParams<{id:string}>();const query=useQuery({queryKey:['products'],queryFn:()=>api<Product[]>('/api/products')});if(query.isLoading)return <PageSkeleton/>;const product=query.data?.find(item=>item.id===id);if(query.isError||!product)return <main className="page"><ErrorState retry={()=>query.refetch()}/></main>;return <main className="page"><div className="card relative aspect-[16/10] overflow-hidden"><Image src={product.cover} alt="" fill priority className="object-cover" sizes="600px"/><div className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent"/></div><div className="mt-6 flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-widest text-[#e43d82]">Продукт HUB</p><h1 className="mt-2 text-3xl font-extrabold">{product.name}</h1></div>{product.active&&<span className="flex items-center gap-1 rounded-full bg-emerald-400/10 px-3 py-1.5 text-xs font-bold text-emerald-300"><CheckCircle2 size={14}/>Активно</span>}</div><p className="muted mt-5 text-[15px] leading-7">{product.description}</p><div className="card mt-6 p-5"><p className="muted text-xs">Стоимость подписки</p><p className="mt-1 text-2xl font-extrabold">{product.priceRub===null?'По запросу':`${product.priceRub.toLocaleString('ru-RU')} ₽`}</p><p className="muted mt-3 text-xs leading-5">Оформление и оплата пока доступны в Telegram-боте HUB.</p><Link href="/catalog" className="secondary-button mt-5 w-full">Вернуться в каталог</Link></div></main>}

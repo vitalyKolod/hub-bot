@@ -1,0 +1,4 @@
+import Image from 'next/image'
+import Link from 'next/link'
+import type { Product } from '@/lib/types'
+export function ProductCard({product}:{product:Product}){return <Link href={`/catalog/${product.id}`} className="card overflow-hidden"><div className="relative aspect-[16/10] bg-[#202024]"><Image src={product.cover} alt="" fill className="object-cover opacity-80" sizes="(max-width:600px) 50vw,280px"/></div><div className="p-4"><div className="flex items-start justify-between gap-2"><h3 className="font-bold">{product.name}</h3>{product.active&&<span className="text-[10px] font-bold uppercase text-emerald-300">Активно</span>}</div><p className="muted mt-2 line-clamp-2 text-xs leading-5">{product.description}</p><p className="mt-3 text-sm font-bold">{product.priceRub===null?'По запросу':`${product.priceRub.toLocaleString('ru-RU')} ₽`}</p></div></Link>}

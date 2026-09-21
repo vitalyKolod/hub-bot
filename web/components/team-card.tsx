@@ -1,0 +1,4 @@
+import Link from 'next/link'
+import { ChevronRight, MapPin, Users } from 'lucide-react'
+import type { Team } from '@/lib/types'
+export function TeamCard({team}:{team:Team}){const active=team.subscriptions.filter(s=>s.status==='active').length;return <Link href={`/teams/${team.id}`} className="card block p-5 transition active:scale-[.99]"><div className="flex justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wider text-[#e43d82]">{team.viewerRole==='owner'?'Владелец':'Участник'}</p><h3 className="mt-2 text-lg font-bold">{team.name}</h3><p className="muted mt-2 flex items-center gap-1.5 text-sm"><MapPin size={14}/>{team.city||team.church||'Город не указан'}</p></div><ChevronRight className="mt-1 text-zinc-600"/></div><div className="muted mt-5 flex gap-5 border-t border-white/[.06] pt-4 text-xs"><span className="flex items-center gap-1.5"><Users size={14}/>{team.membersCount} участников</span><span>{active} подписок</span></div></Link>}
