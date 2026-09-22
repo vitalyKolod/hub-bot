@@ -4,10 +4,6 @@ import { InlineKeyboard } from 'grammy'
 import { UserModel } from '../../models/User.js'
 import { ADMIN_GROUP_ID } from '../../config/env.js'
 
-// The original notification was sent to the forum's General topic. That topic
-// is now named "Регистрации"; Telegram reserves thread ID 1 for General.
-export const REGISTRATION_THREAD_ID = 1
-
 function escapeHtml(value: unknown) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -35,15 +31,14 @@ export async function sendRegistrationAdminNotification(ctx: any, userId: number
   ].join('\n')
 
   console.info(
-    `[registration] Sending admin notification userId=${userId} chatId=${ADMIN_GROUP_ID} threadId=${REGISTRATION_THREAD_ID}`
+    `[registration] Sending admin notification userId=${userId} chatId=${ADMIN_GROUP_ID} destination=general`
   )
   await ctx.api.sendMessage(ADMIN_GROUP_ID, text, {
     parse_mode: 'HTML',
-    message_thread_id: REGISTRATION_THREAD_ID,
     reply_markup: new InlineKeyboard().url('Написать пользователю', `tg://user?id=${userId}`),
   })
   console.info(
-    `[registration] Admin notification sent userId=${userId} chatId=${ADMIN_GROUP_ID} threadId=${REGISTRATION_THREAD_ID}`
+    `[registration] Admin notification sent userId=${userId} chatId=${ADMIN_GROUP_ID} destination=general`
   )
 }
 

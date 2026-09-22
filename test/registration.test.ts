@@ -37,7 +37,7 @@ function keyboardCallbacks(markup: any) {
   return markup.inline_keyboard.flat().map((button: any) => button.callback_data)
 }
 
-test('registration notification uses the existing admin group and registration topic', async (t) => {
+test('registration notification uses the admin group general feed', async (t) => {
   let sent: any[] | undefined
   t.mock.method(UserModel as any, 'findOne', async () => profile)
 
@@ -47,7 +47,7 @@ test('registration notification uses the existing admin group and registration t
   )
 
   assert.equal(sent?.[0], -1003775348160)
-  assert.equal(sent?.[2].message_thread_id, 1)
+  assert.equal('message_thread_id' in sent?.[2], false)
   assert.match(sent?.[1], /Волонтер тест/)
   assert.match(sent?.[1], /@volunteer/)
   assert.doesNotMatch(sent?.[1], /verify:/)

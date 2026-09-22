@@ -94,7 +94,7 @@ export async function handleConfirmRegistration(ctx: MyContext, userId: number) 
     await sendRegistrationAdminNotification(ctx, userId)
   } catch (error) {
     console.error(
-      `[registration] Failed to send registration notification groupId=${process.env.ADMIN_GROUP_ID} threadId=1 telegramId=${userId}`,
+      `[registration] Failed to send registration notification userId=${userId} chatId=${process.env.ADMIN_GROUP_ID}`,
       error
     )
   }
