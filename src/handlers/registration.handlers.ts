@@ -93,7 +93,10 @@ export async function handleConfirmRegistration(ctx: MyContext, userId: number) 
   try {
     await sendRegistrationAdminNotification(ctx, userId)
   } catch (error) {
-    console.error('Registration admin topic notification failed:', error)
+    console.error(
+      `[registration] Failed to send registration notification groupId=${process.env.ADMIN_GROUP_ID} threadId=1 telegramId=${userId}`,
+      error
+    )
   }
 
   if (profile.pendingInviteCode) {

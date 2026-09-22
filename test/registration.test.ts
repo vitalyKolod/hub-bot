@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-process.env.ADMIN_GROUP_ID ||= '-100123'
+process.env.ADMIN_GROUP_ID ||= '-1003775348160'
 process.env.CONTENT_GROUP_ID ||= '-100124'
 process.env.SUPPORT_GROUP_ID ||= '-100125'
 process.env.SUNDAY_SCREENS_GROUP_ID ||= '-100126'
 process.env.PROP_WAITLIST_THREAD_ID ||= '10'
 process.env.PROP_STREAM_VERIFY_THREAD_ID ||= '11'
-process.env.REGISTRATION_THREAD_ID ||= '12'
 
 import { UserModel } from '../src/models/User.js'
 import { AuditLogModel } from '../src/models/AuditLog.js'
@@ -47,8 +46,8 @@ test('registration notification uses the existing admin group and registration t
     42
   )
 
-  assert.equal(sent?.[0], -100123)
-  assert.equal(sent?.[2].message_thread_id, 12)
+  assert.equal(sent?.[0], -1003775348160)
+  assert.equal(sent?.[2].message_thread_id, 1)
   assert.match(sent?.[1], /Волонтер тест/)
   assert.match(sent?.[1], /@volunteer/)
   assert.doesNotMatch(sent?.[1], /verify:/)
@@ -126,7 +125,7 @@ test('notification failure does not roll back completed registration', async (t)
   } as any)
   const ctx: any = {
     from: { id: 42, username: 'volunteer' },
-    api: { sendMessage: async (chatId: number) => { if (chatId === -100123) throw new Error('Telegram unavailable') } },
+    api: { sendMessage: async (chatId: number) => { if (chatId === -1003775348160) throw new Error('Telegram unavailable') } },
     reply: async () => ({ message_id: 1 }),
     replyWithPhoto: async () => ({ message_id: 2 }),
   }
