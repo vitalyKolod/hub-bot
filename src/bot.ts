@@ -65,6 +65,7 @@ import {
   handleEditField,
   handleEditingFieldText,
   handleEditRegistration,
+  handleEditRegistrationBack,
 } from './handlers/registration.handlers.js'
 import {
   handleAcceptTeamInvite,
@@ -678,6 +679,12 @@ export function registerHandlers(bot: Bot<MyContext>) {
     //Редактирование поля
     if (data === 'edit_registration') {
       await handleEditRegistration(ctx)
+      await ctx.answerCallbackQuery()
+      return
+    }
+
+    if (data === 'edit_registration_back') {
+      await handleEditRegistrationBack(ctx, userId)
       await ctx.answerCallbackQuery()
       return
     }

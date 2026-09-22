@@ -16,6 +16,7 @@ export const SUPPORT_GROUP_ID = required('SUPPORT_GROUP_ID')
 export const SUNDAY_SCREENS_GROUP_ID = required('SUNDAY_SCREENS_GROUP_ID')
 export const PROP_WAITLIST_THREAD_ID = required('PROP_WAITLIST_THREAD_ID')
 export const PROP_STREAM_VERIFY_THREAD_ID = required('PROP_STREAM_VERIFY_THREAD_ID')
+export const REGISTRATION_THREAD_ID = Number(process.env.REGISTRATION_THREAD_ID || 0)
 
 export const PRO_CONTENT_CHAT_LINK = process.env.PRO_CONTENT_CHAT_LINK!
 export const CMG_CONTENT_CHAT_LINK = process.env.CMG_CONTENT_CHAT_LINK!

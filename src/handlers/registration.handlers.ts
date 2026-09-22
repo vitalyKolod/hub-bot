@@ -1,7 +1,13 @@
 import { InlineKeyboard } from 'grammy'
 import { UserModel } from '../models/User.js'
 import { getOrCreateUser } from '../services/user.service.js'
-import { finishRegistration } from '../flows/registration/index.js'
+import {
+  buildConfirmationMessage,
+  confirmationKeyboard,
+  finishRegistration,
+  REGISTRATION_FIELDS,
+  sendRegistrationAdminNotification,
+} from '../flows/registration/index.js'
 import { goHome, goTo } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
 import type { MyContext } from '../types/context.js'
@@ -10,18 +16,21 @@ import { auditLogService } from '../services/auditLog.service.js'
 
 export async function handleEditRegistration(ctx: MyContext) {
   const kb = new InlineKeyboard()
-    .text('ФИО', 'edit_field:fio')
-    .icon('5258011929993026890')
-    .row()
-    .text('Город', 'edit_field:city')
-    .icon('5453906530824903181')
-    .row()
-    .text('Церковь', 'edit_field:church')
-    .icon('5370857213533379300')
-    .row()
+  for (const [field, metadata] of Object.entries(REGISTRATION_FIELDS)) {
+    kb.text(metadata.label, `edit_field:${field}`).icon(metadata.customEmojiId).row()
+  }
+  kb.text('← Назад', 'edit_registration_back')
 
   await ctx.editMessageText('Что хотите изменить?', {
     reply_markup: kb,
+  })
+}
+
+export async function handleEditRegistrationBack(ctx: MyContext, userId: number) {
+  const message = await buildConfirmationMessage(userId)
+  await ctx.editMessageText(message.text, {
+    entities: message.entities,
+    reply_markup: confirmationKeyboard(),
   })
 }
 
@@ -53,13 +62,18 @@ export async function handleConfirmRegistration(ctx: MyContext, userId: number) 
     return
   }
 
-  await UserModel.updateOne(
-    { telegramId: userId },
+  const result = await UserModel.updateOne(
+    { telegramId: userId, reg: { $ne: 'done' } },
     {
       reg: 'done',
       regStep: 'done',
     }
   )
+
+  if (!result.modifiedCount) {
+    await ctx.reply('✅ Вы уже зарегистрированы в ХАБе.')
+    return
+  }
 
   const profile = await getOrCreateUser(userId)
 
@@ -75,6 +89,12 @@ export async function handleConfirmRegistration(ctx: MyContext, userId: number) 
       church: profile.church,
     },
   })
+
+  try {
+    await sendRegistrationAdminNotification(ctx, userId)
+  } catch (error) {
+    console.error('Registration admin topic notification failed:', error)
+  }
 
   if (profile.pendingInviteCode) {
     goTo(userId, 'team_invite')
@@ -145,15 +165,9 @@ export async function handleEditingFieldText(ctx: MyContext, userId: number) {
 
   await ctx.reply('✅ Данные обновлены')
 
-  const { buildConfirmationText } = await import('../flows/registration/index.js')
-
-  const kb = new InlineKeyboard()
-    .text('✅ Подтвердить', 'confirm_registration')
-    .row()
-    .text('✏️ Изменить данные', 'edit_registration')
-
-  await ctx.reply(await buildConfirmationText(userId), {
-    parse_mode: 'Markdown',
-    reply_markup: kb,
+  const message = await buildConfirmationMessage(userId)
+  await ctx.reply(message.text, {
+    entities: message.entities,
+    reply_markup: confirmationKeyboard(),
   })
 }

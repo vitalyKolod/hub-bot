@@ -1,4 +1,6 @@
 import { UserModel } from '../../models/User.js'
+import { b, emoji, fmt } from '@grammyjs/parse-mode'
+import { REGISTRATION_FIELDS } from './fields.js'
 
 function stepTitle(step: string): string {
   switch (step) {
@@ -39,15 +41,33 @@ export async function buildConfirmationText(userId: number): Promise<string> {
 
   if (!user) return 'Ошибка загрузки данных'
 
+  const { fio, city, church } = REGISTRATION_FIELDS
   let text = `*📋 ПРОВЕРКА ДАННЫХ*
 
-👤 *ФИО:* ${user.fio || '-'}
-🌍 *Город:* ${user.city || '-'}
-⛪ *Церковь:* ${user.church || '-'}
+${fio.emoji} *${fio.label}:* ${user.fio || '-'}
+${city.emoji} *${city.label}:* ${user.city || '-'}
+${church.emoji} *${church.label}:* ${user.church || '-'}
 `
 
   text += `
 
 Всё верно?`
   return text
+}
+
+export async function buildConfirmationMessage(userId: number) {
+  const user = await UserModel.findOne({ telegramId: userId })
+  if (!user) return fmt`Ошибка загрузки данных`
+
+  const fio = REGISTRATION_FIELDS.fio
+  const city = REGISTRATION_FIELDS.city
+  const church = REGISTRATION_FIELDS.church
+
+  return fmt`${b}📋 ПРОВЕРКА ДАННЫХ${b}
+
+${emoji(fio.customEmojiId)}${fio.emoji}${emoji(fio.customEmojiId)} ${b}${fio.label}:${b} ${user.fio || '-'}
+${emoji(city.customEmojiId)}${city.emoji}${emoji(city.customEmojiId)} ${b}${city.label}:${b} ${user.city || '-'}
+${emoji(church.customEmojiId)}${church.emoji}${emoji(church.customEmojiId)} ${b}${church.label}:${b} ${user.church || '-'}
+
+Всё верно?`
 }
