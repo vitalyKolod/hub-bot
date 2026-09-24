@@ -24,9 +24,13 @@ export async function deliverAcceptedPayment(api: Api, result: PaymentDecisionRe
 }
 
 export async function deliverRejectedPayment(api: Api, result: PaymentDecisionResult) {
-  if (!result.applied || !result.payment.cartItemId) return
+  if (!result.applied) return
   const team = await getTeamById(result.payment.teamId)
   if (!team) return
   const product = getProduct(result.payment.productId)
-  await api.sendMessage(team.ownerId, `❌ Отклонено: ${product?.name || result.payment.productId}\nСвяжитесь с поддержкой.`)
+  await api.sendMessage(
+    team.ownerId,
+    `❌ ОПЛАТА НЕ ПОДТВЕРЖДЕНА\n\n${product?.name || result.payment.productId}\n\nПричина:\n${result.payment.rejectionReason}\n\nЕсли считаете, что произошла ошибка, свяжитесь с нами — мы поможем разобраться.`,
+    { reply_markup: { inline_keyboard: [[{ text: '💬 Написать в поддержку', callback_data: `s2:reject:${result.payment.id || result.payment._id}` }]] } }
+  )
 }

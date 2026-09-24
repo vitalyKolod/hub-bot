@@ -1,12 +1,11 @@
 import { InlineKeyboard } from 'grammy'
 import { packCb } from '../core/callback.js'
-import { goTo } from '../state/ui.js'
+import { getUi, goTo } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
 import {
   getTeamById,
   isTeamProductPurchaseLocked,
   activateTeamSubscription,
-  rejectTeamSubscription,
 } from '../services/team.service.js'
 import { getProduct } from '../config/products.js'
 import {
@@ -19,8 +18,9 @@ import {
 } from '../services/cart.service.js'
 import type { MyContext } from '../types/context.js'
 import { auditLogService, buildSubscriptionTargetId } from '../services/auditLog.service.js'
-import { acceptPayment, getPayment, rejectPayment } from '../services/payment.service.js'
-import { deliverAcceptedPayment, deliverRejectedPayment } from '../adapters/telegram/paymentDelivery.js'
+import { acceptPayment, getPayment } from '../services/payment.service.js'
+import { deliverAcceptedPayment } from '../adapters/telegram/paymentDelivery.js'
+import { showPaymentRejectReasons, fullAdminPaymentKeyboard } from './payment.handlers.js'
 
 function callbackCaptionValue(ctx: MyContext, label: string): string | undefined {
   const message = ctx.callbackQuery?.message
@@ -50,8 +50,11 @@ export async function handleAddToCart(
     return
   }
 
-  await addToCart(teamId, productId)
-  await ctx.answerCallbackQuery({ text: '✅ Добавлено в корзину' })
+  const added = await addToCart(teamId, productId)
+  await ctx.answerCallbackQuery({ text: added ? '✅ Добавлено в корзину' : 'Товар уже находится в корзине' })
+  if (added && getUi(userId).current === productId) {
+    await renderScreen(ctx, userId, productId as any, teamId)
+  }
 }
 
 export async function handleRemoveFromCart(ctx: MyContext, userId: number, itemId: string) {
@@ -169,7 +172,8 @@ export async function handleCartAccept(ctx: MyContext, itemId: string) {
       return
     }
     await deliverAcceptedPayment(ctx.api, decision, ctx.me.username)
-    await updateCartAdminMessage(ctx, itemId, '✅')
+    const msg = ctx.callbackQuery?.message
+    if (msg) await ctx.api.editMessageReplyMarkup(msg.chat.id, msg.message_id, { reply_markup: await fullAdminPaymentKeyboard(decision.payment) })
     await ctx.answerCallbackQuery({ text: 'Принято ✓' })
     return
   }
@@ -240,14 +244,7 @@ export async function handleCartAccept(ctx: MyContext, itemId: string) {
 export async function handleCartReject(ctx: MyContext, itemId: string) {
   const persistentPayment = await getPayment(itemId)
   if (persistentPayment) {
-    const decision = await rejectPayment(itemId, ctx.from!.id)
-    if (!decision.applied) {
-      await ctx.answerCallbackQuery({ text: decision.payment.status === 'rejected' ? 'Уже отклонено' : `Статус: ${decision.payment.status}`, show_alert: true })
-      return
-    }
-    await deliverRejectedPayment(ctx.api, decision)
-    await updateCartAdminMessage(ctx, itemId, '❌')
-    await ctx.answerCallbackQuery({ text: 'Отклонено ✗' })
+    await showPaymentRejectReasons(ctx, itemId)
     return
   }
   const { cart, item } = await findCartItemByItemId(itemId)
@@ -257,36 +254,5 @@ export async function handleCartReject(ctx: MyContext, itemId: string) {
     return
   }
 
-  const teamId = cart.teamId
-  const team = await getTeamById(teamId)
-  const product = getProduct(item.product)
-
-  await rejectTeamSubscription(teamId, item.product, {
-    actorType: 'admin',
-    actorTelegramId: ctx.from?.id,
-  })
-  await setCartItemStatus(teamId, itemId, 'rejected')
-  await auditLogService.createLog({
-    type: 'payment.rejected',
-    actorType: 'admin',
-    actorTelegramId: ctx.from?.id,
-    targetUserId: team?.ownerId,
-    targetTeamId: teamId,
-    targetPaymentId: itemId,
-    metadata: {
-      teamName: team?.name,
-      productId: item.product,
-      productName: product?.name || item.product,
-      method: callbackCaptionValue(ctx, 'Способ оплаты'),
-      operation: callbackCaptionValue(ctx, 'Тип операции'),
-    },
-  })
-
-  await ctx.api.sendMessage(
-    team!.ownerId,
-    `❌ Отклонено: ${product?.name || item.product}\nСвяжитесь с поддержкой.`
-  )
-
-  await updateCartAdminMessage(ctx, itemId, '❌')
-  await ctx.answerCallbackQuery({ text: 'Отклонено ✗' })
+  await ctx.answerCallbackQuery({ text: 'Платёж не найден. Обновите карточку.', show_alert: true })
 }

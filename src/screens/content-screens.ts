@@ -15,7 +15,7 @@ export async function procontentScreen(userId: number, teamId: string): Promise<
 
   let message = new FormattedString('')
 
-  message = message.emoji('📦', '5251299351375937406').plain(' ').bold('PROCONTENT').plain('\n\n')
+  message = message.emoji('📦', product.customEmojiId!).plain(' ').bold('PROCONTENT').plain('\n\n')
 
   message = message.plain('Большая библиотека видеоконтента для церквей:').plain('\n\n')
 

@@ -36,6 +36,7 @@ import { propresenterCheckScreen } from './propresenter-check.js'
 import { propresenterStreamsScreen } from './propresenter-streams.js'
 import { propresenterNoStreamScreen } from './propresenter-no-stream.js'
 import { propresenterConfirmScreen } from './propresenter-confirm.js'
+import { tutorialsScreen, tutorialScreen } from './tutorials.js'
 
 export function initScreens() {
   const registry: Record<
@@ -43,6 +44,8 @@ export function initScreens() {
     (userId: number, params?: any, ctx?: any) => ScreenView | Promise<ScreenView>
   > = {
     main: mainScreen,
+    tutorials: tutorialsScreen,
+    tutorial: tutorialScreen,
 
     // временные заглушки
     profile: profileScreen,

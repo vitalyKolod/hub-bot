@@ -51,6 +51,9 @@ test('registration notification uses the admin group general feed', async (t) =>
   assert.match(sent?.[1], /Волонтер тест/)
   assert.match(sent?.[1], /@volunteer/)
   assert.doesNotMatch(sent?.[1], /verify:/)
+  const buttons = sent?.[2].reply_markup.inline_keyboard.flat()
+  assert.equal(buttons.some((button: any) => button.text === '💬 Написать пользователю'), false)
+  assert.equal(buttons.find((button: any) => button.url)?.url, 'tg://user?id=42')
 })
 
 test('confirmation screen reuses the edit menu field icons', async (t) => {
@@ -133,4 +136,12 @@ test('notification failure does not roll back completed registration', async (t)
   await handleConfirmRegistration(ctx, 42)
 
   assert.equal(storedReg, 'done')
+})
+
+test('registration admin keyboard keeps profile and verification without conversation', async () => {
+  const { buildAdminKeyboard } = await import('../src/flows/registration/admin.js')
+  const buttons = buildAdminKeyboard({ subscriptions: { propresenter: { status: 'pending' } } }, 42).inline_keyboard.flat()
+  assert.equal(buttons.some((button: any) => button.callback_data?.startsWith('cv:')), false)
+  assert.ok(buttons.some((button: any) => button.callback_data === 'verify:prop:42'))
+  assert.ok(buttons.some((button: any) => button.url === 'tg://user?id=42'))
 })

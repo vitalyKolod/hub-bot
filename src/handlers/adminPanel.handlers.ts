@@ -563,7 +563,7 @@ async function showUserCard(
     .row()
     .text('✏️ Церковь', apCb('u', telegramId, 'edit', 'church'))
     .row()
-    .url('✉️ Написать юзеру', `tg://user?id=${telegramId}`)
+    .url('👤 Открыть Telegram-профиль', `tg://user?id=${telegramId}`)
     .row()
 
   for (const t of teams) {
@@ -852,7 +852,7 @@ async function runTeamSearch(ctx: Context, query: string) {
 async function showTeamCard(
   ctx: Context,
   teamId: string,
-  back?: { label: string; callback: string },
+  back?: { label: string; callback: string; requestId?: string },
   renderOptions: RenderOptions = {}
 ) {
   const team = await ap.adminGetTeam(teamId)
@@ -939,7 +939,7 @@ async function showTeamCard(
   kb.text('👑 Передать владение', apCb('t', teamId, 'owner'))
   kb.text('✏️ Название', apCb('t', teamId, 'edit', 'name'))
   kb.row()
-  kb.url('✉️ Написать владельцу', `tg://user?id=${team.ownerId}`).row()
+  kb.url('👤 Открыть Telegram-профиль', `tg://user?id=${team.ownerId}`).row()
   kb.text('🗑 Удалить команду', apCb('t', teamId, 'delete')).row()
   kb.text(back?.label || '‹ К списку', back?.callback || apCb('tl', 0))
 
@@ -1393,9 +1393,12 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
       case 'wt': {
         const teamId = rest[0]
         const flowNumber = Number(rest[1])
+        const entries = await getPendingBatch(flowNumber)
+        const request = entries.find((entry: any) => entry.teamId === teamId)
         await showTeamCard(ctx, teamId, {
           label: `‹ К заявкам №${flowNumber}`,
           callback: apCb('wait', flowNumber),
+          requestId: request?.id,
         })
         break
       }

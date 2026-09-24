@@ -2,6 +2,14 @@ import mongoose from 'mongoose'
 
 const supportTicketSchema = new mongoose.Schema(
   {
+    metadata: {
+      category: { type: String, enum: ['payment', 'subscription', 'team', 'propresenter', 'hub', 'other'] },
+      subcategory: String,
+      source: { type: String, enum: ['support_menu', 'payment_rejection'] },
+      paymentId: String,
+      teamId: String,
+      productIds: { type: [String], default: undefined },
+    },
     userId: { type: Number, required: true, index: true },
     threadId: { type: Number, required: true, unique: true, index: true },
     cardMessageId: { type: Number, default: null },
@@ -12,6 +20,7 @@ const supportTicketSchema = new mongoose.Schema(
     closedAt: { type: Date, default: null },
     reopenedAt: { type: Date, default: null },
     reopenedBy: { type: Number, default: null },
+    conversationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', default: null, index: true },
   },
   { timestamps: true }
 )

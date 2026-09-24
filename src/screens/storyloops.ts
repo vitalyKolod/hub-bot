@@ -16,7 +16,7 @@ export async function storyloopsScreen(userId: number, teamId: string): Promise<
 
   let message = new FormattedString('')
 
-  message = message.emoji('⬜️', '5190877553887323413').plain(' ').bold('STORYLOOPS').plain('\n\n')
+  message = message.emoji('⬜️', product.customEmojiId!).plain(' ').bold('STORYLOOPS').plain('\n\n')
 
   message = message
     .plain(

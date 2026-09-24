@@ -31,6 +31,10 @@ export type ActionId =
   | 'checkout_cart'
   | 'cart_accept'
   | 'cart_reject'
+  | 'payment_reject_reason'
+  | 'payment_reject_custom'
+  | 'payment_reject_back'
+  | 'payment_retry'
   | 'accept_team_invite'
   | 'decline_team_invite'
 

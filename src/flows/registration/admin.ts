@@ -27,7 +27,8 @@ export function buildAdminKeyboard(user: any, userId: number) {
     .icon('5237755382461391050')
 
     .row()
-    .url('Написать юзеру', `tg://user?id=${userId}`)
+
+  kb.url('👤 Открыть Telegram-профиль', `tg://user?id=${userId}`)
 
   return kb
 }

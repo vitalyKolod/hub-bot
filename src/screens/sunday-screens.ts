@@ -17,7 +17,7 @@ export async function SundayScreensScreen(userId: number, teamId: string): Promi
   let message = new FormattedString('')
 
   message = message
-    .emoji('☀️', '5291749654017381020')
+    .emoji('☀️', product.customEmojiId!)
     .plain(' ')
     .bold('SUNDAY SCREENS')
     .plain('\n\n')

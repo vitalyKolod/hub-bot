@@ -14,10 +14,12 @@ export async function addToCart(teamId: string, productId: string) {
   if (!product || !product.cartable) {
     throw new Error(`Product "${productId}" is not cartable`)
   }
-  const cart = await getOrCreateCart(teamId)
-  cart.items.push({ product: productId, status: 'pending' } as any)
-  await cart.save()
-  return cart
+  await getOrCreateCart(teamId)
+  const result = await CartModel.updateOne(
+    { teamId, items: { $not: { $elemMatch: { product: productId, status: 'pending' } } } },
+    { $push: { items: { product: productId, status: 'pending' } } }
+  )
+  return result.modifiedCount > 0
 }
 
 export async function removeFromCart(teamId: string, itemId: string) {
@@ -29,6 +31,10 @@ export async function removeFromCart(teamId: string, itemId: string) {
 
 export function getPendingItems(cart: any) {
   return cart.items.filter((i: any) => i.status === 'pending')
+}
+
+export function getCartItemCount(cart: any): number {
+  return new Set(getPendingItems(cart).map((item: any) => item.product)).size
 }
 
 export function getCartTotal(cart: any, currency: Currency = 'rub'): number {
@@ -65,7 +71,7 @@ export async function findCartItem(teamId: string, itemId: string) {
 export async function setCartItemStatus(
   teamId: string,
   itemId: string,
-  status: 'active' | 'rejected'
+  status: 'in_review' | 'active' | 'rejected'
 ) {
   const { cart, item } = await findCartItem(teamId, itemId)
   if (!item) return null

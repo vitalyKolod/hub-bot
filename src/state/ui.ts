@@ -43,6 +43,8 @@ export type ScreenId =
   | 'rub_sbp_methods'
   | 'end_support'
   | 'team_invite'
+  | 'tutorials'
+  | 'tutorial'
 
 export type StackEntry = {
   screen: ScreenId

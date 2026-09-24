@@ -1,7 +1,7 @@
 import { Types } from 'mongoose'
 import { getProduct, type Currency } from '../config/products.js'
 import { PaymentModel } from '../models/Payment.js'
-import { activateTeamSubscription, getTeamById, rejectTeamSubscription } from './team.service.js'
+import { activateTeamSubscription, getTeamById } from './team.service.js'
 import { createTeamInvite } from './teamInvite.service.js'
 import { setCartItemStatus } from './cart.service.js'
 import { auditLogService, buildSubscriptionTargetId } from './auditLog.service.js'
@@ -39,11 +39,20 @@ export async function createPayment(input: CreatePaymentInput) {
   if (!product) throw new Error('Unknown product')
   const amount = input.currency === 'rub' ? product.priceRub : product.priceUsd
   if (amount === null) throw new Error('Product has no configured price')
-  const filter = input.cartItemId ? { cartItemId: input.cartItemId } : { _id: input.id || new Types.ObjectId() }
+  const filter = input.cartItemId
+    ? { cartItemId: input.cartItemId }
+    : {
+        userId: input.userId,
+        teamId: input.teamId,
+        productId: input.productId,
+        operation: input.operation,
+        status: 'pending',
+      }
   return PaymentModel.findOneAndUpdate(
     filter,
     {
       $setOnInsert: {
+        _id: input.id ? new Types.ObjectId(input.id) : new Types.ObjectId(),
         userId: input.userId,
         teamId: input.teamId,
         productId: input.productId,
@@ -120,10 +129,12 @@ export async function acceptPayment(paymentId: string, adminId: number): Promise
   }
 }
 
-export async function rejectPayment(paymentId: string, adminId: number): Promise<PaymentDecisionResult> {
+export async function rejectPayment(paymentId: string, adminId: number, reason: string): Promise<PaymentDecisionResult> {
+  const rejectionReason = reason.trim()
+  if (!rejectionReason) throw new Error('Payment rejection reason is required')
   const payment = await PaymentModel.findOneAndUpdate(
     { _id: paymentId, status: 'pending' },
-    { $set: { status: 'rejected', adminId, rejectedAt: new Date(), decisionError: null } },
+    { $set: { status: 'rejected', adminId, rejectedBy: adminId, rejectedAt: new Date(), rejectionReason, decisionError: null } },
     { new: true }
   )
   if (!payment) {
@@ -133,16 +144,38 @@ export async function rejectPayment(paymentId: string, adminId: number): Promise
   }
   const team = await getTeamById(payment.teamId)
   if (payment.cartItemId) {
-    await rejectTeamSubscription(payment.teamId, payment.productId, { actorType: 'admin', actorTelegramId: adminId })
     await setCartItemStatus(payment.teamId, payment.cartItemId, 'rejected')
   }
   await auditLogService.createLog({
     type: 'payment.rejected', actorType: 'admin', actorTelegramId: adminId,
     targetUserId: team?.ownerId || payment.userId, targetTeamId: payment.teamId,
     targetPaymentId: payment.id,
-    metadata: { teamName: team?.name, productId: payment.productId, productName: getProduct(payment.productId)?.name, method: payment.paymentMethod, operation: payment.operation },
+    metadata: { teamName: team?.name, productId: payment.productId, productName: getProduct(payment.productId)?.name, method: payment.paymentMethod, operation: payment.operation, rejectionReason },
   })
   return { payment, applied: true }
+}
+
+export async function returnPaymentToPending(paymentId: string, adminId: number): Promise<PaymentDecisionResult> {
+  const payment = await PaymentModel.findOneAndUpdate(
+    { _id: paymentId, status: 'rejected' },
+    { $set: { status: 'pending', adminId, decisionError: null } },
+    { new: true }
+  )
+  if (!payment) {
+    const current = await PaymentModel.findById(paymentId)
+    if (!current) throw new PaymentNotFoundError('Payment not found')
+    return { payment: current, applied: false }
+  }
+  if (payment.cartItemId) await setCartItemStatus(payment.teamId, payment.cartItemId, 'in_review')
+  return { payment, applied: true }
+}
+
+export function getLatestPaymentStatesForTeam(teamId: string) {
+  const rejectedSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  return PaymentModel.find({
+    teamId,
+    $or: [{ status: 'pending' }, { status: 'rejected', rejectedAt: { $gte: rejectedSince } }],
+  }).sort({ createdAt: -1 })
 }
 
 export function listPayments() {
@@ -151,4 +184,8 @@ export function listPayments() {
 
 export function getPayment(paymentId: string) {
   return PaymentModel.findById(paymentId)
+}
+
+export function getPaymentsForAdminMessage(messageId: number) {
+  return PaymentModel.find({ telegramAdminMessageId: messageId }).sort({ createdAt: 1 })
 }

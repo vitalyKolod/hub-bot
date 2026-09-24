@@ -7,6 +7,7 @@ import { getProduct } from '../config/products.js'
 
 import { getTeamById, hasActiveTeamSubscription } from '../services/team.service.js'
 import { UserModel } from '../models/User.js'
+import { getLatestPaymentStatesForTeam } from '../services/payment.service.js'
 import {
   PRO_CONTENT_CHAT_LINK,
   CMG_CONTENT_CHAT_LINK,
@@ -80,6 +81,11 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
   const owner = await UserModel.findOne({
     telegramId: team.ownerId,
   })
+  const recentPayments = await getLatestPaymentStatesForTeam(teamId)
+  const paymentByProduct = new Map<string, any>()
+  for (const payment of recentPayments) {
+    if (!paymentByProduct.has(payment.productId)) paymentByProduct.set(payment.productId, payment)
+  }
 
   const prop = team.subscriptions?.get('propresenter')
   const content = team.subscriptions?.get('procontent')
@@ -87,6 +93,12 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
   const cgs = team.subscriptions?.get('cgs')
   const storyloops = team.subscriptions?.get('storyloops')
   const cmg = team.subscriptions?.get('cmg')
+  const propPayment = paymentByProduct.get('propresenter')
+  const contentPayment = paymentByProduct.get('procontent')
+  const sundayPayment = paymentByProduct.get('sunday_screens')
+  const cgsPayment = paymentByProduct.get('cgs')
+  const storyloopsPayment = paymentByProduct.get('storyloops')
+  const cmgPayment = paymentByProduct.get('cmg')
 
   const meta = prop?.meta as
     | {
@@ -214,8 +226,18 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
       .plain('\n')
 
     message = message.plain('┗ До: ').code(formatExpiryDateTime(prop!.expiresAt)).plain('\n')
-  } else if (prop?.status === 'pending') {
-    message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+    if (propPayment?.status === 'pending')
+      message = message.plain('┗ Продление: ').bold('⏳ На проверке').plain('\n')
+  } else if (propPayment?.status === 'pending' || prop?.status === 'pending') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('⏳ На проверке')
+      .plain('\n┗ Оплата проверяется администратором\n')
+  } else if (propPayment?.status === 'rejected') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('❌ Оплата отклонена')
+      .plain(`\n┗ Причина: ${propPayment.rejectionReason || 'не указана'}\n`)
   } else if (prop?.status === 'expired' || prop?.status === 'active') {
     message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {
@@ -236,8 +258,18 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
       .plain('\n')
 
     message = message.plain('┗ До: ').code(formatExpiryDateTime(content!.expiresAt)).plain('\n')
-  } else if (content?.status === 'pending') {
-    message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+    if (contentPayment?.status === 'pending')
+      message = message.plain('┗ Продление: ').bold('⏳ На проверке').plain('\n')
+  } else if (contentPayment?.status === 'pending' || content?.status === 'pending') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('⏳ На проверке')
+      .plain('\n┗ Оплата проверяется администратором\n')
+  } else if (contentPayment?.status === 'rejected') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('❌ Оплата отклонена')
+      .plain(`\n┗ Причина: ${contentPayment.rejectionReason || 'не указана'}\n`)
   } else if (content?.status === 'expired' || content?.status === 'active') {
     message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {
@@ -259,8 +291,18 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
       .plain('\n')
 
     message = message.plain('┗ До: ').code(formatExpiryDateTime(cmg!.expiresAt)).plain('\n')
-  } else if (cmg?.status === 'pending') {
-    message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+    if (cmgPayment?.status === 'pending')
+      message = message.plain('┗ Продление: ').bold('⏳ На проверке').plain('\n')
+  } else if (cmgPayment?.status === 'pending' || cmg?.status === 'pending') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('⏳ На проверке')
+      .plain('\n┗ Оплата проверяется администратором\n')
+  } else if (cmgPayment?.status === 'rejected') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('❌ Оплата отклонена')
+      .plain(`\n┗ Причина: ${cmgPayment.rejectionReason || 'не указана'}\n`)
   } else if (cmg?.status === 'expired' || cmg?.status === 'active') {
     message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {
@@ -282,8 +324,18 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
       .plain('\n')
 
     message = message.plain('┗ До: ').code(formatExpiryDateTime(sunday!.expiresAt)).plain('\n')
-  } else if (sunday?.status === 'pending') {
-    message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+    if (sundayPayment?.status === 'pending')
+      message = message.plain('┗ Продление: ').bold('⏳ На проверке').plain('\n')
+  } else if (sundayPayment?.status === 'pending' || sunday?.status === 'pending') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('⏳ На проверке')
+      .plain('\n┗ Оплата проверяется администратором\n')
+  } else if (sundayPayment?.status === 'rejected') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('❌ Оплата отклонена')
+      .plain(`\n┗ Причина: ${sundayPayment.rejectionReason || 'не указана'}\n`)
   } else if (sunday?.status === 'expired' || sunday?.status === 'active') {
     message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {
@@ -305,8 +357,18 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
       .plain('\n')
 
     message = message.plain('┗ До: ').code(formatExpiryDateTime(cgs!.expiresAt)).plain('\n')
-  } else if (cgs?.status === 'pending') {
-    message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+    if (cgsPayment?.status === 'pending')
+      message = message.plain('┗ Продление: ').bold('⏳ На проверке').plain('\n')
+  } else if (cgsPayment?.status === 'pending' || cgs?.status === 'pending') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('⏳ На проверке')
+      .plain('\n┗ Оплата проверяется администратором\n')
+  } else if (cgsPayment?.status === 'rejected') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('❌ Оплата отклонена')
+      .plain(`\n┗ Причина: ${cgsPayment.rejectionReason || 'не указана'}\n`)
   } else if (cgs?.status === 'expired' || cgs?.status === 'active') {
     message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {
@@ -328,8 +390,18 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
       .plain('\n')
 
     message = message.plain('┗ До: ').code(formatExpiryDateTime(storyloops!.expiresAt)).plain('\n')
-  } else if (storyloops?.status === 'pending') {
-    message = message.plain('┗ Статус: ').bold('⏳ На проверке').plain('\n')
+    if (storyloopsPayment?.status === 'pending')
+      message = message.plain('┗ Продление: ').bold('⏳ На проверке').plain('\n')
+  } else if (storyloopsPayment?.status === 'pending' || storyloops?.status === 'pending') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('⏳ На проверке')
+      .plain('\n┗ Оплата проверяется администратором\n')
+  } else if (storyloopsPayment?.status === 'rejected') {
+    message = message
+      .plain('┗ Статус: ')
+      .bold('❌ Оплата отклонена')
+      .plain(`\n┗ Причина: ${storyloopsPayment.rejectionReason || 'не указана'}\n`)
   } else if (storyloops?.status === 'expired' || storyloops?.status === 'active') {
     message = message.plain('┗ Статус: ').bold('❌ Подписка закончилась').plain('\n')
   } else {

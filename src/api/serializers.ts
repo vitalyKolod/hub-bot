@@ -58,6 +58,7 @@ export function serializePayment(payment: any) {
     receipt: payment.receipt ? { type: payment.receipt.type, fileName: payment.receipt.fileName || null, mimeType: payment.receipt.mimeType || null } : null,
     createdAt: payment.createdAt, updatedAt: payment.updatedAt,
     acceptedAt: payment.acceptedAt || null, rejectedAt: payment.rejectedAt || null, adminId: payment.adminId || null,
+    rejectionReason: payment.rejectionReason || null, rejectedBy: payment.rejectedBy || null,
   }
 }
 

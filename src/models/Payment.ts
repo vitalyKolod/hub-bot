@@ -28,6 +28,8 @@ const paymentSchema = new mongoose.Schema(
     adminId: { type: Number, default: null },
     acceptedAt: { type: Date, default: null },
     rejectedAt: { type: Date, default: null },
+    rejectionReason: { type: String, default: null },
+    rejectedBy: { type: Number, default: null },
     decisionError: { type: String, default: null },
     telegramAdminThreadId: { type: Number, default: null },
     telegramAdminMessageId: { type: Number, default: null },
@@ -37,6 +39,10 @@ const paymentSchema = new mongoose.Schema(
 
 paymentSchema.index({ status: 1, createdAt: -1 })
 paymentSchema.index({ userId: 1, createdAt: -1 })
+paymentSchema.index(
+  { userId: 1, teamId: 1, productId: 1, operation: 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: 'pending', cartItemId: null } }
+)
 paymentSchema.index(
   { cartItemId: 1 },
   { unique: true, partialFilterExpression: { cartItemId: { $type: 'string' } } }

@@ -1,166 +1,183 @@
-import { PROP_FLOWS } from '../data/ProPresenterFLows.js'
+import { FormattedString } from '@grammyjs/parse-mode'
 import { InlineKeyboard } from 'grammy'
+
 import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
-import { getOrCreateUser } from '../services/user.service.js'
 import { UserModel } from '../models/User.js'
-import { escapeUnderscore } from '../utils/escape.js'
+import { getUserTeams } from '../services/team.service.js'
+import { PROFILE_ICONS } from '../ui/emoji/icons.js'
 
-function getDaysLeft(date?: Date | string | null) {
-  if (!date) return 0
+const MAX_VISIBLE_VOLUNTEERS = 5
 
-  const target = new Date(date)
-  if (isNaN(target.getTime())) return 0
+export type ProfileUser = {
+  fio?: string | null
+  username?: string | null
+  city?: string | null
+  church?: string | null
+}
 
-  const now = new Date()
-  target.setHours(0, 0, 0, 0)
-  now.setHours(0, 0, 0, 0)
+export type ProfileMember = {
+  telegramId?: number
+  role?: string
+  status?: string
+  fio?: string | null
+  username?: string | null
+}
 
-  const diff = Math.floor((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  return diff > 0 ? diff : 0
+export type ProfileTeam = {
+  name?: string | null
+  ownerId?: number
+  members?: ProfileMember[]
+  subscriptions?: Map<string, unknown> | Record<string, unknown> | null
+}
+
+function valueOrFallback(value: unknown, fallback = 'Не указано') {
+  const normalized = String(value ?? '').trim()
+  return normalized || fallback
+}
+
+function subscriptionCount(subscriptions: ProfileTeam['subscriptions']) {
+  if (subscriptions instanceof Map) return subscriptions.size
+  if (subscriptions && typeof subscriptions === 'object') return Object.keys(subscriptions).length
+  return 0
+}
+
+function memberName(member: ProfileMember) {
+  const fio = String(member.fio ?? '').trim()
+  if (fio) return fio
+  const username = String(member.username ?? '')
+    .trim()
+    .replace(/^@/, '')
+  return username ? `@${username}` : 'Пользователь'
+}
+
+function isActiveMember(member: ProfileMember) {
+  return member.status !== 'pending'
+}
+
+export function buildProfileMessage(
+  userId: number,
+  user: ProfileUser,
+  teams: ProfileTeam[]
+): FormattedString {
+  let message = new FormattedString('')
+    .emoji('👤', PROFILE_ICONS.profile)
+    .bold(' МОЙ ПРОФИЛЬ')
+    .plain('\n\n')
+    .bold(valueOrFallback(user.fio, 'Имя не указано'))
+
+  const username = String(user.username ?? '')
+    .trim()
+    .replace(/^@/, '')
+  if (username) message = message.plain(`\n@${username}`)
+
+  message = message
+    .plain('\n\n├ ')
+    .emoji('🏙', PROFILE_ICONS.city)
+    .plain(` Город: ${valueOrFallback(user.city)}`)
+    .plain('\n├ ')
+    .emoji('⛪', PROFILE_ICONS.church)
+    .plain(` Церковь: ${valueOrFallback(user.church)}`)
+    .plain(`\n└ Команд: ${teams.length}`)
+    .plain('\n────────────\n')
+    .emoji('▫️', PROFILE_ICONS.teams)
+    .bold(' МОИ КОМАНДЫ')
+    .plain('\n\n')
+
+  if (teams.length === 0) return message.plain('└ Пока у вас нет команд.')
+
+  teams.forEach((team, teamIndex) => {
+    try {
+      const members = Array.isArray(team.members) ? team.members.filter(isActiveMember) : []
+      const isOwner = team.ownerId === userId
+      const ownMembership = members.find((member) => member.telegramId === userId)
+      const role = isOwner || ownMembership?.role === 'owner' ? 'Владелец' : 'Волонтёр'
+      const volunteers = members.filter(
+        (member) => member.role !== 'owner' && member.telegramId !== team.ownerId
+      )
+
+      message = message
+        // .plain('\n')
+        .emoji('👥', PROFILE_ICONS.team)
+        .bold(` ${valueOrFallback(team.name, 'Команда')}${isOwner ? ' 👑' : ''}`)
+        .plain(`\n\n├ Роль: ${role}`)
+        .plain(`\n├ Подписок: ${subscriptionCount(team.subscriptions)}`)
+
+      if (isOwner) message = message.plain(`\n├ Волонтёров: ${volunteers.length}`)
+      message = message.plain(`\n└ Участников: ${members.length}`)
+
+      if (isOwner && volunteers.length > 0) {
+        message = message.plain('\n\nВолонтёры:\n\n')
+        const visible = volunteers.slice(0, MAX_VISIBLE_VOLUNTEERS)
+        visible.forEach((volunteer, index) => {
+          const isLast = index === visible.length - 1 && volunteers.length <= MAX_VISIBLE_VOLUNTEERS
+          message = message.plain(`${isLast ? '└' : '├'} ${memberName(volunteer)}\n`)
+        })
+        if (volunteers.length > MAX_VISIBLE_VOLUNTEERS) {
+          message = message.plain(`└ + ещё ${volunteers.length - MAX_VISIBLE_VOLUNTEERS}\n`)
+        }
+      }
+
+      if (teamIndex < teams.length - 1) message = message.plain('\n────────────\n')
+    } catch (error) {
+      console.error('Profile team rendering failed:', error)
+      message = message.plain('\n\nКоманда\n\n└ Данные временно недоступны.')
+    }
+  })
+
+  return message
+}
+
+export function buildProfileKeyboard() {
+  return new InlineKeyboard().text('← Назад', packCb({ a: 'home' }))
 }
 
 export async function profileScreen(userId: number): Promise<ScreenView> {
-  const user = await getOrCreateUser(userId)
-  const isVolunteer = !!user.volunteer?.ownerId
+  const [user, rawTeams] = await Promise.all([
+    UserModel.findOne({ telegramId: userId }),
+    getUserTeams(userId),
+  ])
 
-  const kb = new InlineKeyboard()
-  const lines: string[] = ['', '']
+  const memberIds = [
+    ...new Set(
+      rawTeams.flatMap((team) =>
+        Array.isArray(team?.members)
+          ? team.members.map((member) => member?.telegramId).filter(Number.isSafeInteger)
+          : []
+      )
+    ),
+  ].filter(Number.isSafeInteger)
+  const profiles = memberIds.length ? await UserModel.find({ telegramId: { $in: memberIds } }) : []
+  const profilesById = new Map(profiles.map((profile) => [profile.telegramId, profile]))
 
-  const content = user.subscriptions?.content
-
-  const volunteers = user.subscriptions?.volunteers || []
-  const maxVolunteers = 5
-
-  // 👇 подтягиваем владельца ТОЛЬКО если нужно
-  let owner: any = null
-  if (isVolunteer && user.volunteer?.ownerId) {
-    owner = await UserModel.findOne({
-      telegramId: user.volunteer.ownerId,
-    })
-  }
-
-  // 👇 ВАЖНО: отдельно выбираем prop
-  const prop = isVolunteer ? owner?.subscriptions?.propresenter : user.subscriptions?.propresenter
-
-  // 🟧 ProPresenter
-  if (prop?.status === 'active') {
-    const stream = prop.flow || '#'
-    const flowData = PROP_FLOWS.find((f) => f.flow === Number(prop.flow))
-    const days = getDaysLeft(flowData?.expiresAt)
-
-    if (flowData?.chatFlow) {
-      kb.url(`💬 Чат потока №${prop.flow}`, flowData.chatFlow).row()
-    }
-
-    lines.push(
-      `*ProPresenter*`,
-      `Поток: №${stream}`,
-      `Логин: ${prop.email || '-'}`,
-      `Пароль: \`${prop.password || '-'}\``,
-      `Дата окончания: ${
-        flowData?.expiresAt ? new Date(flowData.expiresAt).toLocaleDateString('ru-RU') : '-'
-      }`,
-      `Осталось дней: ${days}`,
-      ''
-    )
-
-    if (isVolunteer) {
-      // lines.push(`Роль: Волонтёр`)
-      // lines.push(`Доступ выдан владельцем`, '')
-    }
-  } else if (prop?.status === 'pending') {
-    lines.push(`*ProPresenter*`, `⏳ На проверке (поток №${prop.flow})`, '')
-  }
-
-  if (content?.status === 'pending') {
-    lines.push(
-      `*Контент для экранов*`,
-      `⏳ На проверке, дата: ${
-        content.expiresAt ? new Date(content.expiresAt).toLocaleDateString('ru-RU') : '-'
-      }`,
-      ''
-    )
-  }
-
-  if (content?.status === 'active') {
-    const days = getDaysLeft(content.expiresAt)
-
-    if (!isVolunteer && days <= 30) {
-      kb.text('💳 ПРОДЛИТЬ PRO CONTENT', packCb({ a: 'pay_product', p: 'content_screens' })).row()
-    }
-
-    kb.url('ЧАТ КОНТЕНТ ДЛЯ ЭКРАНОВ', 'https://t.me/+Pv-uHdH-X7JiMjky')
-      .icon('5373330964372004748')
-      .row()
-
-    lines.push(
-      `*Контент для экранов*`,
-      `Дата окончания: ${content.expiresAt?.toLocaleDateString('ru-RU')}`,
-      `Осталось дней: ${days},`
-    )
-
-    // 👇 ВОЛОНТЁР
-    if (isVolunteer) {
-      lines.push(`
-*Роль: Волонтёр*`)
-
-      lines.push(`*Владелец*:
-• ${owner?.fio || 'Не найден'}
-• Username: ${owner?.username ? '@' + escapeUnderscore(owner.username) : '-'}
-• ID: ${user.volunteer?.ownerId || '-'}`)
-
-      lines.push('')
-    }
-
-    // 👇 ВЛАДЕЛЕЦ
-    if (!isVolunteer) {
-      const count = volunteers.length
-
-      lines.push(`Волонтёры: ${count}/${maxVolunteers}`, '')
-
-      if (volunteers.length > 0) {
-        lines.push('*Твои волонтёры:*')
-
-        for (const v of volunteers) {
-          const fullVolunteer = await UserModel.findOne({
-            telegramId: v.telegramId,
-          })
-
-          lines.push(
-            `• ${fullVolunteer?.fio || 'Без имени'}
-• Username: ${fullVolunteer?.username ? '@' + escapeUnderscore(fullVolunteer.username) : '-'}
-• ID: ${v.telegramId}`
-          )
-        }
-
-        lines.push('')
+  const teams: ProfileTeam[] = rawTeams.map((team) => {
+    try {
+      return {
+        name: team?.name,
+        ownerId: team?.ownerId,
+        subscriptions: team?.subscriptions,
+        members: Array.isArray(team?.members)
+          ? team.members.filter(Boolean).map((member) => ({
+              telegramId: member.telegramId,
+              role: member.role,
+              status: member.status,
+              fio: profilesById.get(member.telegramId)?.fio,
+              username: profilesById.get(member.telegramId)?.username,
+            }))
+          : [],
       }
-
-      if (count < maxVolunteers) {
-        kb.text('ДОБАВИТЬ ВОЛОНТЕРА', packCb({ a: 'open', s: 'add_volunteer' }))
-          .icon('5258362837411045098')
-          .row()
-      }
+    } catch (error) {
+      console.error('Profile team normalization failed:', error)
+      return { name: team?.name }
     }
-  }
-
-  // ❌ нет подписок
-  if (prop?.status !== 'active' && content?.status !== 'active') {
-    lines.push('У вас пока нет активных подписок.', '', 'Вы можете приобрести новую подписку.')
-
-    kb.text('ПРИОБРЕСТИ ПОДПИСКУ', packCb({ a: 'open', s: 'add_subscription' }))
-      .icon('5397916757333654639')
-      .row()
-  }
-
-  kb.text('◀️ НАЗАД', packCb({ a: 'open', s: 'main' }))
-    .text('ПОМОЩЬ', packCb({ a: 'open', s: 'support' }))
-    .icon('5238025132177369293')
+  })
+  const message = buildProfileMessage(userId, user ?? {}, teams)
+  const keyboard = buildProfileKeyboard()
 
   return {
     photo: './public/profile.png',
-    caption: lines.join('\n'),
-    keyboard: kb,
+    caption: message.caption,
+    caption_entities: message.caption_entities,
+    keyboard,
   }
 }

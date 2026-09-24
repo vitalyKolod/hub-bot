@@ -35,7 +35,7 @@ export async function sendRegistrationAdminNotification(ctx: any, userId: number
   )
   await ctx.api.sendMessage(ADMIN_GROUP_ID, text, {
     parse_mode: 'HTML',
-    reply_markup: new InlineKeyboard().url('Написать пользователю', `tg://user?id=${userId}`),
+    reply_markup: new InlineKeyboard().url('👤 Открыть Telegram-профиль', `tg://user?id=${userId}`),
   })
   console.info(
     `[registration] Admin notification sent userId=${userId} chatId=${ADMIN_GROUP_ID} destination=general`

@@ -1,3 +1,5 @@
+import { markSupportUiOpened, markSupportUiClosed } from './ui/supportUi.js'
+import { startSupportFlow, handleSupportFlowCallback, guardSupportSelection } from './handlers/supportFlow.handlers.js'
 import { PROP_FLOWS } from './data/ProPresenterFLows.js'
 import { Bot, InlineKeyboard, session, type Context, type SessionFlavor } from 'grammy'
 import {
@@ -92,6 +94,7 @@ import {
 import {
   handleAdminAccept,
   handleAdminReject,
+  handleCustomPaymentRejectText,
   handleCryptoNetwork,
   handleCryptoSelected,
   handlePaid,
@@ -101,7 +104,19 @@ import {
   handleRubBank,
   handleRubCardType,
   handleRubType,
+  handlePaymentRejectBack,
+  handlePaymentRejectReason,
+  handlePaymentRetry,
+  startCustomPaymentReject,
 } from './handlers/payment.handlers.js'
+import {
+  closeConversation,
+  openConversation,
+  parseConversationCallback,
+  relayActiveConversationMessage,
+  reopenConversation,
+  type ConversationType,
+} from './services/conversation.service.js'
 
 import {
   showAdminPanelMenu,
@@ -195,11 +210,22 @@ type MyContext = Context &
       mediaGroupId?: string
       isSending?: boolean
     }
+    supportUiMessageId?: number
+    supportUiOpened?: boolean
+    supportDraft?: import('./services/supportContext.js').SupportDraft
     inSupportMode?: boolean
     isExtension: boolean
 
     supportThreadId?: number
     supportPanelMessageId?: number
+
+    paymentReject?: {
+      paymentId: string
+      chatId: number
+      messageId: number
+    }
+    waitingForPaymentRejectReason?: boolean
+    activeConversationId?: string
 
     adminPanelInput?: any
   }>
@@ -398,6 +424,14 @@ export function registerHandlers(bot: Bot<MyContext>) {
     })
   )
 
+  bot.use(async (ctx, next) => {
+    if (ctx.chat?.type === 'private' && ctx.message?.text?.startsWith('/') && ctx.session.supportDraft) {
+      ctx.session.supportDraft = undefined
+      ctx.session.inSupportMode = false
+    }
+    return next()
+  })
+
   bot.command('start', async (ctx) => {
     const payload = ctx.match
     const userId = ctx.from.id
@@ -501,8 +535,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
   bot.command('support', async (ctx) => {
     await clearInputMode(ctx.from.id)
-    goTo(ctx.from.id, 'support')
-    await renderScreen(ctx, ctx.from.id, 'support', undefined, { forceNew: true })
+    await startSupportFlow(ctx)
   })
 
   bot.command('admin', async (ctx) => {
@@ -513,6 +546,10 @@ export function registerHandlers(bot: Bot<MyContext>) {
   // ====================== CALLBACK QUERY ======================
   bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data
+    if (ctx.session.supportDraft && !data.startsWith('s2:') && !data.startsWith('support:')) {
+      ctx.session.supportDraft = undefined
+      ctx.session.inSupportMode = false
+    }
     if (await handleAdminPanelCallback(ctx, data)) return
 
     const userId = ctx.from?.id
@@ -527,6 +564,25 @@ export function registerHandlers(bot: Bot<MyContext>) {
     console.log('callback data:', data)
 
     const message = ctx.callbackQuery.message
+
+    const conversationAction = parseConversationCallback(data)
+    if (conversationAction) {
+      try {
+        if (conversationAction.action === 'open' && conversationAction.contextId) {
+          await openConversation(ctx, conversationAction.value as ConversationType, conversationAction.contextId)
+          await ctx.answerCallbackQuery({ text: 'Режим общения включён' })
+        } else if (conversationAction.action === 'close') {
+          const result = await closeConversation(ctx, conversationAction.value)
+          await ctx.answerCallbackQuery({ text: result.applied ? 'Обращение завершено' : 'Обращение уже завершено' })
+        } else if (conversationAction.action === 'reopen') {
+          const result = await reopenConversation(ctx, conversationAction.value)
+          await ctx.answerCallbackQuery({ text: result.applied ? 'Обращение возобновлено' : 'Обращение уже открыто' })
+        }
+      } catch (error) {
+        await ctx.answerCallbackQuery({ text: error instanceof Error ? error.message : 'Ошибка обращения', show_alert: true })
+      }
+      return
+    }
 
     if (data.startsWith('renew:')) {
       if (!isAdmin(userId)) {
@@ -610,30 +666,20 @@ export function registerHandlers(bot: Bot<MyContext>) {
       return
     }
 
-    if (data === 'support:start') {
-      ctx.session.inSupportMode = true
-      await ctx.answerCallbackQuery({ text: 'Чат с поддержкой открыт' })
-      await ctx.reply(
-        '💬 Опишите вопрос одним или несколькими сообщениями. Можно отправлять фото, видео, документы и голосовые.\n\n👍 — сообщение доставлено поддержке\n👎 — отправка отменена из-за ошибки',
-        {
-          reply_markup: new InlineKeyboard().text('✅ Завершить диалог', 'support:close:user'),
-        }
-      )
-      return
-    }
+    if (await handleSupportFlowCallback(ctx, data)) return
 
     if (data === 'support:close:user') {
       const ticket = await closeOpenTicketForUser(ctx.api, userId)
       ctx.session.inSupportMode = false
+      ctx.session.supportDraft = undefined
       ctx.session.supportThreadId = undefined
       await ctx.answerCallbackQuery({
         text: ticket ? 'Обращение завершено' : 'Активных обращений нет',
       })
-      await ctx.reply(
-        ticket
-          ? '✅ Диалог завершён. Спасибо за обращение! Если понадобится помощь — откройте новое обращение.'
-          : 'У вас сейчас нет активного обращения.'
-      )
+      const closedText = ticket
+        ? 'Обращение завершено. Спасибо за обращение! Если понадобится помощь — откройте новое обращение.'
+        : 'У вас сейчас нет активного обращения.'
+      if (!(await markSupportUiClosed(ctx, closedText))) await ctx.reply(closedText)
       return
     }
 
@@ -860,7 +906,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
         }
 
         if (parsed.a === 'reject') {
-          await handleAdminReject(ctx, caption, message.message_id)
+          await handleAdminReject(ctx, caption, message.message_id, String(parsed.p || ''))
           return
         }
         if (parsed.a === 'prop_verify_accept') {
@@ -921,14 +967,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     const parsed = parseCb(data)
     if (!parsed) {
-      await ack()
-      return
-    }
-
-    // Поддержка
-    if (parsed.a === 'open' && parsed.s === 'support') {
-      goTo(userId, 'support')
-      await renderScreen(ctx, userId, 'support')
       await ack()
       return
     }
@@ -1126,6 +1164,26 @@ export function registerHandlers(bot: Bot<MyContext>) {
       return
     }
 
+    if (parsed.a === 'payment_reject_reason' && parsed.p) {
+      await handlePaymentRejectReason(ctx, String(parsed.p))
+      return
+    }
+
+    if (parsed.a === 'payment_reject_custom' && parsed.p) {
+      await startCustomPaymentReject(ctx, String(parsed.p))
+      return
+    }
+
+    if (parsed.a === 'payment_reject_back' && parsed.p) {
+      await handlePaymentRejectBack(ctx, String(parsed.p))
+      return
+    }
+
+    if (parsed.a === 'payment_retry' && parsed.p) {
+      await handlePaymentRetry(ctx, String(parsed.p))
+      return
+    }
+
     await ack()
 
     if (parsed.a === 'add_volunteer_contact') {
@@ -1153,6 +1211,11 @@ export function registerHandlers(bot: Bot<MyContext>) {
       await ack()
       return
     }
+  })
+
+  bot.on('message', async (ctx, next) => {
+    if (await guardSupportSelection(ctx)) return
+    return next()
   })
 
   // Черновик рассылки должен перехватываться до более узких text/photo handlers.
@@ -1215,6 +1278,9 @@ export function registerHandlers(bot: Bot<MyContext>) {
     const userId = ctx.from?.id
     if (!userId) return
 
+    if (await handleCustomPaymentRejectText(ctx)) return
+    if (await relayActiveConversationMessage(ctx)) return
+
     // В топике поддержки ввод из админ-панели (дата, имя, статус и т.д.)
     // должен обрабатываться раньше, чем обычный ответ пользователю.
     if (await handleAdminPanelText(ctx)) return
@@ -1240,6 +1306,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
     if (ctx.session.inSupportMode) {
       try {
         await sendUserMessageToSupport(ctx, userId)
+        await markSupportUiOpened(ctx)
         try {
           await ctx.react('👍')
         } catch {}
@@ -1266,12 +1333,15 @@ export function registerHandlers(bot: Bot<MyContext>) {
       return
     }
 
+    if (await relayActiveConversationMessage(ctx)) return
+
     if (await relayAdminMessage(ctx)) return
 
     // Если не чек — проверяем поддержку
     if (ctx.session.inSupportMode) {
       try {
         await sendUserMessageToSupport(ctx, ctx.from.id)
+        await markSupportUiOpened(ctx)
         try {
           await ctx.react('👍')
         } catch {}
@@ -1331,11 +1401,13 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
   // Остальные типы сообщений поддержки: видео, голосовые, кружки, стикеры и т.д.
   bot.on('message', async (ctx) => {
+    if (await relayActiveConversationMessage(ctx)) return
     if (await relayAdminMessage(ctx)) return
     if (ctx.chat.type !== 'private' || !ctx.from || !ctx.session.inSupportMode) return
 
     try {
       await sendUserMessageToSupport(ctx, ctx.from.id)
+      await markSupportUiOpened(ctx)
       try {
         await ctx.react('👍')
       } catch {}

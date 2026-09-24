@@ -26,10 +26,20 @@ export type SessionData = {
     mediaGroupId?: string
     isSending?: boolean
   }
+  supportUiMessageId?: number
+  supportUiOpened?: boolean
+  supportDraft?: import('../services/supportContext.js').SupportDraft
   inSupportMode?: boolean
   isExtension: boolean
   supportThreadId?: number
   supportPanelMessageId?: number
+  paymentReject?: {
+    paymentId: string
+    chatId: number
+    messageId: number
+  }
+  waitingForPaymentRejectReason?: boolean
+  activeConversationId?: string
 }
 
 export type MyContext = Context & SessionFlavor<SessionData>

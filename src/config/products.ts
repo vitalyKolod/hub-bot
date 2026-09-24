@@ -9,10 +9,12 @@ export type ProductConfig = {
 
   groupId?: number
   cartable: boolean
+  customEmojiId?: string
 }
 
 export const PRODUCTS: Record<string, ProductConfig> = {
   procontent: {
+    customEmojiId: '5251299351375937406',
     id: 'procontent',
     name: 'ProContent',
     description: 'Готовый медиаконтент для церковных экранов и служений.',
@@ -26,6 +28,7 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   },
 
   propresenter: {
+    customEmojiId: '5251272469175631339',
     id: 'propresenter',
     name: 'Pro Presenter',
     description: 'Доступ к ProPresenter для подготовки и проведения служений.',
@@ -38,6 +41,7 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   },
 
   cmg: {
+    customEmojiId: '5310127020213043624',
     id: 'cmg',
     name: 'CMG',
     description: 'Коллекция визуальных материалов Church Motion Graphics.',
@@ -51,6 +55,7 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   },
 
   sunday_screens: {
+    customEmojiId: '5291749654017381020',
     id: 'sunday_screens',
     name: 'Sunday Screens',
     description: 'Современные фоны и визуальные материалы для воскресных служений.',
@@ -64,6 +69,7 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   },
 
   cgs: {
+    customEmojiId: '5190419001703963847',
     id: 'cgs',
     name: 'CGS',
     description: 'Медиаресурсы Church Graphics Studio для вашей команды.',
@@ -77,6 +83,7 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   },
 
   storyloops: {
+    customEmojiId: '5190877553887323413',
     id: 'storyloops',
     name: 'StoryLoops',
     description: 'Анимированные фоны и видеолоопы для экранов.',
@@ -101,7 +108,14 @@ export const PRODUCTS: Record<string, ProductConfig> = {
     cartable: false,
   },
 
+  yandex_360: {
+    id: 'yandex_360', name: 'Яндекс 360', description: 'Яндекс 360', cover: '',
+    priceRub: null, priceUsd: null, cartable: false,
+    customEmojiId: '5310051278464778081',
+  },
+
   add_member: {
+    customEmojiId: '5258362837411045098',
     id: 'add_member',
     name: 'Добавление участника',
     description: 'Дополнительное место для участника вашей команды.',

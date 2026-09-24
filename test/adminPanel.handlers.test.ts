@@ -158,7 +158,8 @@ test('user card includes contact, create and delete actions in the expected orde
 
   const buttons = keyboardButtons(edits[0])
   const labels = buttons.map((button) => button.text)
-  assert.equal(buttons.find((button) => button.text === '✉️ Написать юзеру')?.url, `tg://user?id=${targetId}`)
+  assert.equal(buttons.some((button) => button.text === '💬 Написать пользователю'), false)
+  assert.equal(buttons.find((button) => button.text === '👤 Открыть Telegram-профиль')?.url, `tg://user?id=${targetId}`)
   assert.ok(labels.indexOf('👥 Спасение') < labels.indexOf('➕ Создать команду'))
   assert.ok(labels.indexOf('➕ Создать команду') < labels.indexOf('➕ Добавить в команду'))
   assert.ok(labels.indexOf('🗑 Удалить юзера') < labels.indexOf('‹ К списку'))

@@ -1,4 +1,6 @@
 import { InlineKeyboard } from 'grammy'
+import { FormattedString } from '@grammyjs/parse-mode'
+import { PAYMENT_ICONS } from '../ui/emoji/icons.js'
 import { Types } from 'mongoose'
 import { packCb } from '../core/callback.js'
 import { goTo } from '../state/ui.js'
@@ -17,8 +19,148 @@ import { markCartInReview, getOrCreateCart } from '../services/cart.service.js'
 import { ADMIN_GROUP_ID } from '../config/env.js'
 import type { MyContext } from '../types/context.js'
 import { auditLogService } from '../services/auditLog.service.js'
-import { acceptPayment, attachPaymentTelegramLocation, createPayment, PaymentNotFoundError, rejectPayment } from '../services/payment.service.js'
-import { deliverAcceptedPayment } from '../adapters/telegram/paymentDelivery.js'
+import { acceptPayment, attachPaymentTelegramLocation, createPayment, getPayment, getPaymentsForAdminMessage, PaymentNotFoundError, rejectPayment, returnPaymentToPending } from '../services/payment.service.js'
+import { deliverAcceptedPayment, deliverRejectedPayment } from '../adapters/telegram/paymentDelivery.js'
+import { appendConversationContactButtons } from '../services/conversation.service.js'
+
+export function paymentProductLine(productId: string): FormattedString {
+  const product = getProduct(productId)
+  let line = new FormattedString('').plain('• ')
+  if (product?.customEmojiId) line = line.emoji('📦', product.customEmojiId).plain(' ')
+  return line.plain(product?.name || productId)
+}
+
+export function paymentCard(input: { operation: string; productIds: string[]; owner: string; username: string; userId: number; team: string; teamId: string; method: string; time: string }): FormattedString {
+  let card = new FormattedString('').emoji('💰', PAYMENT_ICONS.payment).bold(' ОПЛАТА: ')
+  card = card.emoji('🆕', PAYMENT_ICONS.newSubscription).bold(` ${input.operation.toUpperCase()}`)
+    .plain('\n━━━━━━━━━━━━━━\n📦 Товары:\n')
+  for (const id of input.productIds) card = card.concat(paymentProductLine(id)).plain('\n')
+  return card.plain('━━━━━━━━━━━━━━\n')
+    .emoji('👤', PAYMENT_ICONS.owner).plain(` Владелец: ${input.owner}\n`)
+    .emoji('😎', PAYMENT_ICONS.username).plain(` Юзернейм: ${input.username}\n`)
+    .emoji('🆔', PAYMENT_ICONS.id).plain(` ID: ${input.userId}\n`)
+    .emoji('👥', PAYMENT_ICONS.team).plain(` Команда: ${input.team}\n`)
+    .emoji('🆔', PAYMENT_ICONS.id).plain(` Team ID: ${input.teamId}\n`)
+    .plain(`━━━━━━━━━━━━━━\n💳 Способ оплаты: ${input.method}\n🕒 Время: ${input.time}\n\n━━━━━━━━━━━━━━\nПроверь и подтверди вручную! `)
+    .emoji('👇', PAYMENT_ICONS.confirm)
+}
+
+const PAYMENT_REJECTION_REASONS: Record<string, string> = {
+  transfer: 'Не найден перевод',
+  amount: 'Неверная сумма',
+  unreadable: 'Не читается чек',
+  receipt: 'Неверный чек',
+}
+
+export async function fullAdminPaymentKeyboard(payment: any) {
+  const payments = payment.telegramAdminMessageId
+    ? await getPaymentsForAdminMessage(payment.telegramAdminMessageId)
+    : [payment]
+  const kb = new InlineKeyboard()
+  for (const item of payments) {
+    if (item.status === 'pending') {
+      if (item.cartItemId) {
+        kb.text(`✅ ${getProduct(item.productId)?.name || item.productId}`, packCb({ a: 'cart_accept', p: item.id }))
+          .text('❌', packCb({ a: 'cart_reject', p: item.id })).row()
+      } else {
+        kb.text('✅ Подтвердить', packCb({ a: 'accept', p: item.teamId }))
+          .text('❌ Отклонить', packCb({ a: 'reject', p: item.id })).row()
+      }
+    } else if (item.status === 'accepted') {
+      kb.text('✅ Принято', packCb({ a: 'noop' })).row()
+    } else if (item.status === 'rejected') {
+      kb.text(`↩️ Вернуть ${getProduct(item.productId)?.name || item.productId} на проверку`, packCb({ a: 'payment_retry', p: item.id })).row()
+    }
+  }
+  if (payment.userId) {
+    appendConversationContactButtons(kb, 'payment', payment.id, payment.userId)
+  }
+  return kb
+}
+
+export async function showPaymentRejectReasons(ctx: MyContext, paymentId: string) {
+  const payment = await getPayment(paymentId)
+  if (!payment || payment.status !== 'pending') {
+    await ctx.answerCallbackQuery({ text: payment ? `Статус: ${payment.status}` : 'Оплата не найдена', show_alert: true })
+    return
+  }
+  const kb = new InlineKeyboard()
+    .text('💸 Не найден перевод', packCb({ a: 'payment_reject_reason', p: `${paymentId}:transfer` })).row()
+    .text('🔢 Неверная сумма', packCb({ a: 'payment_reject_reason', p: `${paymentId}:amount` })).row()
+    .text('🧾 Не читается чек', packCb({ a: 'payment_reject_reason', p: `${paymentId}:unreadable` })).row()
+    .text('📎 Неверный чек', packCb({ a: 'payment_reject_reason', p: `${paymentId}:receipt` })).row()
+    .text('✏️ Другая причина', packCb({ a: 'payment_reject_custom', p: paymentId })).row()
+    .text('← Назад', packCb({ a: 'payment_reject_back', p: paymentId }))
+  await ctx.editMessageReplyMarkup({ reply_markup: kb })
+  await ctx.answerCallbackQuery({ text: 'Выберите причину отклонения' })
+}
+
+async function finishPaymentReject(ctx: MyContext, paymentId: string, reason: string) {
+  const decision = await rejectPayment(paymentId, ctx.from!.id, reason)
+  if (!decision.applied) {
+    await ctx.answerCallbackQuery({ text: decision.payment.status === 'rejected' ? 'Уже отклонено' : `Статус: ${decision.payment.status}`, show_alert: true })
+    return
+  }
+  await deliverRejectedPayment(ctx.api, decision)
+  const msg = ctx.callbackQuery?.message
+  const caption = msg && 'caption' in msg ? msg.caption || '' : ''
+  if (msg && caption) {
+    await ctx.api.editMessageCaption(msg.chat.id, msg.message_id, {
+      caption: `${caption}\n\n❌ Отклонено\nПричина: ${reason}`,
+      caption_entities: 'caption_entities' in msg ? msg.caption_entities : undefined,
+      reply_markup: await fullAdminPaymentKeyboard(decision.payment),
+    })
+  }
+  await ctx.answerCallbackQuery({ text: 'Отклонено ✗' })
+}
+
+export async function handlePaymentRejectReason(ctx: MyContext, payload: string) {
+  const separator = payload.lastIndexOf(':')
+  const paymentId = payload.slice(0, separator)
+  const reason = PAYMENT_REJECTION_REASONS[payload.slice(separator + 1)]
+  if (!reason) return ctx.answerCallbackQuery({ text: 'Неизвестная причина', show_alert: true })
+  await finishPaymentReject(ctx, paymentId, reason)
+}
+
+export async function startCustomPaymentReject(ctx: MyContext, paymentId: string) {
+  const msg = ctx.callbackQuery?.message
+  if (!msg) return
+  ctx.session.paymentReject = { paymentId, chatId: msg.chat.id, messageId: msg.message_id }
+  ctx.session.waitingForPaymentRejectReason = true
+  await ctx.answerCallbackQuery()
+  await ctx.reply('Введите причину отклонения.')
+}
+
+export async function handleCustomPaymentRejectText(ctx: MyContext) {
+  const state = ctx.session.paymentReject
+  if (!state || !ctx.session.waitingForPaymentRejectReason) return false
+  const reason = ctx.message?.text?.trim()
+  if (!reason) return true
+  ctx.session.paymentReject = undefined
+  ctx.session.waitingForPaymentRejectReason = false
+  const payment = await rejectPayment(state.paymentId, ctx.from!.id, reason)
+  await deliverRejectedPayment(ctx.api, payment)
+  const stored = await getPayment(state.paymentId)
+  await ctx.api.editMessageReplyMarkup(state.chatId, state.messageId, {
+    reply_markup: stored ? await fullAdminPaymentKeyboard(stored) : undefined,
+  }).catch(() => {})
+  await ctx.reply(stored?.status === 'rejected' ? 'Оплата отклонена.' : `Статус оплаты: ${stored?.status}`)
+  return true
+}
+
+export async function handlePaymentRejectBack(ctx: MyContext, paymentId: string) {
+  const payment = await getPayment(paymentId)
+  if (!payment) return ctx.answerCallbackQuery({ text: 'Оплата не найдена', show_alert: true })
+  await ctx.editMessageReplyMarkup({ reply_markup: await fullAdminPaymentKeyboard(payment) })
+  await ctx.answerCallbackQuery()
+}
+
+export async function handlePaymentRetry(ctx: MyContext, paymentId: string) {
+  const result = await returnPaymentToPending(paymentId, ctx.from!.id)
+  if (!result.applied) return ctx.answerCallbackQuery({ text: `Статус: ${result.payment.status}`, show_alert: true })
+  await ctx.editMessageReplyMarkup({ reply_markup: await fullAdminPaymentKeyboard(result.payment) })
+  await ctx.answerCallbackQuery({ text: 'Возвращено на проверку' })
+}
 
 function captionValue(caption: string, label: string): string | undefined {
   const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -216,11 +358,7 @@ export async function handleReceiptUpload(ctx: MyContext) {
       const items = cart.items.filter((i: any) => i.status === 'in_review')
       const operations = items.map((i: any) => operationFor(i.product))
 
-      productsText = items
-        .map(
-          (i: any) => `• ${getProduct(i.product)?.name || i.product} — ${operationFor(i.product)}`
-        )
-        .join('\n')
+      productsText = items.map((i: any) => i.product).join(',')
       operationText = new Set(operations).size === 1 ? operations[0] : '📦 Смешанный заказ'
 
       for (const item of items) {
@@ -236,46 +374,40 @@ export async function handleReceiptUpload(ctx: MyContext) {
           .text(`❌`, packCb({ a: 'cart_reject', p: persistentPayment.id }))
           .row()
       }
-      kb.url('Написать юзеру', `tg://user?id=${userId}`)
+      const messagePaymentId = createdPayments[0]?.id
+      if (messagePaymentId) {
+        appendConversationContactButtons(kb, 'payment', messagePaymentId, userId)
+      } else {
+        kb.url('👤 Открыть Telegram-профиль', `tg://user?id=${userId}`)
+      }
     } else {
-      const paymentId = payment?.paymentId || new Types.ObjectId().toString()
-      if (payment) payment.paymentId = paymentId
+      let paymentId = payment?.paymentId || new Types.ObjectId().toString()
       if (validTeamId && getProduct(payment?.product || '')) {
         const persistentPayment = await createPayment({
           id: paymentId, userId, teamId: validTeamId, productId: payment?.product || '', currency,
           paymentMethod: methodText, operation: operationFor(payment?.product).includes('Продление') ? 'renewal' : 'purchase', receipt,
         })
         createdPayments.push(persistentPayment)
+        paymentId = persistentPayment.id
+        if (payment) payment.paymentId = paymentId
       }
       operationText = operationFor(payment?.product)
-      productsText = `• ${getProduct(payment?.product || '')?.name || payment?.product} — ${operationText}\n\`PRODUCT_ID:${payment?.product}\`\n\`PAYMENT_ID:${paymentId}\``
-      kb.text('✅ Принять', packCb({ a: 'accept', p: teamId }))
-        .text('❌ Отклонить', packCb({ a: 'reject', p: teamId }))
+      productsText = payment?.product || ''
+      kb.text('✅ Подтвердить', packCb({ a: 'accept', p: teamId }))
+        .text('❌ Отклонить', packCb({ a: 'reject', p: paymentId }))
         .row()
-        .url('Написать юзеру', `tg://user?id=${userId}`)
+      appendConversationContactButtons(kb, 'payment', paymentId, userId)
     }
 
     const teamName = team?.name || (validTeamId ? 'Неизвестно' : '—')
 
-    const adminText = `
-💰 *ОПЛАТА: ${operationText.toUpperCase()}*
-━━━━━━━━━━━━━━
-🏷 *Тип операции:* ${operationText}
-📦 *Товары:*
-${productsText}
-━━━━━━━━━━━━━━
-👤 *Владелец:* ${profile.fio || 'не указано'}
-😎 *Юзернейм:* ${usernameText}
-🆔 *ID:* \`${userId}\`
-👥 *Команда:* ${escapeUnderscore(teamName)}
-🆔 *Team ID:* \`${teamId || '—'}\`
-━━━━━━━━━━━━━━
-💳 *Способ оплаты:* ${methodText}
-🕒 *Время:* ${new Date().toLocaleString('ru-RU')}
-
-━━━━━━━━━━━━━━
-Проверь и подтверди вручную! 👇
-`.trim()
+    const adminText = paymentCard({
+      operation: operationText.replace(/^[^А-Яа-яA-Za-z]+/, '').trim(),
+      productIds: payment?.product === 'cart' ? productsText.split(',').filter(Boolean) : [productsText],
+      owner: profile.fio || 'не указано', username: ctx.from!.username ? '@' + ctx.from!.username : 'не указано',
+      userId, team: teamName, teamId: teamId || '—', method: methodText,
+      time: new Date().toLocaleString('ru-RU'),
+    })
 
     let threadId: number | undefined
     try {
@@ -292,15 +424,15 @@ ${productsText}
     if (ctx.message?.photo) {
       const photo = ctx.message.photo.at(-1)!
       sentMessage = await ctx.api.sendPhoto(ADMIN_GROUP_ID, photo.file_id, {
-        caption: adminText,
-        parse_mode: 'Markdown',
+        caption: adminText.text,
+        caption_entities: adminText.entities,
         message_thread_id: threadId,
         reply_markup: kb,
       })
     } else if (ctx.message?.document) {
       sentMessage = await ctx.api.sendDocument(ADMIN_GROUP_ID, ctx.message.document.file_id, {
-        caption: adminText,
-        parse_mode: 'Markdown',
+        caption: adminText.text,
+        caption_entities: adminText.entities,
         message_thread_id: threadId,
         reply_markup: kb,
       })
@@ -399,14 +531,14 @@ export async function handleAdminAccept(
       return
     }
 
-    const productMatch = caption.match(/PRODUCT_ID:(\S+)/)
-    const productId = productMatch?.[1]
+    const persistentPayment = await getPaymentsForAdminMessage(messageId)
+    const productId = persistentPayment[0]?.productId || caption.match(/PRODUCT_ID:(\S+)/)?.[1]
     if (!productId) {
       await ctx.answerCallbackQuery({ text: 'Товар не найден в чеке' })
       return
     }
 
-    const persistentPaymentId = caption.match(/PAYMENT_ID:(\S+)/)?.[1]
+    const persistentPaymentId = persistentPayment[0]?.id || caption.match(/PAYMENT_ID:(\S+)/)?.[1]
     if (persistentPaymentId) {
       try {
         const decision = await acceptPayment(persistentPaymentId, ctx.from!.id)
@@ -415,7 +547,7 @@ export async function handleAdminAccept(
           return
         }
         await deliverAcceptedPayment(ctx.api, decision, ctx.me.username)
-        await ctx.api.editMessageCaption(String(ADMIN_GROUP_ID), messageId, { caption: escapeUnderscore(`${caption}\n\n✅ Принято!`) })
+        await ctx.api.editMessageCaption(String(ADMIN_GROUP_ID), messageId, { caption: `${caption}\n\n✅ Принято`, caption_entities: ctx.callbackQuery?.message && 'caption_entities' in ctx.callbackQuery.message ? ctx.callbackQuery.message.caption_entities : undefined, reply_markup: await fullAdminPaymentKeyboard(decision.payment) })
         await ctx.answerCallbackQuery({ text: 'Принято ✓' })
         return
       } catch (error) {
@@ -510,44 +642,17 @@ export async function handleAdminAccept(
   }
 }
 
-export async function handleAdminReject(ctx: MyContext, caption: string, messageId: number) {
+export async function handleAdminReject(ctx: MyContext, caption: string, messageId: number, paymentIdFromCallback?: string) {
   try {
-    const teamId = caption.match(/Team ID:\s*`?([^`\s]+)`?/i)?.[1]
-    const targetUserId = Number(caption.match(/ID:\s*`?(\d+)`?/i)?.[1]) || undefined
-    const productId = caption.match(/PRODUCT_ID:(\S+)/)?.[1]
-    const persistentPaymentId = caption.match(/PAYMENT_ID:(\S+)/)?.[1]
+    const persistentPaymentId = paymentIdFromCallback || caption.match(/PAYMENT_ID:(\S+)/)?.[1]
     if (persistentPaymentId) {
-      try {
-        const decision = await rejectPayment(persistentPaymentId, ctx.from!.id)
-        if (!decision.applied) {
-          await ctx.answerCallbackQuery({ text: decision.payment.status === 'rejected' ? 'Уже отклонено' : `Статус: ${decision.payment.status}`, show_alert: true })
-          return
-        }
-        await ctx.api.editMessageText(String(ADMIN_GROUP_ID), messageId, `${caption}\n\n❌ Отклонено`, { parse_mode: 'Markdown' })
-        await ctx.answerCallbackQuery({ text: 'Отклонено ✗' })
-        return
-      } catch (error) {
-        if (!(error instanceof PaymentNotFoundError)) throw error
-      }
+      await showPaymentRejectReasons(ctx, persistentPaymentId)
+      return
     }
-    await auditLogService.createLog({
-      type: 'payment.rejected',
-      actorType: 'admin',
-      actorTelegramId: ctx.from?.id,
-      targetUserId,
-      targetTeamId: teamId && teamId !== '—' ? teamId : undefined,
-      targetPaymentId: caption.match(/PAYMENT_ID:(\S+)/)?.[1],
-      metadata: {
-        productId,
-        productName: getProduct(productId || '')?.name || productId,
-        method: captionValue(caption, 'Способ оплаты'),
-        operation: captionValue(caption, 'Тип операции'),
-      },
+    await ctx.answerCallbackQuery({
+      text: 'Платёж не найден. Отклонение без сохранённой причины невозможно.',
+      show_alert: true,
     })
-    await ctx.api.editMessageText(String(ADMIN_GROUP_ID), messageId, `${caption}\n\n❌ Отклонено`, {
-      parse_mode: 'Markdown',
-    })
-    await ctx.answerCallbackQuery({ text: 'Отклонено ✗' })
   } catch (err: any) {
     console.error('Ошибка reject:', err)
     await ctx.answerCallbackQuery({ text: 'Ошибка' })

@@ -30,7 +30,7 @@ export async function teamListScreen(userId: number): Promise<ScreenView> {
     .row()
 
   kb.text('ЧТО ТАКОЕ КОМАНДА', packCb({ a: 'open', s: 'team_about' }))
-    .icon('5465226866321268133')
+    .icon('5436113877181941026')
     .row()
 
   kb.text('◀️ НАЗАД', packCb({ a: 'home' }))

@@ -17,7 +17,7 @@ export async function cmgScreen(userId: number, teamId: string): Promise<ScreenV
   let message = new FormattedString('')
 
   message = message
-    .emoji('🛜', '5310127020213043624')
+    .emoji('🛜', product.customEmojiId!)
     .plain(' ')
     .bold('CHURCH MOTION GRAPHICS (CMG)')
     .plain('\n\n')

@@ -85,8 +85,7 @@ export async function handlePropConfirmStream(ctx: MyContext, userId: number, pa
   const kb = new InlineKeyboard()
     .text('✅ Подтвердить', packCb({ a: 'prop_verify_accept', p: `${teamId}:${flowNumber}` }))
     .text('❌ Отклонить', packCb({ a: 'prop_verify_reject', p: teamId }))
-    .row()
-    .url('Написать юзеру', `tg://user?id=${userId}`)
+    .row().url('👤 Открыть Telegram-профиль', `tg://user?id=${userId}`)
 
   await ctx.api.sendMessage(ADMIN_GROUP_ID, adminText, {
     parse_mode: 'Markdown',
@@ -113,7 +112,7 @@ export async function handlePropNoStreamConfirm(ctx: MyContext, userId: number, 
   const owner = await getOrCreateUser(userId)
   const flowNumber = entry.assignedFlowNumber!
 
-  const kb = new InlineKeyboard().url('Написать юзеру', `tg://user?id=${userId}`)
+  const kb = new InlineKeyboard().url('👤 Открыть Telegram-профиль', `tg://user?id=${userId}`)
 
   if (created) {
     await ctx.api.sendMessage(

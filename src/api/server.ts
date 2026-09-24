@@ -105,9 +105,12 @@ export function createApiServer(options: ApiServerOptions) {
       if (adminDecisionMatch && request.method === 'POST') {
         if (!adminRequired()) return
         const accepting = adminDecisionMatch[2] === 'accept'
+        const body = accepting ? {} : await readJson(request)
+        const reason = typeof body.reason === 'string' ? body.reason.trim() : ''
+        if (!accepting && !reason) return sendJson(response, 422, { error: { code: 'REASON_REQUIRED', message: 'Rejection reason is required' } })
         const result = accepting
           ? await acceptPayment(adminDecisionMatch[1], session.user.id)
-          : await rejectPayment(adminDecisionMatch[1], session.user.id)
+          : await rejectPayment(adminDecisionMatch[1], session.user.id, reason)
         if (accepting) await deliverAcceptedPayment(telegram, result)
         else await deliverRejectedPayment(telegram, result)
         return sendJson(response, 200, { data: serializePayment(result.payment), applied: result.applied })

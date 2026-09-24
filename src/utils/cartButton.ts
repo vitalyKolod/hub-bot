@@ -2,7 +2,11 @@
 
 import type { InlineKeyboard } from 'grammy'
 import { packCb } from '../core/callback.js'
-import { getOrCreateCart, getPendingItems } from '../services/cart.service.js'
+import { getCartItemCount, getOrCreateCart } from '../services/cart.service.js'
+
+export function cartNavigationLabel(count: number): string {
+  return count > 0 ? `🛒 Перейти в корзину · ${count}` : '🛒 Перейти в корзину'
+}
 
 export async function addCartControls(
   kb: InlineKeyboard,
@@ -10,11 +14,11 @@ export async function addCartControls(
   productId: string
 ): Promise<InlineKeyboard> {
   const cart = await getOrCreateCart(teamId)
-  const count = getPendingItems(cart).length
+  const count = getCartItemCount(cart)
 
   kb.text('🛒 В КОРЗИНУ', packCb({ a: 'add_to_cart', p: `${productId}:${teamId}` })).row()
 
-  const cartLabel = count > 0 ? `🛒 ПЕРЕЙТИ В КОРЗИНУ (${count})` : '🛒 ПЕРЕЙТИ В КОРЗИНУ'
+  const cartLabel = cartNavigationLabel(count)
 
   kb.text(cartLabel, packCb({ a: 'open', s: 'cart', p: teamId })).row()
 
@@ -27,7 +31,7 @@ export async function addCartControls(
  */
 export async function getCartCount(teamId: string): Promise<number> {
   const cart = await getOrCreateCart(teamId)
-  return getPendingItems(cart).length
+  return getCartItemCount(cart)
 }
 
 export async function getCartButtonLabel(teamId: string): Promise<string> {
