@@ -8,7 +8,7 @@ import { ProPresenterDeviceModel } from '../models/ProPresenterDevice.js'
 import { PaymentModel } from '../models/Payment.js'
 import { adminSetStreamExpiry } from './adminPanel.service.js'
 
-export const PROP_RENEWAL_STATS_THREAD_ID = Number(process.env.PROP_RENEWAL_STATS_THREAD_ID || 209)
+export const PROP_RENEWAL_STATS_THREAD_ID = Number(process.env.PROP_RENEWAL_STATS_THREAD_ID || 0)
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const DAY_MS = 86_400_000
 
