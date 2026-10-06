@@ -70,7 +70,7 @@ export async function teamScreen(userId: number, input: string | { teamId: strin
   let propQuote = new FormattedString('').emoji('🎬', '5251272469175631339').plain(' ProPresenter\n┗ Статус: ').bold(nextExpiry ? '✅ Активна' : status(prop, byProduct.get('propresenter')))
   if (nextExpiry) propQuote = propQuote.plain(`\n┗ Осталось: ${days(nextExpiry)} дн.`)
   const activeContentCount = PRODUCTS.filter(product => active(team.subscriptions.get(product.id))).length
-  let contentQuote = new FormattedString('').emoji('🖥', '5373330964372004748').plain(' Контент для экранов\n').bold(`Подписок ${activeContentCount}/${PRODUCTS.length}\n`)
+  let contentQuote = new FormattedString('').emoji('🖥', '5373330964372004748').plain(' Контент для экранов\n\n').bold(`Подписок ${activeContentCount}/${PRODUCTS.length}\n`)
   for (const product of PRODUCTS) contentQuote = contentQuote.plain('\n').concat(productLine(product.name, product.icon, team.subscriptions.get(product.id), byProduct.get(product.id))).plain('\n')
   const message = header(team.name).bold('⛪ ПОДПИСКИ\n\n').expandableBlockquote(propQuote).plain('\n\n━━━━━━━━━━━━━━\n').expandableBlockquote(contentQuote).plain('\n━━━━━━━━━━━━━━\n').bold('👑 Владелец\n').plain(`${owner?.fio || 'Не найден'}\n━━━━━━━━━━━━━━\n`).bold('Состав команды:\n').bold(`👥 Участников: ${team.members.length}`)
   const kb = new InlineKeyboard()
@@ -106,7 +106,8 @@ export async function teamProPresenterScreen(userId: number, teamId: string): Pr
 
 export async function teamContentScreen(userId: number, teamId: string): Promise<ScreenView> {
   const { team, byProduct } = await data(teamId)
-  let quote = new FormattedString('').emoji('🖥', '5373330964372004748').plain(' Контент для экранов\n')
+  const activeContentCount = PRODUCTS.filter(product => active(team.subscriptions.get(product.id))).length
+  let quote = new FormattedString('').emoji('🖥', '5373330964372004748').plain(' Контент для экранов\n\n').bold(`Подписок ${activeContentCount}/${PRODUCTS.length}\n`)
   for (const product of PRODUCTS) quote = quote.plain('\n').concat(productLine(product.name, product.icon, team.subscriptions.get(product.id), byProduct.get(product.id), true)).plain('\n')
   const message = header(team.name).expandableBlockquote(quote)
   const kb = new InlineKeyboard()
