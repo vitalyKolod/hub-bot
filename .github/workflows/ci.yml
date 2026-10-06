@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+        env:
+          ADMIN_GROUP_ID: '100001'
+          CONTENT_GROUP_ID: '100002'
+          SUPPORT_GROUP_ID: '100003'
+          SUNDAY_SCREENS_GROUP_ID: '100004'
+          PROP_WAITLIST_THREAD_ID: '100005'
+          PROP_STREAM_VERIFY_THREAD_ID: '100006'

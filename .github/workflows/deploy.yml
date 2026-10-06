@@ -1,0 +1,49 @@
+name: Deploy production
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event == 'push' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          HOST_KEY: ${{ secrets.PRODUCTION_SSH_HOST_KEY }}
+        run: |
+          test -n "$DEPLOY_KEY"
+          test -n "$HOST_KEY"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Deploy tested main commit
+        env:
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          ssh -o BatchMode=yes root@186.246.7.84 "TARGET_SHA=$TARGET_SHA bash -se" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/hub-bot
+          test "$(git branch --show-current)" = main
+          test -z "$(git status --porcelain --untracked-files=normal)"
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$TARGET_SHA"
+          git merge --ff-only "$TARGET_SHA"
+          npm ci
+          npm run build
+          npm test
+          test -z "$(git status --porcelain --untracked-files=normal)"
+          pm2 restart hub-bot --update-env
+          pm2 describe hub-bot | grep -q 'online'
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          REMOTE

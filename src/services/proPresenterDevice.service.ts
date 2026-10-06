@@ -5,7 +5,7 @@ import { ProPresenterDeviceModel, ProPresenterDeviceRequestModel } from '../mode
 import { ProPresenterRenewalSeatModel } from '../models/ProPresenterRenewal.js'
 
 export const DEVICE_ICON = '5431376038628171216'
-export const DEVICE_REQUEST_THREAD_ID = Number(process.env.PROP_DEVICE_REQUEST_THREAD_ID || 221)
+export const DEVICE_REQUEST_THREAD_ID = Number(process.env.PROP_DEVICE_REQUEST_THREAD_ID || 0)
 
 function normalizeName(value: string) {
   const name = value.replace(/\s+/g, ' ').trim()
