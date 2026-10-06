@@ -1,10 +1,12 @@
 export type ScreenId =
   | 'main'
+  | 'yandex360'
   | 'profile'
   | 'my_subscriptions'
   | 'cart'
   | 'team_list'
   | 'team'
+  | 'devices'
   | 'create_team_info'
   | 'team_about'
   | 'create_team_name'
@@ -44,6 +46,7 @@ export type ScreenId =
   | 'end_support'
   | 'team_invite'
   | 'tutorials'
+  | 'tutorial_topic'
   | 'tutorial'
 
 export type StackEntry = {

@@ -18,6 +18,8 @@ const paymentSchema = new mongoose.Schema(
     userId: { type: Number, required: true, index: true },
     teamId: { type: String, required: true, index: true },
     productId: { type: String, required: true, index: true },
+    renewalCampaignId: { type: String, default: null, index: true },
+    renewalDeviceIds: { type: [String], default: [] },
     cartItemId: { type: String, default: null, index: true },
     amount: { type: Number, required: true },
     currency: { type: String, enum: ['rub', 'usd'], required: true },

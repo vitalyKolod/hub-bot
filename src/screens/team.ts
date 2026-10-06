@@ -8,13 +8,9 @@ import { getProduct } from '../config/products.js'
 import { getTeamById, hasActiveTeamSubscription } from '../services/team.service.js'
 import { UserModel } from '../models/User.js'
 import { getLatestPaymentStatesForTeam } from '../services/payment.service.js'
-import {
-  PRO_CONTENT_CHAT_LINK,
-  CMG_CONTENT_CHAT_LINK,
-  SUNDAY_SCREENS_CONTENT_CHAT_LINK,
-  CGS_CHAT_LINK,
-  STORY_LOOP_CHAT_LINK,
-} from '../config/env.js'
+import { listTeamDevices } from '../services/proPresenterDevice.service.js'
+import { DEVICE_ICON } from '../services/proPresenterDevice.service.js'
+import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
 
 function getDaysLeft(date?: Date | string | null) {
   if (!date) return 0
@@ -88,6 +84,8 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
   }
 
   const prop = team.subscriptions?.get('propresenter')
+  const devices = await listTeamDevices(teamId)
+  const deviceFlows = devices.length ? await ProPresenterStreamModel.find({ flowNumber: { $in: [...new Set(devices.map((device) => device.flowNumber))] } }) : []
   const content = team.subscriptions?.get('procontent')
   const sunday = team.subscriptions?.get('sunday_screens')
   const cgs = team.subscriptions?.get('cgs')
@@ -117,7 +115,11 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
 
   // --- Кнопки-ссылки на чаты: показываем ТОЛЬКО для активных подписок ---
 
-  if (isSubscriptionActive(prop) && meta?.chatLink) {
+  for (const stream of deviceFlows) {
+    if (!stream.chatLink) continue
+    kb.url(`Чат потока №${stream.flowNumber}`, stream.chatLink).icon('5251272469175631339').row()
+  }
+  if (isSubscriptionActive(prop) && meta?.chatLink && !deviceFlows.some((stream) => stream.flowNumber === meta.flowNumber && stream.chatLink)) {
     kb.url(
       meta.flowNumber ? `Чат потока №${meta.flowNumber}` : 'Чат потока ProPresenter',
       meta.chatLink
@@ -126,28 +128,31 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
       .row()
   }
 
-  if (isSubscriptionActive(content) && PRO_CONTENT_CHAT_LINK) {
-    kb.url('Чат — ProContent', PRO_CONTENT_CHAT_LINK).icon('5251299351375937406').row()
+  if (isSubscriptionActive(content)) {
+    kb.text('Чат — ProContent', 'chat_access:procontent').icon('5251299351375937406').row()
   }
 
-  if (isSubscriptionActive(sunday) && SUNDAY_SCREENS_CONTENT_CHAT_LINK) {
-    kb.url('Чат — Sunday Screens', SUNDAY_SCREENS_CONTENT_CHAT_LINK)
+  if (isSubscriptionActive(sunday)) {
+    kb.text('Чат — Sunday Screens', 'chat_access:sunday_screens')
       .icon('5291749654017381020')
       .row()
   }
 
-  if (isSubscriptionActive(cmg) && CMG_CONTENT_CHAT_LINK) {
-    kb.url('Чат — CMG', CMG_CONTENT_CHAT_LINK).icon('5310127020213043624').row()
+  if (isSubscriptionActive(cmg)) {
+    kb.text('Чат — CMG', 'chat_access:cmg').icon('5310127020213043624').row()
   }
 
-  if (isSubscriptionActive(cgs) && CGS_CHAT_LINK) {
-    kb.url('Чат — CGS', CGS_CHAT_LINK).icon('5190419001703963847').row()
+  if (isSubscriptionActive(cgs)) {
+    kb.text('Чат — CGS', 'chat_access:cgs').icon('5190419001703963847').row()
   }
 
-  if (isSubscriptionActive(storyloops) && STORY_LOOP_CHAT_LINK) {
-    kb.url('Чат — StoryLoops', STORY_LOOP_CHAT_LINK).icon('5190877553887323413').row()
+  if (isSubscriptionActive(storyloops)) {
+    kb.text('Чат — StoryLoops', 'chat_access:storyloops').icon('5190877553887323413').row()
   }
 
+  if (devices.length || ['active', 'expired'].includes(prop?.status || '')) {
+    kb.text('УСТРОЙСТВА', packCb({ a: 'open', s: 'devices', p: teamId })).icon(DEVICE_ICON).row()
+  }
   if (team.ownerId === userId) {
     for (const [productId, subscription] of team.subscriptions.entries()) {
       // ProPresenter продлевается только администратором через служебное уведомление.
@@ -205,12 +210,24 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
   message = message.emoji('🎬', '5251272469175631339').plain(' ').bold('ProPresenter').plain('\n')
 
   // PRO PRESENTER
-  if (isSubscriptionActive(prop)) {
+  if (devices.length) {
+    const orderedFlows = [...deviceFlows].sort((a, b) => a.flowNumber - b.flowNumber)
+    message = message.plain('┗ Статус: ').bold(orderedFlows.some((stream) => stream.expiresAt && new Date(stream.expiresAt).getTime() > Date.now()) ? '✅ Активна' : '❌ Срок истёк').plain('\n')
+    for (const stream of orderedFlows.slice(0, 5)) {
+      message = message.plain(`┗ Поток №${stream.flowNumber}, до ${formatExpiryDateTime(stream.expiresAt)}\n`)
+      message = message.plain('┗ Осталось: ').bold(`${getDaysLeft(stream.expiresAt)} дн.`).plain('\n')
+      message = message.plain('┗ Логин: ').code(stream.email).plain('\n')
+      message = message.plain('┗ Пароль: ').spoiler(stream.password).plain('\n')
+    }
+    if (orderedFlows.length > 5) message = message.plain(`┗ Ещё потоков: ${orderedFlows.length - 5}\n`)
+    message = message.emoji('🖥', DEVICE_ICON).plain(' Устройства:\n')
+    for (const device of devices.slice(0, 8)) message = message.plain(`  ┗ ${device.name} (№${device.flowNumber})\n`)
+    if (devices.length > 8) message = message.plain(`  ┗ И ещё ${devices.length - 8} — в разделе «Устройства»\n`)
+    if (propPayment?.status === 'pending') message = message.plain('┗ Оплата: ').bold('⏳ На проверке').plain('\n')
+  } else if (isSubscriptionActive(prop)) {
     message = message.plain('┗ Статус: ').bold('✅ Активна').plain('\n')
 
-    if (meta?.flowNumber) {
-      message = message.plain('┗ Поток: ').bold(`№${meta.flowNumber}`).plain('\n')
-    }
+    if (meta?.flowNumber) message = message.plain(`┗ Поток №${meta.flowNumber}, до ${formatExpiryDateTime(prop!.expiresAt)}\n`)
 
     if (meta?.email) {
       message = message.plain('┗ Логин: ').code(meta.email).plain('\n')
@@ -225,7 +242,7 @@ export async function teamScreen(userId: number, params: any): Promise<ScreenVie
       .bold(`${getDaysLeft(prop!.expiresAt)} дн.`)
       .plain('\n')
 
-    message = message.plain('┗ До: ').code(formatExpiryDateTime(prop!.expiresAt)).plain('\n')
+    message = message.emoji('🖥', DEVICE_ICON).plain(' Устройства: пока не указаны\n')
     if (propPayment?.status === 'pending')
       message = message.plain('┗ Продление: ').bold('⏳ На проверке').plain('\n')
   } else if (propPayment?.status === 'pending' || prop?.status === 'pending') {

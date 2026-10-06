@@ -4,11 +4,13 @@
 
 import { UserModel } from '../models/User.js'
 import { TeamModel } from '../models/Team.js'
+import { GroupAccessRevocationModel } from '../models/GroupAccessRevocation.js'
 import { CartModel } from '../models/Cart.js'
 import { TeamInviteModel } from '../models/TeamInvite.js'
 import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
 import { ProPresenterWaitlistModel } from '../models/ProPresenterWaitlist.js'
 import { SupportTicketModel } from '../models/SupportTicket.js'
+import { Yandex360MemberModel, Yandex360RequestModel } from '../models/Yandex360.js'
 import { PAGE_SIZE, SUB_STATUSES } from '../constants/admin-panel.js'
 import { getProduct } from '../config/products.js'
 import {
@@ -239,6 +241,20 @@ export async function adminDeleteUser(telegramId: number, adminTelegramId?: numb
     ),
   ])
 
+  // Запись участника может быть привязана по Telegram ID, по User ID или по обоим.
+  // Удаляем её заявки до удаления профиля, чтобы повторная регистрация не
+  // подхватила старую подписку и не упёрлась в уникальный индекс.
+  const yandexMembers = await Yandex360MemberModel.find({
+    $or: [{ telegramId }, { userId: user._id }],
+  }).select({ _id: 1 })
+  const yandexMemberIds = yandexMembers.map((member) => member._id)
+  const yandexRequests = yandexMemberIds.length
+    ? await Yandex360RequestModel.deleteMany({ memberId: { $in: yandexMemberIds } })
+    : { deletedCount: 0 }
+  const yandexMemberships = yandexMemberIds.length
+    ? await Yandex360MemberModel.deleteMany({ _id: { $in: yandexMemberIds } })
+    : { deletedCount: 0 }
+
   const deletedUser = await UserModel.deleteOne({ _id: user._id })
   if (!deletedUser.deletedCount) return null
 
@@ -261,6 +277,8 @@ export async function adminDeleteUser(telegramId: number, adminTelegramId?: numb
       username: user.username,
       ownedTeamsDeleted: ownedTeams.length,
       teamMembershipsRemoved: memberships.modifiedCount,
+      yandexMembershipsDeleted: yandexMemberships.deletedCount,
+      yandexRequestsDeleted: yandexRequests.deletedCount,
     },
   })
 
@@ -271,6 +289,8 @@ export async function adminDeleteUser(telegramId: number, adminTelegramId?: numb
     inviteHistoryAnonymized: inviteHistory.modifiedCount,
     waitlistEntriesReassigned,
     supportTicketsDeleted: supportTickets.deletedCount,
+    yandexMembershipsDeleted: yandexMemberships.deletedCount,
+    yandexRequestsDeleted: yandexRequests.deletedCount,
   }
 }
 
@@ -469,6 +489,25 @@ export async function adminRemoveTeamMember(
   return team
 }
 
+async function queueRevocationForTeam(team: any, productId: string, previous?: any) {
+  const subscription = previous || team.subscriptions.get(productId)
+  const flow = Number(subscription?.meta?.flowNumber)
+  const stream = productId === 'propresenter' && flow
+    ? await ProPresenterStreamModel.findOne({ flowNumber: flow }) : null
+  const chatId = productId === 'propresenter'
+    ? Number(stream?.chatId || process.env[`PROPRESENTER_FLOW_${flow}_CHAT_ID`]) || 0 : Number(getProduct(productId)?.groupId) || 0
+  if (!chatId) return
+  for (const member of team.members) {
+    if (member.status !== 'active') continue
+    await GroupAccessRevocationModel.updateOne(
+      { chatId, telegramId: member.telegramId },
+      { $setOnInsert: { chatId, telegramId: member.telegramId, productId,
+        teamId: String(team._id), status: 'pending' } },
+      { upsert: true }
+    )
+  }
+}
+
 // ---- подписки команды: subscriptions — Map<productId, {status, expiresAt, meta}> ----
 
 export async function adminSetTeamSubStatus(
@@ -483,6 +522,7 @@ export async function adminSetTeamSubStatus(
   const current = toPlainSub(team.subscriptions.get(product)) || { meta: {} }
   team.subscriptions.set(product, { ...current, status } as any)
   await saveTeam(team)
+  if (['expired', 'none', 'rejected'].includes(status)) await queueRevocationForTeam(team, product)
   const base = {
     ...adminAuditActor(adminTelegramId),
     targetUserId: team.ownerId,
@@ -593,6 +633,7 @@ export async function adminResetTeamSub(teamId: string, product: string, adminTe
   const current = toPlainSub(team.subscriptions.get(product))
   team.subscriptions.set(product, { status: 'none', expiresAt: null, meta: {} } as any)
   await saveTeam(team)
+  await queueRevocationForTeam(team, product, current)
   if (current?.status && current.status !== 'none') {
     await auditLogService.createLog({
       type: 'subscription.disabled',

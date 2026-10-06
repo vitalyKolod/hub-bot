@@ -34,6 +34,8 @@ export const ADMIN_PERMISSION_META = {
   'support.view': { label: 'Просмотр поддержки', shortLabel: 'Просмотр', category: 'support' },
   'support.reply': { label: 'Ответы пользователям', shortLabel: 'Ответы', category: 'support' },
   'broadcasts.send': { label: 'Отправка рассылок', shortLabel: 'Отправка', category: 'broadcasts' },
+  'tutorials.view': { label: 'Просмотр туториалов', shortLabel: 'Просмотр', category: 'tutorials' },
+  'tutorials.edit': { label: 'Управление туториалами', shortLabel: 'Управление', category: 'tutorials' },
   'admins.view': { label: 'Просмотр администраторов', shortLabel: 'Просмотр', category: 'admins' },
   'admins.manage': { label: 'Управление администраторами', shortLabel: 'Управление', category: 'admins' },
 } as const
@@ -43,6 +45,7 @@ export const ADMIN_PERMISSION_CATEGORIES = {
   subscriptions: { label: 'Подписки', emoji: '📦' }, payments: { label: 'Платежи', emoji: '💳' },
   streams: { label: 'Потоки', emoji: '📡' }, requests: { label: 'Заявки', emoji: '📋' },
   support: { label: 'Поддержка', emoji: '💬' }, broadcasts: { label: 'Рассылки', emoji: '📣' },
+  tutorials: { label: 'Туториалы', emoji: '🎬' },
   admins: { label: 'Администраторы', emoji: '👮' },
 } as const
 

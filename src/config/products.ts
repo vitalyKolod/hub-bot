@@ -34,8 +34,8 @@ export const PRODUCTS: Record<string, ProductConfig> = {
     description: 'Доступ к ProPresenter для подготовки и проведения служений.',
     cover: '/media/propres.jpg',
 
-    priceRub: 2000,
-    priceUsd: 20,
+    priceRub: 4000,
+    priceUsd: 40,
 
     cartable: false,
   },

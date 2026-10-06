@@ -5,6 +5,7 @@ import { packCb } from '../core/callback.js'
 import { config } from '../config.js'
 import { getProduct } from '../config/products.js'
 import { getOrCreateCart, getPendingItems, getCartTotal } from '../services/cart.service.js'
+import { getRenewalCampaign } from '../services/proPresenterRenewal.service.js'
 
 import type { ScreenView } from '../core/render.js'
 
@@ -106,6 +107,14 @@ export async function rubPaymentScreen(userId: number, params?: any): Promise<Sc
 
     productName = productConfig?.name || payment.product
     amount = productConfig?.priceRub ?? null
+  }
+  if (payment.renewalCampaignId) {
+    const campaign = await getRenewalCampaign(payment.renewalCampaignId)
+    if (campaign) {
+      const quantity = campaign.billingMode === 'device' ? payment.renewalDeviceIds?.length || 0 : 1
+      productName = `Продление ProPresenter · поток №${campaign.flowNumber} · ${quantity} устройств`
+      amount = campaign.priceRub * quantity
+    }
   }
 
   let message = new FormattedString('')

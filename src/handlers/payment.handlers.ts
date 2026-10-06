@@ -18,10 +18,34 @@ import { createTeamInvite } from '../services/teamInvite.service.js'
 import { markCartInReview, getOrCreateCart } from '../services/cart.service.js'
 import { ADMIN_GROUP_ID } from '../config/env.js'
 import type { MyContext } from '../types/context.js'
-import { auditLogService } from '../services/auditLog.service.js'
+import { auditLogService, recordOperationalEvent } from '../services/auditLog.service.js'
 import { acceptPayment, attachPaymentTelegramLocation, createPayment, getPayment, getPaymentsForAdminMessage, PaymentNotFoundError, rejectPayment, returnPaymentToPending } from '../services/payment.service.js'
 import { deliverAcceptedPayment, deliverRejectedPayment } from '../adapters/telegram/paymentDelivery.js'
+import { createProtectedChatInvite } from '../services/groupJoinAccess.service.js'
 import { appendConversationContactButtons } from '../services/conversation.service.js'
+import { eligibleSeats, getPayableRenewalForFlow, getRenewalCampaign, getRenewalSeat, renewalAcceptsNewPayments, setRenewalPaymentStatus, syncRenewalSummary } from '../services/proPresenterRenewal.service.js'
+import { ProPresenterDeviceModel } from '../models/ProPresenterDevice.js'
+import { sendDeviceChoices } from './proPresenterRenewal.handlers.js'
+
+export async function startRenewalCheckout(ctx: MyContext, campaignId: string, teamId: string) {
+  const userId = ctx.from!.id
+  const campaign = await getRenewalCampaign(campaignId)
+  if (!campaign || !renewalAcceptsNewPayments(campaign)) throw new Error('Приём взносов этого сбора закрыт')
+  const seats = await eligibleSeats(campaignId, userId)
+  const seat = seats.find((item) => item.teamId === teamId)
+  if (!seat) throw new Error('Оплатить может только владелец подписки этой команды')
+  if (campaign.billingMode !== 'device') throw new Error('Этот сбор создан до учёта устройств. Попросите администратора обновить сбор')
+  if (seat.paymentStatus === 'paid') throw new Error('Взнос за эту команду уже подтверждён')
+  if (seat.paymentStatus === 'pending') throw new Error('Чек этой команды уже находится на проверке')
+  const renewalDeviceIds = seat.devices.filter((device) => device.active !== false && device.paymentStatus === 'none' && device.vote === 'yes' && device.deviceId).map((device) => device.deviceId!)
+  if (!renewalDeviceIds.length) throw new Error('Нет устройств для оплаты')
+  ctx.session.payment = {
+    paymentId: new Types.ObjectId().toString(),
+    product: 'propresenter', teamId, renewalCampaignId: campaignId, renewalDeviceIds, method: null,
+  }
+  goTo(userId, 'payment')
+  await renderScreen(ctx, userId, 'payment', undefined, { forceNew: true })
+}
 
 export function paymentProductLine(productId: string): FormattedString {
   const product = getProduct(productId)
@@ -102,6 +126,9 @@ async function finishPaymentReject(ctx: MyContext, paymentId: string, reason: st
     return
   }
   await deliverRejectedPayment(ctx.api, decision)
+  if (decision.payment.renewalCampaignId) {
+    await syncRenewalSummary(ctx.api, decision.payment.renewalCampaignId).catch((error) => console.error('Renewal summary update failed:', error))
+  }
   const msg = ctx.callbackQuery?.message
   const caption = msg && 'caption' in msg ? msg.caption || '' : ''
   if (msg && caption) {
@@ -140,6 +167,9 @@ export async function handleCustomPaymentRejectText(ctx: MyContext) {
   ctx.session.waitingForPaymentRejectReason = false
   const payment = await rejectPayment(state.paymentId, ctx.from!.id, reason)
   await deliverRejectedPayment(ctx.api, payment)
+  if (payment.payment.renewalCampaignId) {
+    await syncRenewalSummary(ctx.api, payment.payment.renewalCampaignId).catch((error) => console.error('Renewal summary update failed:', error))
+  }
   const stored = await getPayment(state.paymentId)
   await ctx.api.editMessageReplyMarkup(state.chatId, state.messageId, {
     reply_markup: stored ? await fullAdminPaymentKeyboard(stored) : undefined,
@@ -159,6 +189,9 @@ export async function handlePaymentRetry(ctx: MyContext, paymentId: string) {
   const result = await returnPaymentToPending(paymentId, ctx.from!.id)
   if (!result.applied) return ctx.answerCallbackQuery({ text: `Статус: ${result.payment.status}`, show_alert: true })
   await ctx.editMessageReplyMarkup({ reply_markup: await fullAdminPaymentKeyboard(result.payment) })
+  if (result.payment.renewalCampaignId) {
+    await syncRenewalSummary(ctx.api, result.payment.renewalCampaignId).catch((error) => console.error('Renewal summary update failed:', error))
+  }
   await ctx.answerCallbackQuery({ text: 'Возвращено на проверку' })
 }
 
@@ -194,6 +227,25 @@ export async function handlePayProduct(
     })
     return
   }
+  if (productId === 'propresenter') {
+    const devices = await ProPresenterDeviceModel.find({ teamId, status: 'active' })
+    const campaigns = (await Promise.all([...new Set(devices.map((device) => device.flowNumber))]
+      .map((flowNumber) => getPayableRenewalForFlow(flowNumber)))).filter((campaign) => campaign?.billingMode === 'device')
+    if (!campaigns.length) {
+      await ctx.answerCallbackQuery({ text: 'Сбор продления этого потока ещё не запущен администратором', show_alert: true })
+      return
+    }
+    if (campaigns.length > 1) {
+      const kb = new InlineKeyboard()
+      for (const campaign of campaigns) kb.text(`Поток №${campaign!.flowNumber}`, `pr:e:${campaign!.id}:${teamId}`).row()
+      await ctx.reply('Выберите поток для продления устройств:', { reply_markup: kb })
+      await ctx.answerCallbackQuery()
+      return
+    }
+    await sendDeviceChoices(ctx.api, userId, campaigns[0]!.id, teamId)
+    await ctx.answerCallbackQuery()
+    return
+  }
   if (await isTeamProductPurchaseLocked(teamId, productId)) {
     await ctx.answerCallbackQuery({
       text: '✅ Этот продукт уже оплачен',
@@ -213,13 +265,13 @@ export async function handlePayProduct(
       ? 'Продление'
       : 'Новая подписка'
   await auditLogService.createLog({
-    type: 'payment.created',
+    type: 'payment.checkout_started',
     actorType: 'user',
     actorTelegramId: userId,
     targetUserId: userId,
     targetTeamId: teamId,
-    targetPaymentId: ctx.session.payment.paymentId,
     metadata: {
+      orderId: ctx.session.payment.paymentId,
       teamName: team.name,
       productId,
       productName: getProduct(productId)?.name || productId,
@@ -308,10 +360,25 @@ export async function handleReceiptUpload(ctx: MyContext) {
     const profile = await getOrCreateUser(userId)
     const username = ctx.from!.username ? `@${ctx.from!.username}` : `ID:${userId}`
     const payment = ctx.session.payment
-    const paymentWasAlreadyCreated = Boolean(payment?.paymentId)
     const teamId = payment?.teamId
     const validTeamId = teamId && teamId !== 'undefined' ? teamId : null
     const team = validTeamId ? await getTeamById(validTeamId) : null
+    if (payment?.renewalCampaignId) {
+      const campaign = await getRenewalCampaign(payment.renewalCampaignId)
+      const seats = await eligibleSeats(payment.renewalCampaignId, userId)
+      if (!campaign || !renewalAcceptsNewPayments(campaign) || !seats.some((seat) => seat.teamId === validTeamId)) {
+        throw new Error('Сбор продления закрыт или вы больше не владелец этой подписки')
+      }
+      const seat = await getRenewalSeat(payment.renewalCampaignId, validTeamId!)
+      if (!seat) throw new Error('Устройства команды не найдены в сборе')
+      if (seat?.paymentStatus !== 'none') throw new Error('Оплата этой команды уже отправлена или подтверждена')
+      if (campaign.billingMode === 'device') {
+        const selected = new Set(payment.renewalDeviceIds || [])
+        if (!selected.size || seat.devices.filter((device) => device.active !== false && selected.has(device.deviceId || '') && device.vote === 'yes' && device.paymentStatus === 'none').length !== selected.size) {
+          throw new Error('Состав устройств изменился. Вернитесь к оплате и начните заново')
+        }
+      }
+    }
 
     const operationFor = (productId?: string) => {
       if (!productId || !team) return '🆕 Новая оплата'
@@ -367,6 +434,12 @@ export async function handleReceiptUpload(ctx: MyContext) {
           paymentMethod: methodText, operation: operationFor(item.product).includes('Продление') ? 'renewal' : 'purchase', receipt,
         })
         createdPayments.push(persistentPayment)
+        await auditLogService.createLog({
+          type: 'payment.created', actorType: 'user', actorTelegramId: userId,
+          targetUserId: userId, targetTeamId: teamId, targetPaymentId: persistentPayment.id,
+          metadata: { orderId: item._id.toString(), productId: item.product,
+            operation: operationFor(item.product) },
+        })
         kb.text(
           `✅ ${getProduct(item.product)?.name}`,
           packCb({ a: 'cart_accept', p: persistentPayment.id })
@@ -385,13 +458,17 @@ export async function handleReceiptUpload(ctx: MyContext) {
       if (validTeamId && getProduct(payment?.product || '')) {
         const persistentPayment = await createPayment({
           id: paymentId, userId, teamId: validTeamId, productId: payment?.product || '', currency,
-          paymentMethod: methodText, operation: operationFor(payment?.product).includes('Продление') ? 'renewal' : 'purchase', receipt,
+          paymentMethod: methodText, operation: payment?.renewalCampaignId || operationFor(payment?.product).includes('Продление') ? 'renewal' : 'purchase', receipt,
+          renewalCampaignId: payment?.renewalCampaignId,
+          renewalDeviceIds: payment?.renewalDeviceIds,
         })
         createdPayments.push(persistentPayment)
         paymentId = persistentPayment.id
         if (payment) payment.paymentId = paymentId
       }
-      operationText = operationFor(payment?.product)
+      operationText = payment?.renewalCampaignId
+        ? `🔄 Продление ProPresenter · поток №${(await getRenewalCampaign(payment.renewalCampaignId))?.flowNumber} · ${payment.renewalDeviceIds?.length || 0} устройств`
+        : operationFor(payment?.product)
       productsText = payment?.product || ''
       kb.text('✅ Подтвердить', packCb({ a: 'accept', p: teamId }))
         .text('❌ Отклонить', packCb({ a: 'reject', p: paymentId }))
@@ -401,13 +478,18 @@ export async function handleReceiptUpload(ctx: MyContext) {
 
     const teamName = team?.name || (validTeamId ? 'Неизвестно' : '—')
 
-    const adminText = paymentCard({
+    let adminText = paymentCard({
       operation: operationText.replace(/^[^А-Яа-яA-Za-z]+/, '').trim(),
       productIds: payment?.product === 'cart' ? productsText.split(',').filter(Boolean) : [productsText],
       owner: profile.fio || 'не указано', username: ctx.from!.username ? '@' + ctx.from!.username : 'не указано',
       userId, team: teamName, teamId: teamId || '—', method: methodText,
       time: new Date().toLocaleString('ru-RU'),
     })
+    if (payment?.renewalCampaignId && createdPayments[0]) {
+      const devices = await ProPresenterDeviceModel.find({ _id: { $in: payment.renewalDeviceIds || [] } })
+      const names = devices.slice(0, 8).map((device) => device.name.slice(0, 35)).join(', ')
+      adminText = adminText.plain(`\n\n🖥 Устройства (${devices.length}): ${names}${devices.length > 8 ? ` и ещё ${devices.length - 8}` : ''}\nК оплате: ${createdPayments[0].amount} ${createdPayments[0].currency === 'rub' ? '₽' : 'USDT'}`)
+    }
 
     let threadId: number | undefined
     try {
@@ -442,6 +524,10 @@ export async function handleReceiptUpload(ctx: MyContext) {
     for (const persistentPayment of createdPayments) {
       await attachPaymentTelegramLocation(persistentPayment.id, { threadId, messageId: sentMessage.message_id })
     }
+    if (payment?.renewalCampaignId && createdPayments[0]) {
+      await setRenewalPaymentStatus(payment.renewalCampaignId, validTeamId!, createdPayments[0].id, 'pending', payment.renewalDeviceIds)
+      await syncRenewalSummary(ctx.api, payment.renewalCampaignId).catch((error) => console.error('Renewal summary update failed:', error))
+    }
 
     if (payment?.product === 'cart' && teamId) {
       const cart = await getOrCreateCart(teamId)
@@ -452,8 +538,9 @@ export async function handleReceiptUpload(ctx: MyContext) {
           actorTelegramId: userId,
           targetUserId: userId,
           targetTeamId: teamId,
-          targetPaymentId: item._id.toString(),
+          targetPaymentId: createdPayments.find((created) => String(created.cartItemId) === item._id.toString())?.id,
           metadata: {
+            orderId: item._id.toString(),
             teamName: team?.name,
             productId: item.product,
             productName: getProduct(item.product)?.name || item.product,
@@ -464,7 +551,7 @@ export async function handleReceiptUpload(ctx: MyContext) {
       }
     } else {
       const paymentId = payment?.paymentId || new Types.ObjectId().toString()
-      if (!paymentWasAlreadyCreated) {
+      if (createdPayments.length) {
         await auditLogService.createLog({
           type: 'payment.created',
           actorType: 'user',
@@ -507,7 +594,7 @@ export async function handleReceiptUpload(ctx: MyContext) {
   } catch (err) {
     console.error('🔥 ОБЩАЯ ОШИБКА в блоке отправки чека:', err)
     await ctx.react('👎').catch(() => {})
-    await ctx.reply('❌ Произошла ошибка при обработке чека. Попробуй ещё раз.')
+    await ctx.reply(`❌ ${err instanceof Error ? err.message : 'Произошла ошибка при обработке чека. Попробуйте ещё раз.'}`)
   }
 }
 
@@ -546,8 +633,14 @@ export async function handleAdminAccept(
           await ctx.answerCallbackQuery({ text: decision.payment.status === 'accepted' ? 'Уже принято' : `Статус: ${decision.payment.status}`, show_alert: true })
           return
         }
-        await deliverAcceptedPayment(ctx.api, decision, ctx.me.username)
+        await deliverAcceptedPayment(ctx.api, decision, ctx.me.username).catch((error) => {
+          if (!decision.payment.renewalCampaignId) throw error
+          console.error('Renewal payment accepted, owner notification failed:', error)
+        })
         await ctx.api.editMessageCaption(String(ADMIN_GROUP_ID), messageId, { caption: `${caption}\n\n✅ Принято`, caption_entities: ctx.callbackQuery?.message && 'caption_entities' in ctx.callbackQuery.message ? ctx.callbackQuery.message.caption_entities : undefined, reply_markup: await fullAdminPaymentKeyboard(decision.payment) })
+        if (decision.payment.renewalCampaignId) {
+          await syncRenewalSummary(ctx.api, decision.payment.renewalCampaignId).catch((error) => console.error('Renewal summary update failed:', error))
+        }
         await ctx.answerCallbackQuery({ text: 'Принято ✓' })
         return
       } catch (error) {
@@ -591,6 +684,10 @@ export async function handleAdminAccept(
       return
     }
 
+    if (productId === 'propresenter') {
+      throw new Error('Платёж ProPresenter не найден в базе. Подтверждение без записи сбора запрещено.')
+    }
+
     const product = getProduct(productId)
     const { isExtension } = await activateTeamSubscription(teamId, productId, 1, {
       actorType: 'admin',
@@ -615,13 +712,19 @@ export async function handleAdminAccept(
     })
 
     if (product?.groupId) {
-      const invite = await ctx.api.createChatInviteLink(product.groupId, {
-        member_limit: 1,
-      })
+      const invite = await createProtectedChatInvite(ctx.api, productId, team.ownerId)
+      if (!invite) throw new Error('Active team access required for chat invitation')
       await ctx.api.sendMessage(
         team.ownerId,
-        `✅ ${isExtension ? 'Продлено' : 'Подписка активирована:'} ${product.name}\n\nВаша ссылка ниже 👇\n\n${invite.invite_link}\n\nчтобы вернуться в команду, нажмите /team_list`
+        `✅ ${isExtension ? 'Продлено' : 'Подписка активирована:'} ${product.name}\n\nСсылка для заявки в чат действует 1 час. Бот проверит ваш Telegram ID 👇\n\n${invite.invite_link}\n\nНовую ссылку можно получить в карточке команды.`
       )
+      await recordOperationalEvent({
+        type: 'access.invite_issued', actorType: 'system', targetUserId: team.ownerId,
+        targetTeamId: teamId, targetSubscriptionId: `${teamId}:${productId}`,
+        metadata: { groupId: product.groupId, productId,
+          result: 'Telegram API принял ссылку; вступление неизвестно',
+          reason: isExtension ? 'восстановление или продление доступа' : 'активация подписки' },
+      })
     } else {
       await ctx.api.sendMessage(
         team.ownerId,

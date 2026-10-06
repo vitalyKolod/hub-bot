@@ -5,6 +5,8 @@ export type SessionData = {
     paymentId?: string
     product: string
     teamId?: string
+    renewalCampaignId?: string
+    renewalDeviceIds?: string[]
     method: string | null
     volunteerId?: number
     rubMethod?: string | null
@@ -40,6 +42,7 @@ export type SessionData = {
   }
   waitingForPaymentRejectReason?: boolean
   activeConversationId?: string
+  deviceDraft?: { mode: 'user_name' | 'admin_name'; teamId: string; flowNumber: number; name?: string; adminMessageId?: number }
 }
 
 export type MyContext = Context & SessionFlavor<SessionData>

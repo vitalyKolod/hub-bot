@@ -1,3 +1,7 @@
+import { handleYandex360Callback, handleYandex360Text } from './handlers/yandex360.handlers.js'
+import { handleTutorialAdminMessage } from './handlers/tutorialAdmin.handlers.js'
+import { bindKnownUser } from './services/yandex360.service.js'
+import { createProtectedChatInvite, handleProductJoinRequest, handleProductMemberJoined } from './services/groupJoinAccess.service.js'
 import { markSupportUiOpened, markSupportUiClosed } from './ui/supportUi.js'
 import { startSupportFlow, handleSupportFlowCallback, guardSupportSelection } from './handlers/supportFlow.handlers.js'
 import { PROP_FLOWS } from './data/ProPresenterFLows.js'
@@ -25,12 +29,13 @@ import {
   handleRegistrationText,
   finishRegistration,
 } from './flows/registration/index.js'
+import { buildAdminKeyboard } from './flows/registration/admin.js'
 
 import dotenv from 'dotenv'
 import { getOrCreateUser } from './services/user.service.js'
 import { activateVolunteer } from './services/volunteer.service.js'
 import { UserModel } from './models/User.js'
-import { runReminders } from './services/reminder.service.js'
+import { runReminders, runYandex360Reminders } from './services/reminder.service.js'
 dotenv.config()
 import { escapeUnderscore } from './utils/escape.js'
 import { isAdmin } from './config/admin.js'
@@ -60,7 +65,6 @@ import {
 } from './services/team.service.js'
 import { createTeamInvite } from './services/teamInvite.service.js'
 import { getPendingBatches } from './services/proPresenterWaitlist.service.js'
-import { getStreamByNumber } from './services/proPresenterStream.service.js'
 import { handleBack, handleHome, handleOpen } from './handlers/navigation.hadlers.js'
 import {
   handleConfirmRegistration,
@@ -130,7 +134,6 @@ import {
   adminExtendTeamSub,
   adminGetAllStreams,
   adminGetUserIdsInStream,
-  adminSetStreamExpiry,
 } from './services/adminPanel.service.js'
 import {
   closeOpenTicketForUser,
@@ -140,7 +143,10 @@ import {
   autoCloseInactiveSupportTickets,
   reopenSupportTicket,
 } from './services/support.service.js'
-import { auditLogService } from './services/auditLog.service.js'
+import { auditLogService, recordOperationalEvent } from './services/auditLog.service.js'
+import { bindStreamChat } from './services/proPresenterRenewal.service.js'
+import { handleRenewalCallback, showRenewalEntry, runRenewalAdminPrompts, runRenewalParticipantReminders } from './handlers/proPresenterRenewal.handlers.js'
+import { handleDeviceCallback, handleDeviceNameText } from './handlers/proPresenterDevice.handlers.js'
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const CONTENT_GROUP_ID = Number(process.env.CONTENT_GROUP_ID)
@@ -184,6 +190,8 @@ type MyContext = Context &
       paymentId?: string
       product: string
       teamId?: string
+      renewalCampaignId?: string
+      renewalDeviceIds?: string[]
       method: string | null
       volunteerId?: number
       rubMethod?: string | null
@@ -226,8 +234,13 @@ type MyContext = Context &
     }
     waitingForPaymentRejectReason?: boolean
     activeConversationId?: string
+    deviceDraft?: { mode: 'user_name' | 'admin_name'; teamId: string; flowNumber: number; name?: string; adminMessageId?: number }
 
     adminPanelInput?: any
+    tutorialAdminInput?: any
+    tutorialAdminPanel?: { chatId: number; messageId: number }
+    tutorialAdminPanelKind?: 'text' | 'media'
+    tutorialAdminTextPanel?: { chatId: number; messageId: number }
   }>
 
 const broadcastAlbumTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -235,6 +248,7 @@ const broadcastAlbumTimers = new Map<string, ReturnType<typeof setTimeout>>()
 async function showAdminRootMenu(ctx: MyContext, editCurrent = false) {
   ctx.session.adminMode = undefined
   ctx.session.adminPanelInput = undefined
+  ctx.session.tutorialAdminInput = undefined
 
   const kb = new InlineKeyboard()
     .text('📢 Рассылка', 'admin:broadcast')
@@ -411,6 +425,31 @@ export function registerHandlers(bot: Bot<MyContext>) {
   auditLogService.setTelegramApi(bot.api)
   initScreens()
 
+  bot.on('chat_join_request', async (ctx) => {
+    try {
+      await handleProductJoinRequest(ctx.api, ctx.chatJoinRequest.chat.id, ctx.chatJoinRequest.from.id)
+    } catch (error) {
+      console.error('Product chat join request check failed:', error)
+      // The request stays pending if the database or Telegram is unavailable.
+    }
+  })
+
+  bot.on('chat_member', async (ctx) => {
+    const update = ctx.chatMember
+    const oldMember = update.old_chat_member
+    const newMember = update.new_chat_member
+    const wasIn = ['creator', 'administrator', 'member'].includes(oldMember.status) ||
+      (oldMember.status === 'restricted' && oldMember.is_member)
+    const isIn = ['creator', 'administrator', 'member'].includes(newMember.status) ||
+      (newMember.status === 'restricted' && newMember.is_member)
+    if (wasIn || !isIn || ['creator', 'administrator'].includes(newMember.status)) return
+    try {
+      await handleProductMemberJoined(ctx.api, update.chat.id, newMember.user.id)
+    } catch (error) {
+      console.error('Product chat entrant check failed:', error)
+    }
+  })
+
   bot.use(
     session<MyContext['session'], Context>({
       initial: () => ({
@@ -436,6 +475,18 @@ export function registerHandlers(bot: Bot<MyContext>) {
     const payload = ctx.match
     const userId = ctx.from.id
     await clearInputMode(userId)
+
+    const profile = await getOrCreateUser(userId)
+    await bindKnownUser(userId)
+    if (profile.createdAt && Date.now() - new Date(profile.createdAt).getTime() < 10_000) {
+      const first = await UserModel.updateOne(
+        { telegramId: userId, firstStartLoggedAt: null },
+        { $set: { firstStartLoggedAt: new Date() } }
+      )
+      if (first.modifiedCount) await recordOperationalEvent({
+        type: 'user.first_started', actorType: 'user', actorTelegramId: userId, targetUserId: userId,
+      })
+    }
 
     if (payload && typeof payload === 'string' && payload.startsWith('join_')) {
       const code = payload.replace('join_', '')
@@ -473,7 +524,20 @@ export function registerHandlers(bot: Bot<MyContext>) {
       }
     }
 
-    const profile = await getOrCreateUser(userId)
+    if (typeof payload === 'string' && payload.startsWith('pr_')) {
+      const campaignId = payload.slice(3)
+      if (profile.reg === 'done') {
+        await showRenewalEntry(ctx, campaignId)
+        return
+      }
+      await UserModel.updateOne({ telegramId: userId }, { $set: { pendingProPresenterRenewalId: campaignId } })
+      await ctx.reply('После регистрации бот вернёт вас к продлению ProPresenter.')
+    }
+    if (typeof payload === 'string' && payload.startsWith('prsup_') && profile.reg === 'done') {
+      await startSupportFlow(ctx)
+      return
+    }
+
     if (profile.reg === 'done') {
       await ctx.reply('✅ Вы уже зарегистрированы в ХАБе.')
       goHome(userId)
@@ -515,6 +579,21 @@ export function registerHandlers(bot: Bot<MyContext>) {
     await ctx.reply(`Thread ID: ${ctx.message.message_thread_id || 'нет (это не топик)'}`)
   })
 
+  bot.command('bind_stream', async (ctx) => {
+    if (!ctx.from || !(await hasAdminPermission(ctx.from.id, 'streams.edit'))) return
+    if (!['group', 'supergroup'].includes(ctx.chat.type)) {
+      await ctx.reply('Эту команду нужно отправить внутри чата нужного потока.')
+      return
+    }
+    const flowNumber = Number(String(ctx.match || '').trim())
+    try {
+      const stream = await bindStreamChat(flowNumber, ctx.chat.id)
+      await ctx.reply(`✅ Этот чат привязан к потоку №${stream.flowNumber}. Опрос будет отправлен только после запуска администратором в карточке потока.`)
+    } catch (error) {
+      await ctx.reply(error instanceof Error ? error.message : 'Не удалось привязать чат')
+    }
+  })
+
   bot.command('main', async (ctx) => {
     await clearInputMode(ctx.from.id)
     goHome(ctx.from.id)
@@ -546,10 +625,32 @@ export function registerHandlers(bot: Bot<MyContext>) {
   // ====================== CALLBACK QUERY ======================
   bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data
+    if (data.startsWith('chat_access:')) {
+      const productId = data.slice('chat_access:'.length)
+      try {
+        const invite = await createProtectedChatInvite(ctx.api, productId, ctx.from.id)
+        if (!invite) {
+          await ctx.answerCallbackQuery({ text: 'Нет действующей подписки для этого чата', show_alert: true })
+          return
+        }
+        await ctx.answerCallbackQuery({ text: 'Ссылка отправлена вам в личные сообщения' })
+        await ctx.api.sendMessage(ctx.from.id,
+          `Ссылка для заявки в чат действует 1 час. Бот проверит ваш Telegram ID при вступлении:\n${invite.invite_link}`)
+      } catch (error) {
+        console.error('Product chat invite failed:', error)
+        await ctx.answerCallbackQuery({ text: 'Не удалось создать ссылку. Попробуйте позже.', show_alert: true }).catch(() => {})
+      }
+      return
+    }
+    if (data !== 'ap:tuts' && !data.startsWith('ap:tuts:')) ctx.session.tutorialAdminInput = undefined
+    if (!data.startsWith('dv:') && ctx.session.deviceDraft) ctx.session.deviceDraft = undefined
     if (ctx.session.supportDraft && !data.startsWith('s2:') && !data.startsWith('support:')) {
       ctx.session.supportDraft = undefined
       ctx.session.inSupportMode = false
     }
+    if (await handleYandex360Callback(ctx, data)) return
+    if (await handleDeviceCallback(ctx, data)) return
+    if (await handleRenewalCallback(ctx, data)) return
     if (await handleAdminPanelCallback(ctx, data)) return
 
     const userId = ctx.from?.id
@@ -598,21 +699,11 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
       if (kind === 'f') {
         const flowNumber = Number(parts[2])
-        const stream = await getStreamByNumber(flowNumber)
-        if (
-          !stream?.expiresAt ||
-          stream.expiresAt.toISOString().slice(0, 10).replaceAll('-', '') !== expectedToken
-        ) {
-          await ctx.answerCallbackQuery({
-            text: 'Уже продлено или дата изменена',
-            show_alert: true,
-          })
-          return
-        }
-        newExpiry = new Date(stream.expiresAt > new Date() ? stream.expiresAt : new Date())
-        newExpiry.setFullYear(newExpiry.getFullYear() + 1)
-        await adminSetStreamExpiry(flowNumber, newExpiry, userId)
-        label = `ProPresenter, поток №${flowNumber}`
+        await ctx.answerCallbackQuery({ text: 'Продление ProPresenter теперь подтверждается в карточке потока.', show_alert: true })
+        await ctx.reply(`Откройте карточку потока №${flowNumber}:`, {
+          reply_markup: new InlineKeyboard().text('📡 Открыть поток', apCb('stream', flowNumber)),
+        })
+        return
       } else if (kind === 't') {
         const [, , teamId, productId] = parts
         const team = await getTeamById(teamId)
@@ -1218,6 +1309,11 @@ export function registerHandlers(bot: Bot<MyContext>) {
     return next()
   })
 
+  bot.on('message', async (ctx, next) => {
+    if (await handleTutorialAdminMessage(ctx)) return
+    return next()
+  })
+
   // Черновик рассылки должен перехватываться до более узких text/photo handlers.
   bot.on('message', async (ctx, next) => {
     if (!ctx.from || !isAdmin(ctx.from.id)) return next()
@@ -1278,6 +1374,8 @@ export function registerHandlers(bot: Bot<MyContext>) {
     const userId = ctx.from?.id
     if (!userId) return
 
+    if (await handleYandex360Text(ctx)) return
+    if (await handleDeviceNameText(ctx)) return
     if (await handleCustomPaymentRejectText(ctx)) return
     if (await relayActiveConversationMessage(ctx)) return
 
@@ -1419,12 +1517,22 @@ export function registerHandlers(bot: Bot<MyContext>) {
       await ctx.reply('⚠️ Этот тип сообщения не удалось отправить. Попробуйте текст или файл.')
     }
   })
+  let checkingSubscriptions = false
   const checkSubscriptions = async () => {
-    console.log('⏰ Проверка подписок и напоминаний...')
-    await runReminders(bot).catch((error) => console.error('Ошибка проверки подписок:', error))
+    if (checkingSubscriptions) return
+    checkingSubscriptions = true
+    try {
+      console.log('⏰ Проверка подписок и напоминаний...')
+      await runReminders(bot).catch((error) => console.error('Ошибка проверки подписок:', error))
+      await runYandex360Reminders(bot).catch((error) => console.error('Ошибка напоминаний Яндекс 360:', error))
+      await runRenewalAdminPrompts(bot.api).catch((error) => console.error('Ошибка приглашений к продлению ProPresenter:', error))
+      await runRenewalParticipantReminders(bot.api).catch((error) => console.error('Ошибка напоминаний ProPresenter:', error))
+    } finally {
+      checkingSubscriptions = false
+    }
   }
   void checkSubscriptions()
-  setInterval(checkSubscriptions, 1000 * 60 * 60) // каждые 60 минут
+  setInterval(checkSubscriptions, 1000 * 60 * 10) // каждые 10 минут
   const checkInactiveSupport = async () => {
     await autoCloseInactiveSupportTickets(bot.api).catch((error) =>
       console.error('Ошибка auto-close поддержки:', error)

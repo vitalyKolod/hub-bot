@@ -19,6 +19,8 @@ const proPresenterStreamSchema = new mongoose.Schema(
       required: true,
     },
 
+    chatId: { type: Number, default: null },
+
     chatLink: {
       type: String,
       default: '',

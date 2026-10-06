@@ -6,6 +6,7 @@ import { config } from '../config.js'
 import { packCb } from '../core/callback.js'
 import { getProduct } from '../config/products.js'
 import { getOrCreateCart, getPendingItems, getCartTotal } from '../services/cart.service.js'
+import { getRenewalCampaign } from '../services/proPresenterRenewal.service.js'
 
 import type { ScreenView } from '../core/render.js'
 
@@ -15,7 +16,8 @@ export async function cryptoPaymentScreen(
     network: string
     product?: string
     teamId?: string
-  }
+  },
+  ctx?: any
 ): Promise<ScreenView> {
   const kb = new InlineKeyboard()
 
@@ -83,6 +85,15 @@ export async function cryptoPaymentScreen(
     productName = productConfig?.name || params?.product || ''
 
     amount = productConfig?.priceUsd ?? null
+  }
+  const campaignId = ctx?.session?.payment?.renewalCampaignId
+  if (campaignId) {
+    const campaign = await getRenewalCampaign(campaignId)
+    if (campaign) {
+      const quantity = campaign.billingMode === 'device' ? ctx?.session?.payment?.renewalDeviceIds?.length || 0 : 1
+      productName = `Продление ProPresenter · поток №${campaign.flowNumber} · ${quantity} устройств`
+      amount = campaign.priceUsd * quantity
+    }
   }
 
   let message = new FormattedString('')

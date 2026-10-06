@@ -32,6 +32,7 @@ test('management menu uses only the configured custom icons on section buttons',
     ['Команды', '5296533616224906961'],
     ['Потоки ProPresenter', '5251272469175631339'],
     ['Заявки на поток №21 (2/20)', '6323602795123443087'],
+    ['Потоки Яндекс 360', '5310051278464778081'],
     ['Администраторы', '5836690092306992715'],
   ])
   for (const [label, icon] of expected) {
@@ -161,6 +162,9 @@ test('user card includes contact, create and delete actions in the expected orde
   assert.equal(buttons.some((button) => button.text === '💬 Написать пользователю'), false)
   assert.equal(buttons.find((button) => button.text === '👤 Открыть Telegram-профиль')?.url, `tg://user?id=${targetId}`)
   assert.ok(labels.indexOf('👥 Спасение') < labels.indexOf('➕ Создать команду'))
+  const yandexButton: any = buttons.find((button) => button.text === '➕ Добавить Яндекс 360')
+  assert.equal(yandexButton?.callback_data, `y360:user:${targetId}`)
+  assert.equal(yandexButton?.icon_custom_emoji_id, '5310051278464778081')
   assert.ok(labels.indexOf('➕ Создать команду') < labels.indexOf('➕ Добавить в команду'))
   assert.ok(labels.indexOf('🗑 Удалить юзера') < labels.indexOf('‹ К списку'))
   assert.equal(

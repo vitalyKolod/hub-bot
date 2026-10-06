@@ -9,6 +9,7 @@ import { TeamInviteModel } from '../src/models/TeamInvite.js'
 import { UserModel } from '../src/models/User.js'
 import { adminDeleteUser } from '../src/services/adminPanel.service.js'
 import { AuditLogModel } from '../src/models/AuditLog.js'
+import { Yandex360MemberModel, Yandex360RequestModel } from '../src/models/Yandex360.js'
 
 function execQuery(result: any) {
   const promise = Promise.resolve(result)
@@ -84,6 +85,20 @@ test('adminDeleteUser removes owned data while preserving surviving-team resourc
   t.mock.method(CartModel as any, 'deleteMany', () => execQuery({ deletedCount: 1 }))
   t.mock.method(SupportTicketModel as any, 'deleteMany', async () => ({ deletedCount: 3 }))
   t.mock.method(UserModel.collection as any, 'updateMany', async () => ({ modifiedCount: 1 }))
+  t.mock.method(Yandex360MemberModel as any, 'find', (filter: any) => {
+    assert.deepEqual(filter, { $or: [{ telegramId: targetId }, { userId: 'user-doc' }] })
+    return { select: async () => [{ _id: 'yandex-member' }] }
+  })
+  t.mock.method(Yandex360RequestModel as any, 'deleteMany', async (filter: any) => {
+    assert.deepEqual(filter, { memberId: { $in: ['yandex-member'] } })
+    events.push('yandex-requests-deleted')
+    return { deletedCount: 2 }
+  })
+  t.mock.method(Yandex360MemberModel as any, 'deleteMany', async (filter: any) => {
+    assert.deepEqual(filter, { _id: { $in: ['yandex-member'] } })
+    events.push('yandex-member-deleted')
+    return { deletedCount: 1 }
+  })
   t.mock.method(UserModel as any, 'deleteOne', async () => {
     events.push('user-deleted')
     return { deletedCount: 1 }
@@ -91,7 +106,7 @@ test('adminDeleteUser removes owned data while preserving surviving-team resourc
 
   const result = await adminDeleteUser(targetId)
 
-  assert.deepEqual(events, ['owned-team-deleted', 'user-deleted'])
+  assert.deepEqual(events, ['owned-team-deleted', 'yandex-requests-deleted', 'yandex-member-deleted', 'user-deleted'])
   assert.deepEqual(inviteUpdates, [
     { filter: { _id: 'invite-id' }, update: { $set: { createdBy: 701 } } },
   ])
@@ -105,5 +120,7 @@ test('adminDeleteUser removes owned data while preserving surviving-team resourc
     inviteHistoryAnonymized: 1,
     waitlistEntriesReassigned: 1,
     supportTicketsDeleted: 3,
+    yandexMembershipsDeleted: 1,
+    yandexRequestsDeleted: 2,
   })
 })

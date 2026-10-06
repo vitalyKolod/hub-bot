@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { Bot } from 'grammy'
+import { API_CONSTANTS, Bot } from 'grammy'
 import { config } from './src/config.js'
 import { registerHandlers } from './src/bot.js'
 import { connectDB } from './db.js'
@@ -25,12 +25,13 @@ export async function start() {
 
     console.log('✅ Бот запущен')
     // 5. Запускаем
-    await bot.start()
+    await bot.start({
+      allowed_updates: [...API_CONSTANTS.DEFAULT_UPDATE_TYPES, 'chat_member'],
+    })
 
     console.log('✅ Bot started')
   } catch (err) {
     console.error('❌ Start failed:', err)
-    console.log(process.env.MONGO_URI)
     process.exit(1)
   }
 }

@@ -4,6 +4,7 @@ import { FormattedString } from '@grammyjs/parse-mode'
 import { packCb } from '../core/callback.js'
 import { getProduct } from '../config/products.js'
 import { getOrCreateCart, getPendingItems, getCartTotal } from '../services/cart.service.js'
+import { getRenewalCampaign } from '../services/proPresenterRenewal.service.js'
 
 import type { ScreenView } from '../core/render.js'
 
@@ -33,6 +34,15 @@ export async function paymentScreen(userId: number, params: any, ctx: any): Prom
 
     amountRub = productConfig?.priceRub ?? null
     amountUsd = productConfig?.priceUsd ?? null
+  }
+  if (payment?.renewalCampaignId) {
+    const campaign = await getRenewalCampaign(payment.renewalCampaignId)
+    if (campaign) {
+      const quantity = campaign.billingMode === 'device' ? payment.renewalDeviceIds?.length || 0 : 1
+      productName = `Продление ProPresenter · поток №${campaign.flowNumber} · ${quantity} устройств`
+      amountRub = campaign.priceRub * quantity
+      amountUsd = campaign.priceUsd * quantity
+    }
   }
 
   const kb = new InlineKeyboard()

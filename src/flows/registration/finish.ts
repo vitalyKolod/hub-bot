@@ -66,4 +66,10 @@ export async function finishRegistration(ctx: any, userId: number) {
   await renderScreen(ctx, userId, 'main', undefined, {
     forceNew: true,
   })
+  const profile = await UserModel.findOne({ telegramId: userId })
+  if (profile?.pendingProPresenterRenewalId) {
+    await UserModel.updateOne({ telegramId: userId }, { $set: { pendingProPresenterRenewalId: null } })
+    const { showRenewalEntry } = await import('../../handlers/proPresenterRenewal.handlers.js')
+    await showRenewalEntry(ctx, profile.pendingProPresenterRenewalId)
+  }
 }
