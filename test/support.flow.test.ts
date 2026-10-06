@@ -39,12 +39,12 @@ function context(t: any, teams: any[] = [], payments: any[] = []) {
 }
 const payment = { id, userId: 10, productId: 'procontent', amount: 500, currency: 'rub', status: 'rejected', rejectionReason: 'Сумма не совпадает' }
 
-test('support starts with exactly six categories without creating a ticket', async t => {
+test('support includes Yandex 360 without creating a ticket', async t => {
   const { ctx, last, draft, switches } = context(t)
   t.mock.method(SupportTicketModel as any, 'create', () => assert.fail('ticket created too early'))
   await startSupportFlow(ctx)
   assert.equal(draft().step, 'categories')
-  assert.equal(last().reply_markup.inline_keyboard.flat().filter((b: any) => b.callback_data.startsWith('s2:category:')).length, 6)
+  assert.equal(last().reply_markup.inline_keyboard.flat().filter((b: any) => b.callback_data.startsWith('s2:category:')).length, 7)
   assert.match(last().text, /С чем вам нужна помощь/)
   assert.deepEqual(switches, [[{ userId: 10, userActive: true }, { $set: { userActive: false } }]])
 })

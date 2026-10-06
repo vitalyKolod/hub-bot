@@ -44,6 +44,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    firstStartLoggedAt: { type: Date, default: null },
   },
   {
     timestamps: true,

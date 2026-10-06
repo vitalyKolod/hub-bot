@@ -1,5 +1,6 @@
 import { registerScreens } from '../core/render.js'
 import { mainScreen } from './main.js'
+import { yandex360Screen } from './yandex360.js'
 import type { ScreenId } from '../state/ui.js'
 import type { ScreenView } from '../core/render.js'
 import { profileScreen } from './profile.js'
@@ -36,7 +37,7 @@ import { propresenterCheckScreen } from './propresenter-check.js'
 import { propresenterStreamsScreen } from './propresenter-streams.js'
 import { propresenterNoStreamScreen } from './propresenter-no-stream.js'
 import { propresenterConfirmScreen } from './propresenter-confirm.js'
-import { tutorialsScreen, tutorialScreen } from './tutorials.js'
+import { tutorialsScreen, tutorialTopicScreen, tutorialScreen } from './tutorials.js'
 
 export function initScreens() {
   const registry: Record<
@@ -44,7 +45,9 @@ export function initScreens() {
     (userId: number, params?: any, ctx?: any) => ScreenView | Promise<ScreenView>
   > = {
     main: mainScreen,
+    yandex360: yandex360Screen,
     tutorials: tutorialsScreen,
+    tutorial_topic: tutorialTopicScreen,
     tutorial: tutorialScreen,
 
     // временные заглушки

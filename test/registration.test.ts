@@ -46,7 +46,7 @@ test('registration notification uses the admin group general feed', async (t) =>
     42
   )
 
-  assert.equal(sent?.[0], -1003775348160)
+  assert.equal(sent?.[0], Number(process.env.ADMIN_GROUP_ID))
   assert.equal('message_thread_id' in sent?.[2], false)
   assert.match(sent?.[1], /Волонтер тест/)
   assert.match(sent?.[1], /@volunteer/)

@@ -9,6 +9,7 @@ export const ADMIN_PERMISSION_DEPENDENCIES: Partial<Record<AdminPermission, Admi
   'users.edit': 'users.view', 'teams.edit': 'teams.view', 'subscriptions.edit': 'subscriptions.view',
   'payments.manage': 'payments.view', 'streams.edit': 'streams.view', 'requests.edit': 'requests.view',
   'support.reply': 'support.view', 'admins.manage': 'admins.view',
+  'tutorials.edit': 'tutorials.view',
 }
 export type ResolvedAdminAccess = { telegramId: number; role: AdminRole; permissions: AdminPermission[]; bootstrap: boolean; active: boolean }
 

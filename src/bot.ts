@@ -1,3 +1,6 @@
+import { handleYandex360Callback, handleYandex360Text } from './handlers/yandex360.handlers.js'
+import { handleTutorialAdminMessage } from './handlers/tutorialAdmin.handlers.js'
+import { bindKnownUser } from './services/yandex360.service.js'
 import { markSupportUiOpened, markSupportUiClosed } from './ui/supportUi.js'
 import { startSupportFlow, handleSupportFlowCallback, guardSupportSelection } from './handlers/supportFlow.handlers.js'
 import { PROP_FLOWS } from './data/ProPresenterFLows.js'
@@ -25,12 +28,13 @@ import {
   handleRegistrationText,
   finishRegistration,
 } from './flows/registration/index.js'
+import { buildAdminKeyboard } from './flows/registration/admin.js'
 
 import dotenv from 'dotenv'
 import { getOrCreateUser } from './services/user.service.js'
 import { activateVolunteer } from './services/volunteer.service.js'
 import { UserModel } from './models/User.js'
-import { runReminders } from './services/reminder.service.js'
+import { runReminders, runYandex360Reminders } from './services/reminder.service.js'
 dotenv.config()
 import { escapeUnderscore } from './utils/escape.js'
 import { isAdmin } from './config/admin.js'
@@ -140,7 +144,7 @@ import {
   autoCloseInactiveSupportTickets,
   reopenSupportTicket,
 } from './services/support.service.js'
-import { auditLogService } from './services/auditLog.service.js'
+import { auditLogService, recordOperationalEvent } from './services/auditLog.service.js'
 
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
 const CONTENT_GROUP_ID = Number(process.env.CONTENT_GROUP_ID)
@@ -228,6 +232,10 @@ type MyContext = Context &
     activeConversationId?: string
 
     adminPanelInput?: any
+    tutorialAdminInput?: any
+    tutorialAdminPanel?: { chatId: number; messageId: number }
+    tutorialAdminPanelKind?: 'text' | 'media'
+    tutorialAdminTextPanel?: { chatId: number; messageId: number }
   }>
 
 const broadcastAlbumTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -235,6 +243,7 @@ const broadcastAlbumTimers = new Map<string, ReturnType<typeof setTimeout>>()
 async function showAdminRootMenu(ctx: MyContext, editCurrent = false) {
   ctx.session.adminMode = undefined
   ctx.session.adminPanelInput = undefined
+  ctx.session.tutorialAdminInput = undefined
 
   const kb = new InlineKeyboard()
     .text('📢 Рассылка', 'admin:broadcast')
@@ -437,6 +446,18 @@ export function registerHandlers(bot: Bot<MyContext>) {
     const userId = ctx.from.id
     await clearInputMode(userId)
 
+    const profile = await getOrCreateUser(userId)
+    await bindKnownUser(userId)
+    if (profile.createdAt && Date.now() - new Date(profile.createdAt).getTime() < 10_000) {
+      const first = await UserModel.updateOne(
+        { telegramId: userId, firstStartLoggedAt: null },
+        { $set: { firstStartLoggedAt: new Date() } }
+      )
+      if (first.modifiedCount) await recordOperationalEvent({
+        type: 'user.first_started', actorType: 'user', actorTelegramId: userId, targetUserId: userId,
+      })
+    }
+
     if (payload && typeof payload === 'string' && payload.startsWith('join_')) {
       const code = payload.replace('join_', '')
 
@@ -473,7 +494,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
       }
     }
 
-    const profile = await getOrCreateUser(userId)
     if (profile.reg === 'done') {
       await ctx.reply('✅ Вы уже зарегистрированы в ХАБе.')
       goHome(userId)
@@ -546,10 +566,12 @@ export function registerHandlers(bot: Bot<MyContext>) {
   // ====================== CALLBACK QUERY ======================
   bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data
+    if (data !== 'ap:tuts' && !data.startsWith('ap:tuts:')) ctx.session.tutorialAdminInput = undefined
     if (ctx.session.supportDraft && !data.startsWith('s2:') && !data.startsWith('support:')) {
       ctx.session.supportDraft = undefined
       ctx.session.inSupportMode = false
     }
+    if (await handleYandex360Callback(ctx, data)) return
     if (await handleAdminPanelCallback(ctx, data)) return
 
     const userId = ctx.from?.id
@@ -1218,6 +1240,11 @@ export function registerHandlers(bot: Bot<MyContext>) {
     return next()
   })
 
+  bot.on('message', async (ctx, next) => {
+    if (await handleTutorialAdminMessage(ctx)) return
+    return next()
+  })
+
   // Черновик рассылки должен перехватываться до более узких text/photo handlers.
   bot.on('message', async (ctx, next) => {
     if (!ctx.from || !isAdmin(ctx.from.id)) return next()
@@ -1278,6 +1305,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
     const userId = ctx.from?.id
     if (!userId) return
 
+    if (await handleYandex360Text(ctx)) return
     if (await handleCustomPaymentRejectText(ctx)) return
     if (await relayActiveConversationMessage(ctx)) return
 
@@ -1419,12 +1447,20 @@ export function registerHandlers(bot: Bot<MyContext>) {
       await ctx.reply('⚠️ Этот тип сообщения не удалось отправить. Попробуйте текст или файл.')
     }
   })
+  let checkingSubscriptions = false
   const checkSubscriptions = async () => {
-    console.log('⏰ Проверка подписок и напоминаний...')
-    await runReminders(bot).catch((error) => console.error('Ошибка проверки подписок:', error))
+    if (checkingSubscriptions) return
+    checkingSubscriptions = true
+    try {
+      console.log('⏰ Проверка подписок и напоминаний...')
+      await runReminders(bot).catch((error) => console.error('Ошибка проверки подписок:', error))
+      await runYandex360Reminders(bot).catch((error) => console.error('Ошибка напоминаний Яндекс 360:', error))
+    } finally {
+      checkingSubscriptions = false
+    }
   }
   void checkSubscriptions()
-  setInterval(checkSubscriptions, 1000 * 60 * 60) // каждые 60 минут
+  setInterval(checkSubscriptions, 1000 * 60 * 10) // каждые 10 минут
   const checkInactiveSupport = async () => {
     await autoCloseInactiveSupportTickets(bot.api).catch((error) =>
       console.error('Ошибка auto-close поддержки:', error)

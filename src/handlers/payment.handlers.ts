@@ -18,7 +18,7 @@ import { createTeamInvite } from '../services/teamInvite.service.js'
 import { markCartInReview, getOrCreateCart } from '../services/cart.service.js'
 import { ADMIN_GROUP_ID } from '../config/env.js'
 import type { MyContext } from '../types/context.js'
-import { auditLogService } from '../services/auditLog.service.js'
+import { auditLogService, recordOperationalEvent } from '../services/auditLog.service.js'
 import { acceptPayment, attachPaymentTelegramLocation, createPayment, getPayment, getPaymentsForAdminMessage, PaymentNotFoundError, rejectPayment, returnPaymentToPending } from '../services/payment.service.js'
 import { deliverAcceptedPayment, deliverRejectedPayment } from '../adapters/telegram/paymentDelivery.js'
 import { appendConversationContactButtons } from '../services/conversation.service.js'
@@ -213,13 +213,13 @@ export async function handlePayProduct(
       ? 'Продление'
       : 'Новая подписка'
   await auditLogService.createLog({
-    type: 'payment.created',
+    type: 'payment.checkout_started',
     actorType: 'user',
     actorTelegramId: userId,
     targetUserId: userId,
     targetTeamId: teamId,
-    targetPaymentId: ctx.session.payment.paymentId,
     metadata: {
+      orderId: ctx.session.payment.paymentId,
       teamName: team.name,
       productId,
       productName: getProduct(productId)?.name || productId,
@@ -308,7 +308,6 @@ export async function handleReceiptUpload(ctx: MyContext) {
     const profile = await getOrCreateUser(userId)
     const username = ctx.from!.username ? `@${ctx.from!.username}` : `ID:${userId}`
     const payment = ctx.session.payment
-    const paymentWasAlreadyCreated = Boolean(payment?.paymentId)
     const teamId = payment?.teamId
     const validTeamId = teamId && teamId !== 'undefined' ? teamId : null
     const team = validTeamId ? await getTeamById(validTeamId) : null
@@ -367,6 +366,12 @@ export async function handleReceiptUpload(ctx: MyContext) {
           paymentMethod: methodText, operation: operationFor(item.product).includes('Продление') ? 'renewal' : 'purchase', receipt,
         })
         createdPayments.push(persistentPayment)
+        await auditLogService.createLog({
+          type: 'payment.created', actorType: 'user', actorTelegramId: userId,
+          targetUserId: userId, targetTeamId: teamId, targetPaymentId: persistentPayment.id,
+          metadata: { orderId: item._id.toString(), productId: item.product,
+            operation: operationFor(item.product) },
+        })
         kb.text(
           `✅ ${getProduct(item.product)?.name}`,
           packCb({ a: 'cart_accept', p: persistentPayment.id })
@@ -452,8 +457,9 @@ export async function handleReceiptUpload(ctx: MyContext) {
           actorTelegramId: userId,
           targetUserId: userId,
           targetTeamId: teamId,
-          targetPaymentId: item._id.toString(),
+          targetPaymentId: createdPayments.find((created) => String(created.cartItemId) === item._id.toString())?.id,
           metadata: {
+            orderId: item._id.toString(),
             teamName: team?.name,
             productId: item.product,
             productName: getProduct(item.product)?.name || item.product,
@@ -464,7 +470,7 @@ export async function handleReceiptUpload(ctx: MyContext) {
       }
     } else {
       const paymentId = payment?.paymentId || new Types.ObjectId().toString()
-      if (!paymentWasAlreadyCreated) {
+      if (createdPayments.length) {
         await auditLogService.createLog({
           type: 'payment.created',
           actorType: 'user',
@@ -622,6 +628,13 @@ export async function handleAdminAccept(
         team.ownerId,
         `✅ ${isExtension ? 'Продлено' : 'Подписка активирована:'} ${product.name}\n\nВаша ссылка ниже 👇\n\n${invite.invite_link}\n\nчтобы вернуться в команду, нажмите /team_list`
       )
+      await recordOperationalEvent({
+        type: 'access.invite_issued', actorType: 'system', targetUserId: team.ownerId,
+        targetTeamId: teamId, targetSubscriptionId: `${teamId}:${productId}`,
+        metadata: { groupId: product.groupId, productId,
+          result: 'Telegram API принял ссылку; вступление неизвестно',
+          reason: isExtension ? 'восстановление или продление доступа' : 'активация подписки' },
+      })
     } else {
       await ctx.api.sendMessage(
         team.ownerId,

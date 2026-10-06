@@ -1,54 +1,50 @@
-import { existsSync, statSync } from 'node:fs'
-import { join } from 'node:path'
 import { InlineKeyboard } from 'grammy'
 import { packCb } from '../core/callback.js'
 import type { ScreenView } from '../core/render.js'
+import { getLesson, getTopic, listLessons, listTopics } from '../services/tutorial.service.js'
 
 const cover = './public/tutorials.png'
-const directory = join(process.cwd(), 'public', 'tutorials')
 
-export const tutorials = [
-  { id: 'create-team', title: 'Как создать команду' },
-  { id: 'join-team', title: 'Как вступить в команду' },
-  { id: 'buy-subscription', title: 'Как купить подписку' },
-  { id: 'buy-multiple-subscriptions', title: 'Как купить несколько подписок' },
-  { id: 'check-subscription-and-access', title: 'Как проверить подписку и найти доступ' },
-  { id: 'add-team-member', title: 'Как добавить участника в команду' },
-  { id: 'renew-subscription', title: 'Как продлить подписку' },
-  { id: 'connect-propresenter', title: 'Как подключить ProPresenter' },
-  { id: 'contact-support', title: 'Как написать в поддержку' },
-] as const
-
-export function tutorialsScreen(): ScreenView {
+export async function tutorialsScreen(): Promise<ScreenView> {
   const keyboard = new InlineKeyboard()
-  for (const tutorial of tutorials) {
-    keyboard.text(tutorial.title, packCb({ a: 'open', s: 'tutorial', p: tutorial.id })).row()
+  for (const topic of await listTopics()) {
+    keyboard.text(topic.title, packCb({ a: 'open', s: 'tutorial_topic', p: String(topic._id) })).row()
   }
   keyboard.text('◀️ НАЗАД', packCb({ a: 'back' }))
-
   return {
     photo: cover,
-    caption: 'ТУТОРИАЛЫ\n\nКороткие видео покажут, как выполнить основные действия в боте. Выберите нужную тему ниже.',
+    caption: 'ТУТОРИАЛЫ\n\nВыберите тему, чтобы посмотреть уроки.',
     keyboard,
   }
 }
 
-export function tutorialScreen(_userId: number, id?: string): ScreenView {
-  const tutorial = tutorials.find((item) => item.id === id)
-  const keyboard = new InlineKeyboard().text('◀️ НАЗАД', packCb({ a: 'back' }))
-  if (!tutorial) {
-    return { photo: cover, caption: 'Туториал не найден.', keyboard }
+export async function tutorialTopicScreen(_userId: number, id?: string): Promise<ScreenView> {
+  const topic = await getTopic(id || '')
+  const keyboard = new InlineKeyboard()
+  if (topic) {
+    for (const lesson of await listLessons(String(topic._id), true)) {
+      keyboard.text(lesson.title, packCb({ a: 'open', s: 'tutorial', p: String(lesson._id) })).row()
+    }
   }
-
-  const path = join(directory, `${tutorial.id}.mp4`)
-  const available = existsSync(path) && statSync(path).isFile() && statSync(path).size > 0
-
+  keyboard.text('◀️ НАЗАД', packCb({ a: 'back' }))
   return {
     photo: cover,
-    video: available ? path : undefined,
-    caption: available
-      ? tutorial.title
-      : `${tutorial.title}\n\nВидео скоро появится.`,
+    caption: topic ? `${topic.title.toUpperCase()}\n\nВыберите туториал.` : 'Тема не найдена.',
+    keyboard,
+  }
+}
+
+export async function tutorialScreen(_userId: number, id?: string): Promise<ScreenView> {
+  const lesson = await getLesson(id || '', true)
+  const keyboard = new InlineKeyboard().text('◀️ НАЗАД', packCb({ a: 'back' }))
+  if (!lesson || !lesson.mediaFileId) {
+    return { photo: cover, caption: 'Туториал не найден.', keyboard }
+  }
+  return {
+    photo: lesson.mediaType === 'photo' ? lesson.mediaFileId : cover,
+    video: lesson.mediaType === 'video' ? lesson.mediaFileId : undefined,
+    mediaIsFileId: true,
+    caption: [lesson.title, lesson.description].filter(Boolean).join('\n\n').slice(0, 1024),
     keyboard,
   }
 }

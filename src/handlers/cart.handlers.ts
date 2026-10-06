@@ -17,7 +17,7 @@ import {
   setCartItemStatus,
 } from '../services/cart.service.js'
 import type { MyContext } from '../types/context.js'
-import { auditLogService, buildSubscriptionTargetId } from '../services/auditLog.service.js'
+import { auditLogService, buildSubscriptionTargetId, recordOperationalEvent } from '../services/auditLog.service.js'
 import { acceptPayment, getPayment } from '../services/payment.service.js'
 import { deliverAcceptedPayment } from '../adapters/telegram/paymentDelivery.js'
 import { showPaymentRejectReasons, fullAdminPaymentKeyboard } from './payment.handlers.js'
@@ -95,13 +95,13 @@ export async function handleCheckoutCart(ctx: MyContext, userId: number, teamId:
   for (const item of items) {
     const currentSubscription = team?.subscriptions.get(item.product)
     await auditLogService.createLog({
-      type: 'payment.created',
+      type: 'payment.checkout_started',
       actorType: 'user',
       actorTelegramId: userId,
       targetUserId: userId,
       targetTeamId: teamId,
-      targetPaymentId: item._id.toString(),
       metadata: {
+        orderId: item._id.toString(),
         teamName: team?.name,
         productId: item.product,
         productName: getProduct(item.product)?.name || item.product,
@@ -226,6 +226,13 @@ export async function handleCartAccept(ctx: MyContext, itemId: string) {
         team!.ownerId,
         `✅ ${isExtension ? 'Продлено' : 'Оплата подтверждена'}: ${product.name}\n\nВаша ссылка ниже 👇\n\n${invite.invite_link}\n\nЧтобы вернуться в команду, нажмите /team_list`
       )
+      await recordOperationalEvent({
+        type: 'access.invite_issued', actorType: 'system', targetUserId: team!.ownerId,
+        targetTeamId: teamId, targetSubscriptionId: buildSubscriptionTargetId(teamId, item.product),
+        metadata: { groupId: product.groupId, productId: item.product,
+          result: 'Telegram API принял ссылку; вступление неизвестно',
+          reason: isExtension ? 'восстановление или продление доступа' : 'активация подписки' },
+      })
     } catch (err) {
       console.error('Ошибка создания инвайта:', err)
       await ctx.api.sendMessage(team!.ownerId, `✅ Оплата подтверждена: ${product.name}`)

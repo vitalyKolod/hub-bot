@@ -1,17 +1,20 @@
 import { UserModel } from '../../models/User.js'
 import { getOrCreateUser } from '../../services/user.service.js'
+import { recordOperationalEvent } from '../../services/auditLog.service.js'
 
 import { buildQuestionText } from './questions.js'
 import { sendPrompt } from './ui.js'
 
 export async function startRegistration(ctx: any, userId: number) {
-  await UserModel.updateOne(
-    { telegramId: userId },
-    { reg: 'in_progress', regStep: 'fio', username: ctx.from?.username || 'нету' },
-    { upsert: true }
+  await getOrCreateUser(userId)
+  const started = await UserModel.updateOne(
+    { telegramId: userId, reg: 'none' },
+    { reg: 'in_progress', regStep: 'fio', username: ctx.from?.username || 'нету' }
   )
+  if (started.modifiedCount) await recordOperationalEvent({
+    type: 'user.registration_started', actorType: 'user', actorTelegramId: userId, targetUserId: userId,
+  })
 
-  const user = await getOrCreateUser(userId)
   await sendPrompt(ctx, userId, await buildQuestionText(userId))
 }
 

@@ -4,7 +4,7 @@ import { PaymentModel } from '../models/Payment.js'
 import { activateTeamSubscription, getTeamById } from './team.service.js'
 import { createTeamInvite } from './teamInvite.service.js'
 import { setCartItemStatus } from './cart.service.js'
-import { auditLogService, buildSubscriptionTargetId } from './auditLog.service.js'
+import { auditLogService, buildSubscriptionTargetId, recordOperationalEvent } from './auditLog.service.js'
 
 export type ReceiptInput = {
   type: 'photo' | 'document'
@@ -125,6 +125,12 @@ export async function acceptPayment(paymentId: string, adminId: number): Promise
       { _id: payment._id, status: 'processing' },
       { $set: { status: 'pending', adminId: null, decisionError: error instanceof Error ? error.message : 'Unknown error' } }
     )
+    await recordOperationalEvent({
+      type: 'payment.processing_failed', actorType: 'admin', actorTelegramId: adminId,
+      targetUserId: payment.userId, targetTeamId: payment.teamId, targetPaymentId: payment.id,
+      metadata: { productId: payment.productId, result: 'платёж возвращён в ожидание',
+        reason: error instanceof Error ? error.message : String(error) },
+    })
     throw error
   }
 }

@@ -3,6 +3,7 @@
 // Подключение — см. WIRING.md (несколько вставок в bot.ts).
 
 import { InlineKeyboard, type Context } from 'grammy'
+import { handleTutorialAdminCallback } from './tutorialAdmin.handlers.js'
 import { FormattedString } from '@grammyjs/parse-mode'
 import { isAdmin } from '../config/admin.js'
 import {
@@ -32,6 +33,7 @@ import {
 } from '../constants/admin-panel.js'
 import * as ap from '../services/adminPanel.service.js'
 import { SUPPORT_GROUP_ID } from '../config/env.js'
+import { LOG_GROUP_ID } from '../config/logs.js'
 import {
   getPendingBatch,
   getPendingBatches,
@@ -144,6 +146,8 @@ function getCallbackMessageTarget(ctx: Context): MessageTarget | undefined {
  * чтобы обновление роутера сохранило и ранее отправленную историю. */
 function isAuditShortcutMessage(ctx: Context): boolean {
   const message = ctx.callbackQuery?.message
+  if (message && 'chat' in message && message.chat.id === LOG_GROUP_ID &&
+      'text' in message && message.text?.includes('Кто выполнил')) return true
   if (
     !message ||
     !('chat' in message) ||
@@ -272,8 +276,14 @@ export async function showAdminPanelMenu(ctx: Context) {
     )
     .icon(ADMIN_MANAGEMENT_ICONS.requests)
     .row()
+    .text('Потоки Яндекс 360', 'y360:admin')
+    .icon('5310051278464778081')
+    .row()
   if (ctx.from && await hasAdminPermission(ctx.from.id, 'admins.view')) {
     kb.text('Администраторы', apCb('admins')).icon(ADMIN_MANAGEMENT_ICONS.admins).row()
+  }
+  if (ctx.from && await hasAdminPermission(ctx.from.id, 'tutorials.view')) {
+    kb.text('Туториалы', apCb('tuts')).row()
   }
   kb.text('‹ Назад', 'admin:root')
 
@@ -570,6 +580,11 @@ async function showUserCard(
     kb.text(`👥 ${t.name}`, apCb('t', t._id.toString())).row()
   }
 
+  if (ctx.from && await hasAdminPermission(ctx.from.id, 'streams.edit')) {
+    kb.text('➕ Добавить Яндекс 360', `y360:user:${telegramId}`)
+      .icon('5310051278464778081').row()
+  }
+
   kb.text('➕ Создать команду', apCb('u', telegramId, 'ct')).row()
   kb.text('➕ Добавить в команду', apCb('u', telegramId, 'addteam')).row()
   if (teams.length) {
@@ -731,7 +746,7 @@ async function showDeleteUserConfirm(ctx: Context, telegramId: number) {
     '🗑 *УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ*\n\n' +
     `Пользователь: *${escapeMd(cleanProfileValue(user.fio, 'без имени'))}*\n` +
     `ID: \`${telegramId}\`\n\n` +
-    'Будут удалены профиль пользователя, его обращения и связанные приглашения.\n' +
+    'Будут удалены профиль пользователя, его обращения, связанные приглашения, запись участника Яндекс 360 и его заявки.\n' +
     `Собственные команды: ${ownedTeamsCount} — будут удалены вместе с данными и подписками в базе.\n` +
     `Участие в чужих командах: ${membershipsCount} — пользователь будет исключён.\n\n` +
     'Это не бан: если пользователь снова запустит бота, профиль создастся заново.\n\n' +
@@ -1006,7 +1021,7 @@ async function showRemoveMemberMenu(ctx: Context, teamId: string) {
 
 // ==================== ПОДПИСКА КОМАНДЫ (карточка продукта) ====================
 
-async function showTeamProductCard(ctx: Context, teamId: string, product: string) {
+async function showTeamProductCard(ctx: Context, teamId: string, product: string, renderOptions: RenderOptions = {}) {
   const team = await ap.adminGetTeam(teamId)
   const sub: any = team?.subscriptions.get(product)
   const productEmoji = PRODUCT_EMOJI[product] || '📦'
@@ -1038,7 +1053,7 @@ async function showTeamProductCard(ctx: Context, teamId: string, product: string
     kb.text('➕ Добавить поток', apCb('t', teamId, product, 'assign')).row()
     kb.text('♻️ Сбросить поток', apCb('t', teamId, product, 'rs')).row()
     kb.text('‹ К команде', apCb('t', teamId))
-    await render(ctx, text, kb)
+    await render(ctx, text, kb, true, renderOptions)
     return
   }
 
@@ -1054,7 +1069,7 @@ async function showTeamProductCard(ctx: Context, teamId: string, product: string
   kb.text('♻️ Сбросить (нет подписки)', apCb('t', teamId, product, 'rs')).row()
   kb.text('‹ К команде', apCb('t', teamId))
 
-  await render(ctx, text, kb)
+  await render(ctx, text, kb, true, renderOptions)
 }
 
 async function promptSetTeamSubDate(ctx: Context, teamId: string, product: string) {
@@ -1221,6 +1236,7 @@ async function startNewStream(ctx: Context) {
 /** Вызывать первой строкой в bot.on('callback_query:data', ...). */
 export async function handleAdminPanelCallback(ctx: Context, data: string): Promise<boolean> {
   if (!isAdminPanelCallback(data)) return false
+  if (data === 'ap:tuts' || data.startsWith('ap:tuts:')) return handleTutorialAdminCallback(ctx, data)
   if (!(await guard(ctx))) return true
 
   // Любая кнопка админ-панели завершает предыдущий режим текстового ввода.
@@ -1350,7 +1366,7 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
           const product = next
           const productAction = rest[2]
           if (!productAction) {
-            await showTeamProductCard(ctx, teamId, product)
+            await showTeamProductCard(ctx, teamId, product, openSeparately ? { forceNew: true } : {})
           } else if (product === 'propresenter' && productAction === 'assign') {
             await promptAssignTeamStream(ctx, teamId)
           } else if (product === 'propresenter' && productAction === 'rs') {

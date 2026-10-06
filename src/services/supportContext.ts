@@ -3,7 +3,7 @@ import { getProduct } from '../config/products.js'
 export const SUPPORT_CATEGORIES = {
   payment: '💳 Оплата', subscription: '📦 Подписка / доступ',
   team: '👥 Команда / волонтёры', propresenter: '📡 ProPresenter',
-  hub: '⚙️ Работа HUB', other: '❓ Другое',
+  yandex360: '✉️ Яндекс 360', hub: '⚙️ Работа HUB', other: '❓ Другое',
 } as const
 export type SupportCategory = keyof typeof SUPPORT_CATEGORIES
 export const SUPPORT_ISSUES: Record<SupportCategory, Record<string, string>> = {
@@ -11,6 +11,7 @@ export const SUPPORT_ISSUES: Record<SupportCategory, Record<string, string>> = {
   subscription: { no_access: '🚫 Нет доступа', no_invite: '🔗 Не пришла ссылка / приглашение', credentials: '🔑 Не работают данные для входа', renewal: '🔄 Продление', expiry: '📅 Срок подписки', other: '❓ Другое' },
   team: { add_member: '➕ Добавить волонтёра', join: '🚪 Не получается вступить', no_invite: '🔗 Не пришло приглашение', member: '👤 Проблема с участником', subscription: '📦 Проблема с подпиской команды', other: '❓ Другое' },
   propresenter: { stream: '📡 Проблема с потоком', credentials: '🔑 Не подходят данные для входа', request: '📝 Вопрос по заявке на поток', chat: '💬 Не работает чат / приглашение', renewal: '🔄 Продление', other: '❓ Другое' },
+  yandex360: { add_email: '➕ Добавить email', change_email: '✏️ Изменить email', access: '🔐 Проблема с доступом', stream: '📅 Вопрос по потоку', other: '❓ Другое' },
   hub: { bot: '🤖 Бот работает неправильно', team: '👥 Проблема с командой', notifications: '🔔 Не приходят уведомления', interface: '📱 Проблема с интерфейсом', other: '❓ Другое' },
   other: {},
 }

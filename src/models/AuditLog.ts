@@ -3,6 +3,9 @@ import mongoose from 'mongoose'
 export const AUDIT_ACTOR_TYPES = ['user', 'admin', 'system'] as const
 
 export const AUDIT_LOG_TYPES = [
+  'user.first_started',
+  'user.registration_started',
+  'user.registration_failed',
   'user.registered',
   'user.profile_updated',
   'user.deleted',
@@ -11,11 +14,15 @@ export const AUDIT_LOG_TYPES = [
   'team.member_added',
   'team.member_removed',
   'team.updated',
+  'subscription.reminder_sent',
+  'subscription.reminder_failed',
   'subscription.created',
   'subscription.activated',
   'subscription.renewed',
   'subscription.expired',
   'subscription.disabled',
+  'payment.checkout_started',
+  'payment.processing_failed',
   'payment.created',
   'payment.receipt_submitted',
   'payment.approved',
@@ -23,6 +30,11 @@ export const AUDIT_LOG_TYPES = [
   'support.message_user',
   'support.message_admin',
   'support.auto_closed',
+  'access.invite_issued',
+  'access.group_removed',
+  'access.group_retained',
+  'access.group_restored',
+  'access.group_removal_failed',
   'admin.access_added',
   'admin.access_updated',
   'admin.role_changed',
@@ -32,6 +44,11 @@ export const AUDIT_LOG_TYPES = [
   'propresenter.stream_created',
   'propresenter.stream_date_changed',
   'propresenter.team_added',
+  'yandex360.stream_changed',
+  'yandex360.member_changed',
+  'yandex360.member_linked',
+  'yandex360.email_requested',
+  'yandex360.email_decided',
 ] as const
 
 export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number]

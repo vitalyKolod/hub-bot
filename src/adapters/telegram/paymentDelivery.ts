@@ -2,6 +2,7 @@ import type { Api } from 'grammy'
 import { getProduct } from '../../config/products.js'
 import { getTeamById } from '../../services/team.service.js'
 import type { PaymentDecisionResult } from '../../services/payment.service.js'
+import { recordOperationalEvent } from '../../services/auditLog.service.js'
 
 export async function deliverAcceptedPayment(api: Api, result: PaymentDecisionResult, botUsername?: string) {
   if (!result.applied) return
@@ -18,6 +19,14 @@ export async function deliverAcceptedPayment(api: Api, result: PaymentDecisionRe
   if (product?.groupId) {
     const invite = await api.createChatInviteLink(product.groupId, { member_limit: 1 })
     await api.sendMessage(team.ownerId, `✅ ${result.isExtension ? 'Продлено' : 'Подписка активирована:'} ${product.name}\n\nВаша ссылка ниже 👇\n\n${invite.invite_link}\n\nЧтобы вернуться в команду, нажмите /team_list`)
+    await recordOperationalEvent({
+      type: 'access.invite_issued', actorType: 'system', targetUserId: team.ownerId,
+      targetTeamId: String(team._id), targetPaymentId: payment.id,
+      targetSubscriptionId: `${team._id}:${payment.productId}`,
+      metadata: { groupId: product.groupId, productId: payment.productId,
+        result: 'Telegram API принял ссылку; вступление неизвестно',
+        reason: result.isExtension ? 'восстановление или продление доступа' : 'активация подписки' },
+    })
     return
   }
   await api.sendMessage(team.ownerId, `✅ Подписка активирована: ${product?.name || payment.productId}\nЧтобы вернуться, нажмите /team_list`)

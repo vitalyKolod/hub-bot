@@ -12,7 +12,7 @@ import { goHome, goTo } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
 import type { MyContext } from '../types/context.js'
 import { computeDaysLeft } from '../state/profile.js'
-import { auditLogService } from '../services/auditLog.service.js'
+import { auditLogService, recordOperationalEvent } from '../services/auditLog.service.js'
 
 export async function handleEditRegistration(ctx: MyContext) {
   const kb = new InlineKeyboard()
@@ -97,6 +97,11 @@ export async function handleConfirmRegistration(ctx: MyContext, userId: number) 
       `[registration] Failed to send registration notification userId=${userId} chatId=${process.env.ADMIN_GROUP_ID}`,
       error
     )
+    await recordOperationalEvent({
+      type: 'user.registration_failed', actorType: 'system', targetUserId: userId,
+      metadata: { result: 'не отправлено уведомление администратору',
+        reason: error instanceof Error ? error.message : String(error) },
+    })
   }
 
   if (profile.pendingInviteCode) {

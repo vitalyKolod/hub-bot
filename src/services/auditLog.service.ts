@@ -9,11 +9,13 @@ import {
 import { UserModel } from '../models/User.js'
 import { TeamModel } from '../models/Team.js'
 import { getProduct } from '../config/products.js'
-
-const DEFAULT_AUDIT_GROUP_ID = -1004436462979
-const DEFAULT_AUDIT_TOPIC_ID = 390
+import { LOG_GROUP_ID, LOG_THREADS } from '../config/logs.js'
+import { apCb, TEAM_PRODUCT_IDS } from '../constants/admin-panel.js'
 
 const TYPE_LABELS: Record<AuditLogType, { emoji: string; title: string }> = {
+  'user.first_started': { emoji: '👋', title: 'Первый запуск бота' },
+  'user.registration_started': { emoji: '📝', title: 'Регистрация начата' },
+  'user.registration_failed': { emoji: '⚠️', title: 'Ошибка регистрации' },
   'user.registered': { emoji: '🆕', title: 'Регистрация пользователя' },
   'user.profile_updated': { emoji: '✏️', title: 'Профиль изменён' },
   'user.deleted': { emoji: '🗑', title: 'Пользователь удалён' },
@@ -22,11 +24,15 @@ const TYPE_LABELS: Record<AuditLogType, { emoji: string; title: string }> = {
   'team.member_added': { emoji: '➕', title: 'Участник добавлен' },
   'team.member_removed': { emoji: '➖', title: 'Участник удалён' },
   'team.updated': { emoji: '✏️', title: 'Команда изменена' },
+  'subscription.reminder_sent': { emoji: '🔔', title: 'Напоминание отправлено через Telegram API' },
+  'subscription.reminder_failed': { emoji: '⚠️', title: 'Напоминание не отправлено' },
   'subscription.created': { emoji: '🧾', title: 'Подписка создана' },
   'subscription.activated': { emoji: '✅', title: 'Подписка активирована' },
   'subscription.renewed': { emoji: '🔄', title: 'Подписка продлена' },
   'subscription.expired': { emoji: '⌛️', title: 'Подписка закончилась' },
   'subscription.disabled': { emoji: '⛔️', title: 'Подписка отключена' },
+  'payment.checkout_started': { emoji: '🛒', title: 'Оформление заказа начато' },
+  'payment.processing_failed': { emoji: '⚠️', title: 'Ошибка обработки платежа' },
   'payment.created': { emoji: '💳', title: 'Платёж создан' },
   'payment.receipt_submitted': { emoji: '🧾', title: 'Чек отправлен' },
   'payment.approved': { emoji: '✅', title: 'Платёж подтверждён' },
@@ -34,6 +40,11 @@ const TYPE_LABELS: Record<AuditLogType, { emoji: string; title: string }> = {
   'support.message_user': { emoji: '💬', title: 'Сообщение пользователя в поддержку' },
   'support.message_admin': { emoji: '💬', title: 'Ответ поддержки' },
   'support.auto_closed': { emoji: '🔒', title: 'Обращение закрыто автоматически' },
+  'access.invite_issued': { emoji: '🔑', title: 'Ссылка для доступа выдана' },
+  'access.group_removed': { emoji: '🚫', title: 'Пользователь удалён из группы' },
+  'access.group_retained': { emoji: '✅', title: 'Доступ сохранён через другую команду' },
+  'access.group_restored': { emoji: '🔓', title: 'Доступ в группу восстановлен' },
+  'access.group_removal_failed': { emoji: '⚠️', title: 'Не удалось удалить пользователя из группы' },
   'admin.access_added': { emoji: '👮', title: 'Доступ администратора добавлен' },
   'admin.access_updated': { emoji: '👮', title: 'Доступ администратора изменён' },
   'admin.role_changed': { emoji: '🔄', title: 'Роль администратора изменена' },
@@ -43,6 +54,11 @@ const TYPE_LABELS: Record<AuditLogType, { emoji: string; title: string }> = {
   'propresenter.stream_created': { emoji: '🎬', title: 'Поток ProPresenter создан' },
   'propresenter.stream_date_changed': { emoji: '📅', title: 'Дата потока изменена' },
   'propresenter.team_added': { emoji: '📡', title: 'Команда добавлена в поток' },
+  'yandex360.stream_changed': { emoji: '📅', title: 'Поток Яндекс 360 изменён' },
+  'yandex360.member_changed': { emoji: '👤', title: 'Участник Яндекс 360 изменён' },
+  'yandex360.member_linked': { emoji: '🔗', title: 'Участник Яндекс 360 привязан' },
+  'yandex360.email_requested': { emoji: '✉️', title: 'Заявка Яндекс 360 создана' },
+  'yandex360.email_decided': { emoji: '✅', title: 'Заявка Яндекс 360 рассмотрена' },
 }
 
 const ACTOR_LABELS: Record<AuditActorType, string> = {
@@ -106,6 +122,17 @@ function priceText(metadata: AuditMetadata): string | null {
 
 export function buildSubscriptionTargetId(teamId: string, productId: string): string {
   return `${teamId}:${productId}`
+}
+
+export function auditTopicFor(type: AuditLogType): number | null {
+  if (type.startsWith('support.') || type.startsWith('propresenter.')) return null
+  if (type === 'user.profile_updated') return null
+  if (type === 'user.deleted' || type.startsWith('admin.') || type.startsWith('access.')) return LOG_THREADS.access
+  if (type.startsWith('user.')) return LOG_THREADS.registration
+  if (type.startsWith('team.')) return LOG_THREADS.teams
+  if (type.startsWith('payment.')) return LOG_THREADS.orders
+  if (type.startsWith('subscription.')) return LOG_THREADS.subscriptions
+  return null
 }
 
 export class AuditLogService {
@@ -264,10 +291,19 @@ export class AuditLogService {
 
     const detailLines: Array<string | null> = [
       metadataLine('Продукт', metadata.productName || metadata.productId),
-      metadataLine('Стоимость', priceText(metadata)),
+      ...(log.type.startsWith('access.') ? [] : [metadataLine('Стоимость', priceText(metadata))]),
       metadataLine('Способ оплаты', metadata.method),
       metadataLine('Тип операции', metadata.operation),
-      metadataLine('Статус', metadata.status),
+      metadataLine('Результат', metadata.result || metadata.status || 'выполнено'),
+      metadataLine('Group ID', metadata.groupId),
+      metadataLine('Попыток', metadata.attempts),
+      metadataLine('Причина отзыва доступа', metadata.accessReason),
+      metadataLine('Ответ Telegram', metadata.telegramError),
+      metadataLine('Статус участника', metadata.memberStatus),
+      metadataLine('Что известно', metadata.diagnosis),
+      metadataLine('Что проверить', metadata.action),
+      metadataLine('Следующая попытка', metadata.nextAttemptAt ? `${dateText(metadata.nextAttemptAt, true)} МСК` : null),
+      metadataLine('Order ID', metadata.orderId),
       metadataLine('Поле', metadata.field),
       metadataLine('Было', metadata.previousValue ?? metadata.previousStatus),
       metadataLine('Стало', metadata.newValue ?? metadata.status),
@@ -276,7 +312,7 @@ export class AuditLogService {
       metadataLine('Предыдущая дата', dateText(metadata.previousExpiresAt)),
       metadataLine('Дата окончания', dateText(metadata.expiresAt)),
       metadataLine('Участник', metadata.memberTelegramId),
-      metadataLine('Причина', metadata.reason),
+      metadataLine('Причина', metadata.reason || metadata.rejectionReason),
     ]
 
     const lines = [
@@ -299,28 +335,56 @@ export class AuditLogService {
   async notifyAdmins(log: Pick<AuditLogRecord, keyof AuditLogRecord>) {
     if (!this.telegramApi) return false
 
-    const keyboard = new InlineKeyboard()
-    if (log.targetUserId) {
-      keyboard.text('👤 Пользователь', `support:profile:${log.targetUserId}`)
+    const topicId = auditTopicFor(log.type)
+    if (!topicId) return false
+    const groupId = LOG_GROUP_ID
+    const message = this.formatLogMessage(log)
+    const keyboard = this.buildLogKeyboard(log)
+    const needsErrorTopic = log.type === 'user.registration_failed' ||
+      log.type === 'payment.processing_failed' || log.type === 'subscription.reminder_failed' ||
+      log.type === 'access.group_removal_failed'
+    const topics = needsErrorTopic ? [topicId, LOG_THREADS.errors] : [topicId]
+    const results = await Promise.allSettled(topics.map((message_thread_id) =>
+      this.telegramApi!.sendMessage(groupId, message, {
+        parse_mode: 'HTML', message_thread_id,
+        ...(keyboard ? { reply_markup: keyboard } : {}),
+      })
+    ))
+    for (const [index, result] of results.entries()) {
+      if (result.status === 'rejected') console.error(`Audit Telegram delivery failed for topic ${topics[index]}:`, result.reason)
     }
-    if (log.targetTeamId) {
-      keyboard.text('👥 Команда', `support:team:${log.targetTeamId}`)
-    }
-    const directMessageUserId =
-      log.targetUserId || Number(log.metadata?.teamOwnerTelegramId) || undefined
-    if (directMessageUserId) {
-      keyboard.row().url('✉️ Написать в ЛС', `tg://user?id=${directMessageUserId}`)
-    }
+    return results.some((result) => result.status === 'fulfilled')
+  }
 
-    const groupId = Number(process.env.SUPPORT_GROUP_ID || DEFAULT_AUDIT_GROUP_ID)
-    const topicId = Number(process.env.AUDIT_LOG_THREAD_ID || DEFAULT_AUDIT_TOPIC_ID)
-    await this.telegramApi.sendMessage(groupId, this.formatLogMessage(log), {
-      parse_mode: 'HTML',
-      message_thread_id: topicId,
-      ...(keyboard.inline_keyboard.length ? { reply_markup: keyboard } : {}),
-    })
-    return true
+  buildLogKeyboard(log: Pick<AuditLogRecord, keyof AuditLogRecord>): InlineKeyboard | null {
+    if (!log.type.startsWith('access.') && !['subscription.expired', 'subscription.disabled'].includes(log.type)) return null
+    const keyboard = new InlineKeyboard()
+    let hasButtons = false
+    if (log.targetUserId) {
+      keyboard.text('👤 Профиль и управление', apCb('u', log.targetUserId)).row()
+      hasButtons = true
+    }
+    if (log.targetTeamId && /^[a-f\d]{24}$/i.test(log.targetTeamId)) {
+      keyboard.text(`👥 Команда «${String(log.metadata?.teamName || 'открыть')}»`.slice(0, 60),
+        apCb('t', log.targetTeamId)).row()
+      hasButtons = true
+      const productId = log.metadata?.productId
+      if (typeof productId === 'string' && (TEAM_PRODUCT_IDS as readonly string[]).includes(productId)) {
+        keyboard.text('📦 Подписка команды', apCb('t', log.targetTeamId, productId)).row()
+      }
+    }
+    if (log.targetUserId) keyboard.url('✉️ Открыть Telegram-профиль', `tg://user?id=${log.targetUserId}`)
+    return hasButtons ? keyboard : null
   }
 }
 
 export const auditLogService = new AuditLogService()
+
+/** Best-effort operational event; a logging outage must not stop a user action. */
+export async function recordOperationalEvent(input: CreateAuditLogInput): Promise<void> {
+  try {
+    await auditLogService.createLog(input)
+  } catch (error) {
+    console.error(`Operational audit persistence failed (${input.type}):`, error)
+  }
+}

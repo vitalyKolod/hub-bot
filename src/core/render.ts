@@ -8,6 +8,7 @@ import type { ScreenId } from '../state/ui.js'
 export type ScreenView = {
   photo: string
   video?: string
+  mediaIsFileId?: boolean
   caption: string
   keyboard: InlineKeyboard
   caption_entities?: MessageEntity[]
@@ -41,8 +42,8 @@ export async function renderScreen(
 
   const view = await screenFactory(userId, params, ctx)
   const media = view.video
-    ? { type: 'video' as const, media: new InputFile(view.video), caption: view.caption, caption_entities: view.caption_entities }
-    : { type: 'photo' as const, media: new InputFile(view.photo), caption: view.caption, caption_entities: view.caption_entities }
+    ? { type: 'video' as const, media: view.mediaIsFileId ? view.video : new InputFile(view.video), caption: view.caption, caption_entities: view.caption_entities }
+    : { type: 'photo' as const, media: view.mediaIsFileId ? view.photo : new InputFile(view.photo), caption: view.caption, caption_entities: view.caption_entities }
 
   const isHelp = screenId === 'support'
   if (isHelp && !options?.forceNew && ui.uiMessageId && ctx.session?.supportUiMessageId === ui.uiMessageId) {
@@ -102,8 +103,8 @@ export async function renderScreen(
     reply_markup: view.keyboard,
   }
   const sent = view.video
-    ? await ctx.replyWithVideo(new InputFile(view.video), replyOptions)
-    : await ctx.replyWithPhoto(new InputFile(view.photo), replyOptions)
+    ? await ctx.replyWithVideo(view.mediaIsFileId ? view.video : new InputFile(view.video), replyOptions)
+    : await ctx.replyWithPhoto(view.mediaIsFileId ? view.photo : new InputFile(view.photo), replyOptions)
 
   setUiMessageId(userId, sent.message_id)
   registerRenderedMessage(sent.message_id)
