@@ -43,7 +43,7 @@ export async function devicesScreen(userId: number, input: string | DeviceScreen
         kb.text('Перенести в другой поток', `dv:ms:${params.teamId}`).icon(MOVE_DEVICE_ICON).row()
       }
     }
-    kb.text('‹ К команде', packCb({ a: 'open', s: 'team', p: params.teamId }))
+    kb.text('◀️ НАЗАД', packCb({ a: 'back' }))
   } else if (step === 'add_name') {
     caption += `Поток №${params.flowNumber}. Напишите название устройства одним сообщением. Сообщение с названием бот удалит.`
     back()

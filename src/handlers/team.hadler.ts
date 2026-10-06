@@ -51,7 +51,6 @@ export async function handleAcceptTeamInvite(ctx: MyContext, userId: number, cod
       used: 'Эта ссылка уже была использована.',
       expired: 'Срок действия старой ссылки истёк.',
       team_not_found: 'Команда не найдена.',
-      team_full: 'Команда уже заполнена.',
     }
     await ctx.answerCallbackQuery({ text: reasonText[check.reason] || 'Ошибка' })
     goHome(userId)
