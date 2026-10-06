@@ -17,3 +17,10 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+        env:
+          ADMIN_GROUP_ID: '100001'
+          CONTENT_GROUP_ID: '100002'
+          SUPPORT_GROUP_ID: '100003'
+          SUNDAY_SCREENS_GROUP_ID: '100004'
+          PROP_WAITLIST_THREAD_ID: '100005'
+          PROP_STREAM_VERIFY_THREAD_ID: '100006'
