@@ -18,7 +18,7 @@ test('owner device screen uses the supplied image and one compact action menu', 
   assert.match(screen.caption, /MacBook — поток №2/)
   const buttons = screen.keyboard.inline_keyboard.flat()
   assert.deepEqual(buttons.map((button) => button.text), [
-    'Добавить устройство', 'Отказаться от устройства', 'Перенести в другой поток', '‹ К команде',
+    'Добавить устройство', 'Отказаться от устройства', 'Перенести в другой поток', '◀️ НАЗАД',
   ])
   assert.deepEqual(buttons.slice(0, 3).map((button) => button.icon_custom_emoji_id), [
     '5260251205682079529', '5300821986451148615', '5260450573768990626',
@@ -36,7 +36,7 @@ test('navigation passes team id as a string and an active volunteer can only vie
   const owner = await devicesScreen(10, teamId)
   const volunteer = await devicesScreen(11, teamId)
   assert.match(volunteer.caption, /MacBook — поток №2/)
-  assert.deepEqual(volunteer.keyboard.inline_keyboard.flat().map((button) => button.text), ['‹ К команде'])
+  assert.deepEqual(volunteer.keyboard.inline_keyboard.flat().map((button) => button.text), ['◀️ НАЗАД'])
   assert.ok(owner.keyboard.inline_keyboard.flat().some((button) => button.text === 'Добавить устройство'))
   await assert.rejects(() => devicesScreen(11, { teamId, step: 'add_flow' }), /только владельцу/)
 })

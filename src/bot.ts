@@ -500,7 +500,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
           used: '❌ Эта ссылка уже была использована.',
           expired: '❌ Срок действия старой ссылки истёк.',
           team_not_found: '❌ Команда не найдена.',
-          team_full: '❌ Команда уже заполнена (максимум 5 участников).',
         }
 
         await ctx.reply(reasonText[check.reason] || '❌ Приглашение недействительно.')

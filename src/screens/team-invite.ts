@@ -16,7 +16,6 @@ export async function teamInviteScreen(userId: number, code: string): Promise<Sc
       used: 'Эта ссылка уже была использована.',
       expired: 'Срок действия старой ссылки истёк.',
       team_not_found: 'Команда не найдена.',
-      team_full: 'Команда уже заполнена (максимум 5 участников).',
     }
 
     kb.text('🏠 ГЛАВНОЕ МЕНЮ', packCb({ a: 'home' }))

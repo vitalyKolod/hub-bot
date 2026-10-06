@@ -927,7 +927,7 @@ async function showTeamCard(
     text = text.plain('\n')
   }
 
-  text = text.plain('━━━━━━━━━━━━━━\n').bold(`Состав (${team.members.length}/5):`).plain('\n')
+  text = text.plain('━━━━━━━━━━━━━━\n').bold(`Состав (${team.members.length}):`).plain('\n')
 
   for (const m of team.members) {
     const mu = await ap.adminGetUser(m.telegramId)

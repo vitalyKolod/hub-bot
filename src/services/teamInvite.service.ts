@@ -2,8 +2,6 @@ import crypto from 'crypto'
 import { TeamInviteModel } from '../models/TeamInvite.js'
 import { getTeamById } from './team.service.js'
 
-const MAX_TEAM_MEMBERS = 5
-
 function generateCode(): string {
   return crypto.randomBytes(4).toString('hex') // 8 символов, например "a1b2c3d4"
 }
@@ -69,10 +67,6 @@ export async function validateInvite(code: string) {
 
   if (!team) {
     return { ok: false, reason: 'team_not_found' as const }
-  }
-
-  if (team.members.length >= MAX_TEAM_MEMBERS) {
-    return { ok: false, reason: 'team_full' as const }
   }
 
   return { ok: true as const, invite, team }

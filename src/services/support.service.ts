@@ -309,7 +309,7 @@ export async function createSupportTicketForUser(
         ...(teams.length
           ? teams.map(
               (team) =>
-                `• ${team.name} — ${team.ownerId === userId ? 'владелец' : 'участник'} (${team.members?.length || 0}/5)`
+                `• ${team.name} — ${team.ownerId === userId ? 'владелец' : 'участник'} (${team.members?.length || 0})`
             )
           : ['• Не состоит в команде']),
         '',
