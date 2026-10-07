@@ -4,6 +4,7 @@ import { TeamModel } from '../src/models/Team.js'
 import { ProPresenterDeviceModel, ProPresenterDeviceRequestModel } from '../src/models/ProPresenterDevice.js'
 import { ProPresenterStreamModel } from '../src/models/ProPresenterStream.js'
 import { devicesScreen } from '../src/screens/devices.js'
+import { handleDeviceCallback } from '../src/handlers/proPresenterDevice.handlers.js'
 
 test('owner device screen uses the supplied image and one compact action menu', async (t) => {
   t.mock.method(TeamModel as any, 'findById', async () => ({ ownerId: 10, name: 'Команда' }))
@@ -18,10 +19,10 @@ test('owner device screen uses the supplied image and one compact action menu', 
   assert.match(screen.caption, /MacBook — поток №2/)
   const buttons = screen.keyboard.inline_keyboard.flat()
   assert.deepEqual(buttons.map((button) => button.text), [
-    'Добавить устройство', 'Отказаться от устройства', 'Перенести в другой поток', '◀️ НАЗАД',
+    'Добавить устройство', 'Отказаться от устройства', '◀️ НАЗАД',
   ])
-  assert.deepEqual(buttons.slice(0, 3).map((button) => button.icon_custom_emoji_id), [
-    '5260251205682079529', '5300821986451148615', '5260450573768990626',
+  assert.deepEqual(buttons.slice(0, 2).map((button) => button.icon_custom_emoji_id), [
+    '5260251205682079529', '5300821986451148615',
   ])
 })
 
@@ -65,4 +66,14 @@ test('request confirmation button has no device icon', async (t) => {
   const button = screen.keyboard.inline_keyboard[0][0]
   assert.equal(button.text, '✅ Отправить заявку')
   assert.equal(button.icon_custom_emoji_id, undefined)
+})
+
+test('old user move buttons cannot start a transfer', async () => {
+  const answers: any[] = []
+  const handled = await handleDeviceCallback({
+    session: {},
+    answerCallbackQuery: async (answer: any) => answers.push(answer),
+  }, 'dv:ms:507f1f77bcf86cd799439010')
+  assert.equal(handled, true)
+  assert.match(answers[0].text, /недоступен/)
 })

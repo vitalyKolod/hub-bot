@@ -27,7 +27,7 @@ export async function cartScreen(userId: number, teamId: string): Promise<Screen
     kb.text('💳 ОФОРМИТЬ ЗАКАЗ', packCb({ a: 'checkout_cart', p: teamId })).row()
   }
 
-  kb.text('➕ В каталог', packCb({ a: 'open', s: 'add_subscription', p: teamId })).row()
+  kb.text('➕ В каталог', packCb({ a: 'open', s: 'content_menu', p: teamId })).row()
   kb.text('◀️ Назад', packCb({ a: 'back' })).text('🏠 Главная', packCb({ a: 'home' }))
 
   let message = new FormattedString('').bold('🛒 КОРЗИНА').plain('\n\n')

@@ -83,12 +83,28 @@ export async function teamScreen(userId: number, input: string | { teamId: strin
 
 export async function teamProPresenterScreen(userId: number, teamId: string): Promise<ScreenView> {
   const { team, byProduct } = await data(teamId)
+  if (team.ownerId !== userId && !team.members.some(member => member.telegramId === userId && member.status === 'active')) {
+    throw new Error('ProPresenter доступен только участникам команды')
+  }
   const prop = team.subscriptions.get('propresenter')
   const { devices, streams, nextExpiry } = await propData(teamId, prop)
-  const meta = prop?.meta as { flowNumber?: number; chatLink?: string } | undefined
+  const meta = prop?.meta as { flowNumber?: number; chatLink?: string; email?: string; password?: string } | undefined
   const hasActiveFlow = streams.some(stream => stream.expiresAt && new Date(stream.expiresAt).getTime() > Date.now()) || (active(prop) && !!meta?.flowNumber)
   let quote = new FormattedString('').emoji('🎬', '5251272469175631339').plain(' ProPresenter\n┗ Статус: ').bold(nextExpiry ? '✅ Активна' : status(prop, byProduct.get('propresenter')))
   if (nextExpiry) quote = quote.plain(`\n┗ Осталось: ${days(nextExpiry)} дн.`)
+  if (streams.length) {
+    for (const stream of [...streams].sort((a, b) => a.flowNumber - b.flowNumber).slice(0, 5)) {
+      quote = quote.plain(`\n┗ Поток №${stream.flowNumber}`)
+      if (stream.email) quote = quote.plain('\n┗ Логин: ').code(stream.email)
+      if (stream.password) quote = quote.plain('\n┗ Пароль: ').spoiler(stream.password)
+      if (stream.expiresAt) quote = quote.plain(`\n┗ До: ${dateText(stream.expiresAt)}`)
+    }
+    if (streams.length > 5) quote = quote.plain(`\n┗ Ещё потоков: ${streams.length - 5}`)
+  } else {
+    if (meta?.email) quote = quote.plain('\n┗ Логин: ').code(meta.email)
+    if (meta?.password) quote = quote.plain('\n┗ Пароль: ').spoiler(meta.password)
+    if (prop?.expiresAt) quote = quote.plain(`\n┗ До: ${dateText(prop.expiresAt)}`)
+  }
   quote = quote.plain('\n').emoji('🖥', DEVICE_ICON).plain(` Устройства: ${devices.length}`)
   for (const device of devices.slice(0, 5)) quote = quote.plain(`\n┗ ${device.name} · поток №${device.flowNumber}`)
   if (devices.length > 5) quote = quote.plain(`\n┗ Ещё ${devices.length - 5} — в разделе «Устройства»`)
@@ -104,14 +120,26 @@ export async function teamProPresenterScreen(userId: number, teamId: string): Pr
   return { photo: './public/team-propresenter.png', caption: message.caption, caption_entities: message.caption_entities, keyboard: kb }
 }
 
-export async function teamContentScreen(userId: number, teamId: string): Promise<ScreenView> {
+export async function teamContentScreen(userId: number, teamId: string, ctx?: { api: { getChatMember: (chatId: number, userId: number) => Promise<any>; getChat: (chatId: number) => Promise<any> } }): Promise<ScreenView> {
   const { team, byProduct } = await data(teamId)
   const activeContentCount = PRODUCTS.filter(product => active(team.subscriptions.get(product.id))).length
   let quote = new FormattedString('').emoji('🖥', '5373330964372004748').plain(' Контент для экранов\n\n').bold(`Подписок ${activeContentCount}/${PRODUCTS.length}\n`)
   for (const product of PRODUCTS) quote = quote.plain('\n').concat(productLine(product.name, product.icon, team.subscriptions.get(product.id), byProduct.get(product.id), true)).plain('\n')
   const message = header(team.name).expandableBlockquote(quote)
   const kb = new InlineKeyboard()
-  for (const product of PRODUCTS) if (active(team.subscriptions.get(product.id))) kb.text(`Чат — ${product.name}`, `chat_access:${product.id}`).icon(product.icon).row()
+  const chatLinks = await Promise.all(PRODUCTS.map(async product => {
+    if (!ctx || !active(team.subscriptions.get(product.id))) return null
+    const chatId = Number(getProduct(product.id)?.groupId)
+    if (!Number.isSafeInteger(chatId) || chatId >= 0) return null
+    try {
+      const member = await ctx.api.getChatMember(chatId, userId)
+      if (!['creator', 'administrator', 'member'].includes(member.status) && !(member.status === 'restricted' && member.is_member)) return null
+      const chat = await ctx.api.getChat(chatId).catch(() => null)
+      const url = chat?.username ? `https://t.me/${chat.username}` : chat?.invite_link || (String(chatId).startsWith('-100') ? `https://t.me/c/${String(chatId).slice(4)}/1` : null)
+      return url ? { product, url } : null
+    } catch { return null }
+  }))
+  for (const entry of chatLinks) if (entry) kb.url(`Чат — ${entry.product.name}`, entry.url).icon(entry.product.icon).row()
   if (team.ownerId === userId) {
     for (const product of PRODUCTS) if (shouldShowRenewal(team.subscriptions.get(product.id))) {
       kb.text(`Продлить ${getProduct(product.id)?.name || product.name}`, packCb({ a: 'open', s: product.id, p: teamId })).icon('5346321684574003384').row()

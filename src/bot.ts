@@ -1,7 +1,7 @@
 import { handleYandex360Callback, handleYandex360Text } from './handlers/yandex360.handlers.js'
 import { handleTutorialAdminMessage } from './handlers/tutorialAdmin.handlers.js'
 import { bindKnownUser } from './services/yandex360.service.js'
-import { createProtectedChatInvite, handleProductJoinRequest, handleProductMemberJoined } from './services/groupJoinAccess.service.js'
+import { handleProductJoinRequest, handleProductMemberJoined } from './services/groupJoinAccess.service.js'
 import { markSupportUiOpened, markSupportUiClosed } from './ui/supportUi.js'
 import { startSupportFlow, handleSupportFlowCallback, guardSupportSelection } from './handlers/supportFlow.handlers.js'
 import { PROP_FLOWS } from './data/ProPresenterFLows.js'
@@ -625,20 +625,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
   bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data
     if (data.startsWith('chat_access:')) {
-      const productId = data.slice('chat_access:'.length)
-      try {
-        const invite = await createProtectedChatInvite(ctx.api, productId, ctx.from.id)
-        if (!invite) {
-          await ctx.answerCallbackQuery({ text: 'Нет действующей подписки для этого чата', show_alert: true })
-          return
-        }
-        await ctx.answerCallbackQuery({ text: 'Ссылка отправлена вам в личные сообщения' })
-        await ctx.api.sendMessage(ctx.from.id,
-          `Ссылка для заявки в чат действует 1 час. Бот проверит ваш Telegram ID при вступлении:\n${invite.invite_link}`)
-      } catch (error) {
-        console.error('Product chat invite failed:', error)
-        await ctx.answerCallbackQuery({ text: 'Не удалось создать ссылку. Попробуйте позже.', show_alert: true }).catch(() => {})
-      }
+      await ctx.answerCallbackQuery({ text: 'Откройте экран команды заново — кнопки чатов обновились.', show_alert: true })
       return
     }
     if (data !== 'ap:tuts' && !data.startsWith('ap:tuts:')) ctx.session.tutorialAdminInput = undefined
