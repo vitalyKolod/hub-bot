@@ -165,6 +165,10 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
   if (!data.startsWith('dv:')) return false
   const [_, action, first, second, third] = data.split(':')
   try {
+    if (['ms', 'mf', 'mc', 'mr'].includes(action)) {
+      await ctx.answerCallbackQuery({ text: 'Перенос устройства недоступен', show_alert: true })
+      return true
+    }
     if (!['ac', 'axs', 'ax', 'axc', 'at'].includes(action)) ctx.session.deviceDraft = undefined
     if (action === 'team') {
       if (!(await hasAdminPermission(ctx.from.id, 'teams.view')))

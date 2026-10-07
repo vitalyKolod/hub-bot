@@ -5,14 +5,13 @@ import type { ScreenView } from '../core/render.js'
 export function propresenterCheckScreen(userId: number, teamId: string): ScreenView {
   const kb = new InlineKeyboard()
 
-  kb.text('✅ Да, есть поток', packCb({ a: 'prop_has_stream', p: teamId })).row()
-  kb.text('❌ Нет, нужен поток', packCb({ a: 'prop_no_stream', p: teamId })).row()
+  kb.text('Подать заявку на новый поток', packCb({ a: 'prop_no_stream', p: teamId })).row()
+  kb.text('У меня уже есть поток', packCb({ a: 'prop_has_stream', p: teamId })).row()
   kb.text('◀️ Назад', packCb({ a: 'back' }))
 
   return {
     photo: './public/propres.jpg',
-    caption:
-      `*ProPresenter — подключение*\n\n` + `У вашей команды уже есть номер потока ProPresenter?`,
+    caption: `ProPresenter — подключение\n\n` + `Выберите действие`,
     keyboard: kb,
   }
 }

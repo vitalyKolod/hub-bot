@@ -15,7 +15,7 @@ export async function propresenterScreen(userId: number, teamId: string): Promis
     kb.text(`✅ УЖЕ ЕСТЬ ПОТОК №${flowNumber}`, packCb({ a: 'noop' })).row()
   } else {
     kb.text(
-      'ПОДРОБНЕЕ',
+      'ПРИСОЕДИНИТЬСЯ К ПОТОКУ',
       packCb({
         a: 'open',
         s: 'propresenter_check',
