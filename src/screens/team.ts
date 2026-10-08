@@ -11,10 +11,10 @@ import { getProduct } from '../config/products.js'
 
 const PRODUCTS = [
   { id: 'procontent', name: 'ProContent', icon: '5251299351375937406' },
-  { id: 'cmg', name: 'CMG', icon: '5310127020213043624' },
+  { id: 'cmg', name: 'Church Motion Graphics', icon: '5310127020213043624' },
   { id: 'sunday_screens', name: 'Sunday Screens', icon: '5291749654017381020' },
-  { id: 'cgs', name: 'CGS', icon: '5190419001703963847' },
-  { id: 'storyloops', name: 'StoryLoops', icon: '5190877553887323413' },
+  { id: 'cgs', name: 'Church Goods Studio', icon: '5190419001703963847' },
+  { id: 'storyloops', name: 'Story Loop', icon: '5190877553887323413' },
 ] as const
 type Subscription = { status?: string; expiresAt?: Date | null; meta?: any } | undefined
 type Payment = { status?: string; rejectionReason?: string | null } | undefined
@@ -106,8 +106,8 @@ export async function teamProPresenterScreen(userId: number, teamId: string): Pr
     if (prop?.expiresAt) quote = quote.plain(`\n┗ До: ${dateText(prop.expiresAt)}`)
   }
   quote = quote.plain('\n').emoji('🖥', DEVICE_ICON).plain(` Устройства: ${devices.length}`)
-  for (const device of devices.slice(0, 5)) quote = quote.plain(`\n┗ ${device.name} · поток №${device.flowNumber}`)
-  if (devices.length > 5) quote = quote.plain(`\n┗ Ещё ${devices.length - 5} — в разделе «Устройства»`)
+  for (const device of devices.slice(0, 5)) quote = quote.plain(`\n   ┗ ${device.name} · поток №${device.flowNumber}`)
+  if (devices.length > 5) quote = quote.plain(`\n   ┗ Ещё ${devices.length - 5} — в разделе «Устройства»`)
   const message = header(team.name).bold('⛪ ПОДПИСКИ\n\n').expandableBlockquote(quote)
   const kb = new InlineKeyboard()
   if (devices.length || ['active', 'expired'].includes(prop?.status || '')) kb.text('УСТРОЙСТВА', packCb({ a: 'open', s: 'devices', p: teamId })).icon(DEVICE_ICON).row()

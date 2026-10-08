@@ -43,7 +43,7 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   cmg: {
     customEmojiId: '5310127020213043624',
     id: 'cmg',
-    name: 'CMG',
+    name: 'Church Motion Graphics',
     description: 'Коллекция визуальных материалов Church Motion Graphics.',
     cover: '/media/cmg.png',
 
@@ -71,7 +71,7 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   cgs: {
     customEmojiId: '5190419001703963847',
     id: 'cgs',
-    name: 'CGS',
+    name: 'Church Goods Studio',
     description: 'Медиаресурсы Church Graphics Studio для вашей команды.',
     cover: '/media/sgc.png',
 
@@ -85,7 +85,7 @@ export const PRODUCTS: Record<string, ProductConfig> = {
   storyloops: {
     customEmojiId: '5190877553887323413',
     id: 'storyloops',
-    name: 'StoryLoops',
+    name: 'Story Loop',
     description: 'Анимированные фоны и видеолоопы для экранов.',
     cover: '/media/StoryLoop.png',
 
