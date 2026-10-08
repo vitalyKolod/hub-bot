@@ -151,6 +151,7 @@ export async function rubPaymentScreen(userId: number, params?: any): Promise<Sc
   receiver = receiver.plain('Получатель: ').bold(config.PAYMENT_RECEIVER_NAME)
 
   message = message.blockquote(receiver, true).plain('\n\n')
+  message = message.bold('КОММЕНТАРИИ К ПЕРЕВОДУ ПИСАТЬ НЕ НУЖНО!').plain('\n\n')
 
   message = message
     // .emoji('⚡', '5980930633298350051')

@@ -33,7 +33,7 @@ import {
 } from '../constants/admin-panel.js'
 import * as ap from '../services/adminPanel.service.js'
 import { getActiveRenewalForFlow } from '../services/proPresenterRenewal.service.js'
-import { listFlowDevices, DEVICE_ICON } from '../services/proPresenterDevice.service.js'
+import { listFlowDevices, listTeamDevices, DEVICE_ICON } from '../services/proPresenterDevice.service.js'
 import { SUPPORT_GROUP_ID } from '../config/env.js'
 import { LOG_GROUP_ID } from '../config/logs.js'
 import {
@@ -285,7 +285,7 @@ export async function showAdminPanelMenu(ctx: Context) {
     kb.text('Администраторы', apCb('admins')).icon(ADMIN_MANAGEMENT_ICONS.admins).row()
   }
   if (ctx.from && await hasAdminPermission(ctx.from.id, 'tutorials.view')) {
-    kb.text('Туториалы', apCb('tuts')).row()
+    kb.text('Туториалы', apCb('tuts')).icon('5375309569905938163').row()
   }
   kb.text('‹ Назад', 'admin:root')
 
@@ -885,6 +885,7 @@ async function showTeamCard(
   }
 
   const owner = await ap.adminGetUser(team.ownerId)
+  const devices = await listTeamDevices(teamId)
 
   let text = new FormattedString('')
     .plain('👥 ')
@@ -923,6 +924,10 @@ async function showTeamCard(
       if (sub.meta.email) text = text.plain('┗ Логин: ').code(sub.meta.email).plain('\n')
       if (sub.meta.password) text = text.plain('┗ Пароль: ').code(sub.meta.password).plain('\n')
       if (sub.meta.chatLink) text = text.plain('┗ Чат: есть\n')
+    }
+    if (productId === 'propresenter') {
+      text = text.emoji('🖥', DEVICE_ICON).plain(` Устройства: ${devices.length}\n`)
+      for (const device of devices) text = text.plain(`   ┗ ${device.name} · поток №${device.flowNumber}\n`)
     }
     text = text.plain('\n')
   }

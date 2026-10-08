@@ -15,7 +15,7 @@ export async function cgsScreen(userId: number, teamId: string): Promise<ScreenV
 
   let message = new FormattedString('')
 
-  message = message.emoji('▫️', product.customEmojiId!).plain(' ').bold('CGS').plain('\n\n')
+  message = message.emoji('▫️', product.customEmojiId!).plain(' ').bold(product.name).plain('\n\n')
 
   message = message
     .plain('Библиотека графики и визуального контента для церковных презентаций и служений.')
