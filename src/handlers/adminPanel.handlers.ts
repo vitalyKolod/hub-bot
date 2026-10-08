@@ -285,7 +285,7 @@ export async function showAdminPanelMenu(ctx: Context) {
     kb.text('Администраторы', apCb('admins')).icon(ADMIN_MANAGEMENT_ICONS.admins).row()
   }
   if (ctx.from && await hasAdminPermission(ctx.from.id, 'tutorials.view')) {
-    kb.text('Туториалы', apCb('tuts')).row()
+    kb.text('Туториалы', apCb('tuts')).icon('5375309569905938163').row()
   }
   kb.text('‹ Назад', 'admin:root')
 
