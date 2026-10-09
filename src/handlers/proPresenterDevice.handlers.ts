@@ -21,6 +21,7 @@ import {
   DEVICE_ICON,
   DEVICE_REQUEST_THREAD_ID,
   listFlowDevices,
+  listTeamDevices,
 } from '../services/proPresenterDevice.service.js'
 
 type Draft = {
@@ -83,7 +84,7 @@ async function showAdminFlow(ctx: any, flowNumber: number, page = 0) {
     if (safePage < pages - 1) kb.text('След. ›', `dv:admin:${flowNumber}:${safePage + 1}`)
     kb.row()
   }
-  kb.text('Добавить устройство', `dv:aa:${flowNumber}`).icon(DEVICE_ICON).row()
+  kb.text('Добавить устройство', `dv:aa:${flowNumber}`).icon('5397916757333654639').row()
   kb.text('‹ К потоку', apCb('stream', flowNumber))
   await ctx.editMessageText(text, { reply_markup: kb })
 }
@@ -170,6 +171,32 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
       return true
     }
     if (!['ac', 'axs', 'ax', 'axc', 'at'].includes(action)) ctx.session.deviceDraft = undefined
+    if (action === 'team_devices') {
+      if (!(await hasAdminPermission(ctx.from.id, 'teams.view')))
+        throw new Error('Нет прав на просмотр команды')
+      const team = await TeamModel.findById(first)
+      if (!team) throw new Error('Команда не найдена')
+      const devices = await listTeamDevices(first)
+      const pages = Math.max(1, Math.ceil(devices.length / 20))
+      const page = Math.min(Math.max(0, Number(second) || 0), pages - 1)
+      const visible = devices.slice(page * 20, (page + 1) * 20)
+      const kb = new InlineKeyboard()
+      if (pages > 1) {
+        if (page > 0) kb.text('‹ Пред.', `dv:team_devices:${first}:${page - 1}`)
+        kb.text(`${page + 1}/${pages}`, `dv:team_devices:${first}:${page}`)
+        if (page < pages - 1) kb.text('След. ›', `dv:team_devices:${first}:${page + 1}`)
+        kb.row()
+      }
+      kb.text('‹ К команде', apCb('t', first))
+      await ctx.editMessageText([
+        `🖥 Устройства · ${team.name}`,
+        `Подтверждено: ${devices.length}`,
+        '',
+        ...(visible.length ? visible.map(device => `• ${device.name} · поток №${device.flowNumber}`) : ['У команды пока нет устройств.']),
+      ].join('\n').slice(0, 4000), { reply_markup: kb })
+      await ctx.answerCallbackQuery()
+      return true
+    }
     if (action === 'team') {
       if (!(await hasAdminPermission(ctx.from.id, 'teams.view')))
         throw new Error('Нет прав на просмотр команды')

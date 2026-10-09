@@ -354,3 +354,65 @@ test('legacy ap callback in an existing audit message also opens a separate card
   assert.equal(edits.length, 0)
   assert.equal(replies.length, 1)
 })
+
+test('private admin search edits its prompt and deletes the query without sending a result message', async (t) => {
+  t.mock.method(TeamModel as any, 'find', () => ({ limit: async () => [{ _id: 'team-1', name: 'Спасение', members: [] }] }))
+  const { ctx: prompt, edits, replies, } = callbackContext(111, apCb('search_t'))
+  prompt.chat.type = 'private'
+  await handleAdminPanelCallback(prompt, apCb('search_t'))
+  assert.equal(prompt.session.adminPanelInput.sourceMessageId, 50)
+  const { ctx, replies: results } = textContext(111, 'Спасение', prompt.session, edits)
+  ctx.chat.type = 'private'
+  const deleted: number[] = []
+  ctx.deleteMessage = async () => { deleted.push(ctx.message.message_id) }
+  await handleAdminPanelText(ctx)
+  assert.deepEqual(deleted, [80])
+  assert.equal(results.length, 0)
+  assert.equal(replies.length, 0)
+  assert.equal(edits.at(-1)?.messageId, 50)
+  assert.equal(edits.at(-1)?.text, 'Найдено: 1')
+  assert.equal(keyboardButtons(edits.at(-1)!)[0].callback_data, apCb('t', 'team-1'))
+})
+
+test('private admin validation errors edit the prompt and preserve retry state', async () => {
+  const session = { adminPanelInput: { mode: 'assign_team_stream', teamId: 'team-1', sourceChatId: -900, sourceMessageId: 50 } }
+  const edits: RecordedEdit[] = []
+  const { ctx, replies } = textContext(111, 'invalid', session, edits)
+  ctx.chat.type = 'private'
+  ctx.deleteMessage = async () => true
+  await handleAdminPanelText(ctx)
+  assert.equal(replies.length, 0)
+  assert.equal(edits[0].messageId, 50)
+  assert.match(edits[0].text, /❌/)
+  assert.equal(session.adminPanelInput.mode, 'assign_team_stream')
+})
+
+test('team devices show every flow, paginate, and return to the team', async (t) => {
+  const { ProPresenterDeviceModel } = await import('../src/models/ProPresenterDevice.js')
+  const { handleDeviceCallback } = await import('../src/handlers/proPresenterDevice.handlers.js')
+  t.mock.method(TeamModel as any, 'findById', async () => ({ name: 'Спасение' }))
+  t.mock.method(ProPresenterDeviceModel as any, 'find', (filter: any) => {
+    assert.deepEqual(filter, { teamId: 'team-1', status: 'active' })
+    return { sort: async () => Array.from({ length: 21 }, (_, i) => ({ name: `PC-${i}`, flowNumber: i < 20 ? 10 : 11 })) }
+  })
+  const { ctx, edits } = callbackContext(111, 'dv:team_devices:team-1:1')
+  await handleDeviceCallback(ctx, 'dv:team_devices:team-1:1')
+  assert.match(edits[0].text, /Подтверждено: 21/)
+  assert.match(edits[0].text, /PC-20 · поток №11/)
+  assert.equal(keyboardButtons(edits[0]).at(-1)?.callback_data, apCb('t', 'team-1'))
+  assert.equal(keyboardButtons(edits[0])[0].callback_data, 'dv:team_devices:team-1:0')
+})
+
+test('admin add-device action has its own requested icon', async (t) => {
+  const { ProPresenterDeviceModel } = await import('../src/models/ProPresenterDevice.js')
+  const { ProPresenterStreamModel } = await import('../src/models/ProPresenterStream.js')
+  const { handleDeviceCallback } = await import('../src/handlers/proPresenterDevice.handlers.js')
+  t.mock.method(ProPresenterStreamModel as any, 'findOne', async () => ({ flowNumber: 10 }))
+  t.mock.method(ProPresenterDeviceModel as any, 'find', () => ({ sort: async () => [] }))
+  t.mock.method(TeamModel as any, 'find', async () => [])
+  const { ctx, edits } = callbackContext(111, 'dv:admin:10')
+  await handleDeviceCallback(ctx, 'dv:admin:10')
+  const button: any = keyboardButtons(edits[0]).find(item => item.text === 'Добавить устройство')
+  assert.equal(button.icon_custom_emoji_id, '5397916757333654639')
+  assert.equal(button.callback_data, 'dv:aa:10')
+})

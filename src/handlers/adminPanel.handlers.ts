@@ -105,9 +105,10 @@ function isSupportTopic(ctx: Context): boolean {
 }
 
 /** В поддержке не создаём отдельное сообщение «готово»: ставим реакцию и
- * удаляем служебный ввод администратора. В личной админке сохраняем старое поведение. */
+ * удаляем служебный ввод администратора. В личной админке результат показывает карточка. */
 async function confirmAdminInput(ctx: Context, text: string) {
   if (!isSupportTopic(ctx)) {
+    if ((ctx as any).adminInputTarget) return
     await ctx.reply(text)
     return
   }
@@ -195,23 +196,27 @@ async function render(
 
   const editTarget = options.forceNew
     ? undefined
-    : options.targetMessage || getCallbackMessageTarget(ctx)
+    : options.targetMessage || (ctx as any).adminInputTarget || getCallbackMessageTarget(ctx)
 
-  if (!options.forceNew && (ctx.callbackQuery || options.targetMessage)) {
+  if (!options.forceNew && editTarget) {
     try {
-      if (options.targetMessage) {
+      if (options.targetMessage || (ctx as any).adminInputTarget) {
         await ctx.api.editMessageText(
-          options.targetMessage.chatId,
-          options.targetMessage.messageId,
+          editTarget.chatId,
+          editTarget.messageId,
           text,
           opts
         )
       } else {
         await ctx.editMessageText(text, opts)
       }
+      rememberInputTarget(ctx, editTarget)
       return editTarget
     } catch (error) {
-      if (isMessageNotModified(error)) return editTarget
+      if (isMessageNotModified(error)) {
+        rememberInputTarget(ctx, editTarget)
+        return editTarget
+      }
 
       if (options.replaceOnFailure && editTarget) {
         await ctx.api.deleteMessage(editTarget.chatId, editTarget.messageId).catch(() => {})
@@ -220,7 +225,46 @@ async function render(
   }
 
   const sent = await ctx.reply(text, opts)
-  return { chatId: sent.chat.id, messageId: sent.message_id }
+  const target = { chatId: sent.chat.id, messageId: sent.message_id }
+  rememberInputTarget(ctx, target)
+  return target
+}
+
+function rememberInputTarget(ctx: Context, target?: MessageTarget) {
+  const input = getSession(ctx)?.adminPanelInput
+  if (ctx.chat?.type === 'private' && input && target) {
+    input.sourceChatId = target.chatId
+    input.sourceMessageId = target.messageId
+  }
+}
+
+/** Keep private admin input in the existing panel, including validation and wizard steps. */
+function adminInputContext(ctx: Context, input: ApInput): Context {
+  if (ctx.chat?.type !== 'private' || input.sourceChatId !== ctx.chat.id || !input.sourceMessageId) return ctx
+  let target = { chatId: input.sourceChatId, messageId: input.sourceMessageId }
+  return new Proxy(ctx, {
+    get(original, key) {
+      if (key === 'adminInputTarget') return target
+      if (key === 'reply') return async (text: string, options: any = {}) => {
+        try {
+          const edited = await original.api.editMessageText(target.chatId, target.messageId, text, {
+            ...options,
+            reply_markup: options.reply_markup || new InlineKeyboard().text('‹ Меню', apCb('menu')),
+          })
+          rememberInputTarget(original, target)
+          return edited
+        } catch (error) {
+          if (isMessageNotModified(error)) return { chat: original.chat, message_id: target.messageId }
+          const sent = await original.reply(text, options)
+          target = { chatId: sent.chat.id, messageId: sent.message_id }
+          rememberInputTarget(original, target)
+          return sent
+        }
+      }
+      const value = Reflect.get(original, key, original)
+      return typeof value === 'function' ? value.bind(original) : value
+    },
+  })
 }
 
 function paginationRow(kb: InlineKeyboard, page: number, totalPages: number, base: string) {
@@ -955,6 +999,8 @@ async function showTeamCard(
       .row()
   }
 
+  kb.text('Устройства', `dv:team_devices:${teamId}`).icon(DEVICE_ICON).row()
+
   kb.text('➕ Добавить участника', apCb('t', teamId, 'mem', 'add'))
   kb.text('➖ Удалить участника', apCb('t', teamId, 'mem', 'rmmenu'))
   kb.row()
@@ -1501,6 +1547,8 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
   if (text === undefined) return false
 
   session.adminPanelInput = undefined
+  ctx = adminInputContext(ctx, input)
+  if ((ctx as any).adminInputTarget) await ctx.deleteMessage().catch(() => {})
 
   try {
     switch (input.mode) {
