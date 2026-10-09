@@ -77,6 +77,7 @@ export async function teamScreen(userId: number, input: string | { teamId: strin
   kb.text('ProPresenter', packCb({ a: 'open', s: 'team_propresenter', p: teamId })).icon('5251272469175631339').row()
   kb.text('КОНТЕНТ ДЛЯ ЭКРАНОВ', packCb({ a: 'open', s: 'team_content', p: teamId })).icon('5373330964372004748').row()
   kb.text('КОМАНДА', packCb({ a: 'open', s: 'team_members', p: teamId })).icon('5296533616224906961').row()
+  kb.text('ПОМОЩЬ', packCb({ a: 'open', s: 'support' })).icon('5238025132177369293').row()
   navigation(kb)
   return { photo: './public/my-teams.png', caption: message.caption, caption_entities: message.caption_entities, keyboard: kb }
 }
