@@ -1360,6 +1360,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
     const userId = ctx.from?.id
     if (!userId) return
 
+    if (await handleAdminPanelText(ctx)) return
     if (await handleYandex360Text(ctx)) return
     if (await handleDeviceNameText(ctx)) return
     if (await handleCustomPaymentRejectText(ctx)) return
@@ -1367,7 +1368,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     // В топике поддержки ввод из админ-панели (дата, имя, статус и т.д.)
     // должен обрабатываться раньше, чем обычный ответ пользователю.
-    if (await handleAdminPanelText(ctx)) return
     if (await relayAdminMessage(ctx)) return
 
     const profile = await getOrCreateUser(userId)

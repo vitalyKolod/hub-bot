@@ -1,3 +1,4 @@
+import { adminReplaceDevice } from '../services/adminDevice.service.js'
 import { InlineKeyboard } from 'grammy'
 import { goTo } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
@@ -21,15 +22,21 @@ import {
   DEVICE_ICON,
   DEVICE_REQUEST_THREAD_ID,
   listFlowDevices,
+  listTeamDevices,
 } from '../services/proPresenterDevice.service.js'
 
 type Draft = {
-  mode: 'user_name' | 'admin_name'
+  mode: 'user_name' | 'admin_name' | 'admin_replace'
   teamId: string
   flowNumber: number
   name?: string
+  returnToTeam?: boolean
+  adminDeviceId?: string
   adminMessageId?: number
 }
+const DELETE_DEVICE_ICON = '5300821986451148615'
+const REPLACE_DEVICE_ICON = '5303174911269818848'
+const ADD_DEVICE_ICON = '5397916757333654639'
 const adminGroupId = Number(process.env.ADMIN_GROUP_ID)
 
 async function syncAffectedRenewals(api: any, flows: Array<number | null | undefined>) {
@@ -83,25 +90,23 @@ async function showAdminFlow(ctx: any, flowNumber: number, page = 0) {
     if (safePage < pages - 1) kb.text('След. ›', `dv:admin:${flowNumber}:${safePage + 1}`)
     kb.row()
   }
-  kb.text('Добавить устройство', `dv:aa:${flowNumber}`).icon(DEVICE_ICON).row()
+  kb.text('Добавить устройство', `dv:aa:${flowNumber}`).icon(ADD_DEVICE_ICON).row()
   kb.text('‹ К потоку', apCb('stream', flowNumber))
   await ctx.editMessageText(text, { reply_markup: kb })
 }
 
-async function showAdminDevice(ctx: any, deviceId: string) {
+async function showAdminDevice(ctx: any, deviceId: string, fromTeam = false) {
   const device = await ProPresenterDeviceModel.findById(deviceId)
   if (!device || device.status !== 'active') throw new Error('Устройство не найдено')
   const team = await TeamModel.findById(device.teamId)
+  const suffix = fromTeam ? ':t' : ''
   const kb = new InlineKeyboard()
-    .text('Перенести', `dv:am:${device.id}`)
-    .icon(DEVICE_ICON)
-    .row()
-    .text('Отказ от устройства', `dv:ar:${device.id}`)
-    .icon(DEVICE_ICON)
-    .row()
-    .text('Открыть команду', apCb('t', device.teamId))
-    .row()
-    .text('‹ К устройствам потока', `dv:admin:${device.flowNumber}`)
+    .text('Удалить устройство', `dv:ar:${device.id}${suffix}`)
+    .icon(DELETE_DEVICE_ICON).row()
+  if (fromTeam) kb.text('Заменить устройство', `dv:axn:${device.id}`).icon(REPLACE_DEVICE_ICON).row()
+  kb.text('Открыть команду', apCb('t', device.teamId)).row()
+  kb.text(fromTeam ? '‹ К устройствам команды' : '‹ К устройствам потока',
+    fromTeam ? `dv:team_devices:${device.teamId}` : `dv:admin:${device.flowNumber}`)
   await ctx.editMessageText(
     `🖥 ${device.name}\nПоток №${device.flowNumber}\nКоманда: ${team?.name || '—'}\nСтатус: активное`,
     { reply_markup: kb }
@@ -169,7 +174,36 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
       await ctx.answerCallbackQuery({ text: 'Перенос устройства недоступен', show_alert: true })
       return true
     }
-    if (!['ac', 'axs', 'ax', 'axc', 'at'].includes(action)) ctx.session.deviceDraft = undefined
+    if (!['ac', 'axs', 'ax', 'axc', 'at', 'axok'].includes(action)) ctx.session.deviceDraft = undefined
+    if (action === 'team_devices') {
+      if (!(await hasAdminPermission(ctx.from.id, 'teams.view')))
+        throw new Error('Нет прав на просмотр команды')
+      const team = await TeamModel.findById(first)
+      if (!team) throw new Error('Команда не найдена')
+      const devices = await listTeamDevices(first)
+      const pages = Math.max(1, Math.ceil(devices.length / 20))
+      const page = Math.min(Math.max(0, Number(second) || 0), pages - 1)
+      const visible = devices.slice(page * 20, (page + 1) * 20)
+      const kb = new InlineKeyboard()
+      for (const device of visible)
+        kb.text(`${device.name} · поток №${device.flowNumber}`.slice(0, 58), `dv:ad:${device.id}:t`).icon(DEVICE_ICON).row()
+      if (pages > 1) {
+        if (page > 0) kb.text('‹ Пред.', `dv:team_devices:${first}:${page - 1}`)
+        kb.text(`${page + 1}/${pages}`, `dv:team_devices:${first}:${page}`)
+        if (page < pages - 1) kb.text('След. ›', `dv:team_devices:${first}:${page + 1}`)
+        kb.row()
+      }
+      kb.text('Добавить устройство', `dv:ta:${first}`).icon(ADD_DEVICE_ICON).row()
+      kb.text('‹ К команде', apCb('t', first))
+      await ctx.editMessageText([
+        `🖥 Устройства · ${team.name}`,
+        `Подтверждено: ${devices.length}`,
+        '',
+        ...(visible.length ? visible.map(device => `• ${device.name} · поток №${device.flowNumber}`) : ['У команды пока нет устройств.']),
+      ].join('\n').slice(0, 4000), { reply_markup: kb })
+      await ctx.answerCallbackQuery()
+      return true
+    }
     if (action === 'team') {
       if (!(await hasAdminPermission(ctx.from.id, 'teams.view')))
         throw new Error('Нет прав на просмотр команды')
@@ -206,10 +240,40 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
       return true
     }
 
-    if (['admin', 'aa', 'at', 'ad', 'am', 'atf', 'amc', 'ar', 'arc'].includes(action)) {
+    if (['admin', 'aa', 'at', 'ad', 'am', 'atf', 'amc', 'ar', 'arc', 'ta', 'tf', 'axn', 'axok'].includes(action)) {
       if (!(await hasAdminPermission(ctx.from.id, 'streams.edit')))
         throw new Error('Нет прав для управления устройствами')
-      if (action === 'admin') await showAdminFlow(ctx, Number(first), Number(second) || 0)
+      if (action === 'ta') {
+        const team = await TeamModel.findById(first)
+        if (!team) throw new Error('Команда не найдена')
+        const flows = [...new Set((await listTeamDevices(first)).map(d => d.flowNumber))]
+        const primary = Number(team.subscriptions?.get('propresenter')?.meta?.flowNumber)
+        if (primary > 0 && !flows.includes(primary)) flows.push(primary)
+        const kb = new InlineKeyboard()
+        for (const flow of flows) kb.text(`Поток №${flow}`, `dv:tf:${first}:${flow}`).icon(DEVICE_ICON).row()
+        kb.text('‹ К устройствам команды', `dv:team_devices:${first}`)
+        await ctx.editMessageText(flows.length ? 'Выберите поток для нового устройства:' : 'У команды не назначен поток ProPresenter. Укажите его в подписке команды.', { reply_markup: kb })
+      } else if (action === 'tf') {
+        const team = await TeamModel.findById(first)
+        if (!team) throw new Error('Команда не найдена')
+        const flow = Number(second)
+        const devices = await listTeamDevices(first)
+        if (flow !== Number(team.subscriptions?.get('propresenter')?.meta?.flowNumber) && !devices.some(d => d.flowNumber === flow))
+          throw new Error('Поток не принадлежит команде')
+        ctx.session.deviceDraft = { mode: 'admin_name', teamId: first, flowNumber: flow, returnToTeam: true, adminMessageId: ctx.callbackQuery?.message?.message_id }
+        await ctx.editMessageText('Напишите название устройства одним сообщением.', { reply_markup: new InlineKeyboard().text('Отмена', `dv:team_devices:${first}`) })
+      } else if (action === 'axn') {
+        const device = await ProPresenterDeviceModel.findById(first)
+        if (!device || device.status !== 'active') throw new Error('Устройство не найдено')
+        ctx.session.deviceDraft = { mode: 'admin_replace', teamId: device.teamId, flowNumber: device.flowNumber, adminDeviceId: first, adminMessageId: ctx.callbackQuery?.message?.message_id }
+        await ctx.editMessageText(`Напишите название нового устройства вместо «${device.name}». Поток и оплата сохранятся.`, { reply_markup: new InlineKeyboard().text('Отмена', `dv:ad:${first}:t`) })
+      } else if (action === 'axok') {
+        const draft: Draft | undefined = ctx.session.deviceDraft
+        if (!draft || draft.mode !== 'admin_replace' || draft.adminDeviceId !== first || !draft.name) throw new Error('Начните замену заново')
+        await adminReplaceDevice({ deviceId: first, teamId: draft.teamId, name: draft.name, adminId: ctx.from.id })
+        ctx.session.deviceDraft = undefined
+        await showAdminDevice(ctx, first, true)
+      } else if (action === 'admin') await showAdminFlow(ctx, Number(first), Number(second) || 0)
       else if (action === 'aa') {
         const teams = await TeamModel.find({
           'subscriptions.propresenter.meta.flowNumber': Number(first),
@@ -243,7 +307,7 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
             reply_markup: new InlineKeyboard().text('Отмена', `dv:admin:${first}`),
           }
         )
-      } else if (action === 'ad') await showAdminDevice(ctx, first)
+      } else if (action === 'ad') await showAdminDevice(ctx, first, second === 't')
       else if (action === 'am') {
         const device = await ProPresenterDeviceModel.findById(first)
         if (!device || device.status !== 'active') throw new Error('Устройство не найдено')
@@ -267,17 +331,18 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
         await syncAffectedRenewals(ctx.api, [Number(second), device.history.at(-1)?.fromFlow])
         await showAdminDevice(ctx, first)
       } else if (action === 'ar') {
-        await ctx.editMessageText('Подтвердить отказ от устройства? Оно останется в истории.', {
+        await ctx.editMessageText('Удалить устройство? Оно останется в истории.', {
           reply_markup: new InlineKeyboard()
-            .text('✅ Подтвердить', `dv:arc:${first}`)
-            .icon(DEVICE_ICON)
+            .text('✅ Подтвердить', `dv:arc:${first}${second === 't' ? ':t' : ''}`)
+            .icon(DELETE_DEVICE_ICON)
             .row()
-            .text('Отмена', `dv:ad:${first}`),
+            .text('Отмена', `dv:ad:${first}${second === 't' ? ':t' : ''}`),
         })
       } else if (action === 'arc') {
         const device = await applyDeviceChange(first, 'release', undefined, ctx.from.id)
         await syncAffectedRenewals(ctx.api, [device.flowNumber])
-        await showAdminFlow(ctx, device.flowNumber)
+        if (second === 't') await handleDeviceCallback(ctx, `dv:team_devices:${device.teamId}`)
+        else await showAdminFlow(ctx, device.flowNumber)
       }
       await ctx.answerCallbackQuery()
       return true
@@ -392,19 +457,35 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
 
 export async function handleDeviceNameText(ctx: any): Promise<boolean> {
   const draft: Draft | undefined = ctx.session?.deviceDraft
-  if (!draft || ctx.chat?.type !== 'private' || !ctx.message?.text) return false
+  if (!draft || !ctx.message?.text || (ctx.chat?.type !== 'private' && !draft.mode.startsWith('admin_'))) return false
   if (ctx.message.text.startsWith('/')) {
     ctx.session.deviceDraft = undefined
     return false
   }
+  const showInputError = async (text: string) => {
+    if (draft.mode.startsWith('admin_') && draft.adminMessageId) {
+      await ctx.deleteMessage().catch(() => {})
+      await ctx.api.editMessageText(ctx.chat.id, draft.adminMessageId, text, {
+        reply_markup: new InlineKeyboard().text('Отмена', draft.mode === 'admin_replace'
+          ? `dv:ad:${draft.adminDeviceId}:t`
+          : draft.returnToTeam ? `dv:team_devices:${draft.teamId}` : `dv:admin:${draft.flowNumber}`),
+      })
+    } else await ctx.reply(text)
+  }
   const name = ctx.message.text.replace(/\s+/g, ' ').trim()
   if (name.length < 2 || name.length > 80) {
-    await ctx.reply('Название должно содержать от 2 до 80 символов.')
+    await showInputError('Название должно содержать от 2 до 80 символов. Введите название ещё раз.')
     return true
   }
   await ctx.deleteMessage().catch(() => {})
   try {
-    if (draft.mode === 'admin_name') {
+    if (draft.mode === 'admin_replace') {
+      if (!(await hasAdminPermission(ctx.from.id, 'streams.edit'))) throw new Error('Нет прав')
+      draft.name = name
+      await ctx.api.editMessageText(ctx.chat.id, draft.adminMessageId!, `Заменить устройство на «${name}»? Поток и оплата сохранятся.`, {
+        reply_markup: new InlineKeyboard().text('Да, заменить', `dv:axok:${draft.adminDeviceId}`).icon(REPLACE_DEVICE_ICON).row().text('Отмена', `dv:ad:${draft.adminDeviceId}:t`),
+      })
+    } else if (draft.mode === 'admin_name') {
       if (!(await hasAdminPermission(ctx.from.id, 'streams.edit'))) throw new Error('Нет прав')
       await createApprovedDevice({
         name,
@@ -415,7 +496,12 @@ export async function handleDeviceNameText(ctx: any): Promise<boolean> {
       await syncAffectedRenewals(ctx.api, [draft.flowNumber])
       ctx.session.deviceDraft = undefined
       if (draft.adminMessageId) {
-        await showAdminFlow(
+        if (draft.returnToTeam) {
+          await handleDeviceCallback({ ...ctx, from: ctx.from, session: ctx.session, chat: ctx.chat,
+            editMessageText: (text: string, options: any) => ctx.api.editMessageText(ctx.chat.id, draft.adminMessageId!, text, options),
+            answerCallbackQuery: async () => {},
+          }, `dv:team_devices:${draft.teamId}`)
+        } else await showAdminFlow(
           {
             editMessageText: (text: string, options: any) =>
               ctx.api.editMessageText(ctx.chat.id, draft.adminMessageId!, text, options),
@@ -428,7 +514,7 @@ export async function handleDeviceNameText(ctx: any): Promise<boolean> {
       await showUser(ctx, draft.teamId, 'add_confirm', { flowNumber: draft.flowNumber, name })
     }
   } catch (error) {
-    await ctx.reply(error instanceof Error ? error.message : 'Не удалось сохранить устройство')
+    await showInputError(error instanceof Error ? error.message : 'Не удалось сохранить устройство')
   }
   return true
 }
