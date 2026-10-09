@@ -9,9 +9,22 @@ import { SUPPORT_CATEGORIES, SUPPORT_ISSUES, paymentLabel, productTitle, type Su
 
 const teamsFor = (userId: number) => TeamModel.find({ $or: [{ ownerId: userId }, { 'members.telegramId': userId }] })
 
+const SUPPORT_CATEGORY_ICONS: Partial<Record<SupportCategory, string>> = {
+  payment: '5296320796300426938',
+  subscription: '5373330964372004748',
+  team: '5296533616224906961',
+  propresenter: '5251272469175631339',
+  yandex360: '5310051278464778081',
+}
+
 export function supportCategoriesKeyboard() {
   const kb = new InlineKeyboard()
-  for (const [id, label] of Object.entries(SUPPORT_CATEGORIES)) kb.text(label, `s2:category:${id}`).row()
+  for (const [id, label] of Object.entries(SUPPORT_CATEGORIES)) {
+    const icon = SUPPORT_CATEGORY_ICONS[id as SupportCategory]
+    kb.text(icon ? label.slice(label.indexOf(' ') + 1) : label, `s2:category:${id}`)
+    if (icon) kb.icon(icon)
+    kb.row()
+  }
   return kb.text('← Назад', 's2:back')
 }
 
