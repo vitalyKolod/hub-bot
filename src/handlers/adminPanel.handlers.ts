@@ -232,7 +232,7 @@ async function render(
 
 function rememberInputTarget(ctx: Context, target?: MessageTarget) {
   const input = getSession(ctx)?.adminPanelInput
-  if (ctx.chat?.type === 'private' && input && target) {
+  if (input && target) {
     input.sourceChatId = target.chatId
     input.sourceMessageId = target.messageId
   }
@@ -240,7 +240,7 @@ function rememberInputTarget(ctx: Context, target?: MessageTarget) {
 
 /** Keep private admin input in the existing panel, including validation and wizard steps. */
 function adminInputContext(ctx: Context, input: ApInput): Context {
-  if (ctx.chat?.type !== 'private' || input.sourceChatId !== ctx.chat.id || !input.sourceMessageId) return ctx
+  if (input.sourceChatId !== ctx.chat?.id || !input.sourceMessageId) return ctx
   let target = { chatId: input.sourceChatId, messageId: input.sourceMessageId }
   return new Proxy(ctx, {
     get(original, key) {

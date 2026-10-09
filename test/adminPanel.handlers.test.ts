@@ -106,6 +106,7 @@ function textContext(
   const ctx: any = {
     from: { id: adminId },
     chat,
+    deleteMessage: async () => true,
     message: { message_id: 80, date: 0, chat, from: { id: adminId }, text },
     session,
     api: {
@@ -291,7 +292,8 @@ test('empty manual name keeps the same admin in input mode without creating a te
   assert.equal(await handleAdminPanelText(ctx), true)
   assert.equal(session.adminPanelInput.mode, 'create_team_name')
   assert.equal(createCalled, false)
-  assert.match(replies[0].text, /не может быть пустым/)
+  assert.equal(replies.length, 0)
+  assert.match(edits[0].text, /не может быть пустым/)
 })
 
 test('new callback payloads remain below Telegram 64-byte limit and contain no profile data', () => {
@@ -393,14 +395,16 @@ test('team devices show every flow, paginate, and return to the team', async (t)
   t.mock.method(TeamModel as any, 'findById', async () => ({ name: 'Спасение' }))
   t.mock.method(ProPresenterDeviceModel as any, 'find', (filter: any) => {
     assert.deepEqual(filter, { teamId: 'team-1', status: 'active' })
-    return { sort: async () => Array.from({ length: 21 }, (_, i) => ({ name: `PC-${i}`, flowNumber: i < 20 ? 10 : 11 })) }
+    return { sort: async () => Array.from({ length: 21 }, (_, i) => ({ id: `device-${i}`, name: `PC-${i}`, flowNumber: i < 20 ? 10 : 11 })) }
   })
   const { ctx, edits } = callbackContext(111, 'dv:team_devices:team-1:1')
   await handleDeviceCallback(ctx, 'dv:team_devices:team-1:1')
   assert.match(edits[0].text, /Подтверждено: 21/)
   assert.match(edits[0].text, /PC-20 · поток №11/)
   assert.equal(keyboardButtons(edits[0]).at(-1)?.callback_data, apCb('t', 'team-1'))
-  assert.equal(keyboardButtons(edits[0])[0].callback_data, 'dv:team_devices:team-1:0')
+  assert.ok(keyboardButtons(edits[0]).some(button => button.callback_data === 'dv:team_devices:team-1:0'))
+  assert.ok(keyboardButtons(edits[0]).some(button => button.callback_data === 'dv:ad:device-20:t'))
+  assert.ok(keyboardButtons(edits[0]).some(button => button.callback_data === 'dv:ta:team-1'))
 })
 
 test('admin add-device action has its own requested icon', async (t) => {
@@ -415,4 +419,69 @@ test('admin add-device action has its own requested icon', async (t) => {
   const button: any = keyboardButtons(edits[0]).find(item => item.text === 'Добавить устройство')
   assert.equal(button.icon_custom_emoji_id, '5397916757333654639')
   assert.equal(button.callback_data, 'dv:aa:10')
+})
+
+
+test('group admin search deletes the query and edits the existing prompt', async (t) => {
+  t.mock.method(UserModel as any, 'find', () => ({ limit: async () => [{ telegramId: 456, fio: 'User' }] }))
+  const { ctx: prompt, edits } = callbackContext(111, apCb('search_u'))
+  await handleAdminPanelCallback(prompt, apCb('search_u'))
+  const { ctx, replies } = textContext(111, '456', prompt.session, edits)
+  let deleted = false
+  ctx.deleteMessage = async () => { deleted = true }
+  await handleAdminPanelText(ctx)
+  assert.equal(deleted, true)
+  assert.equal(replies.length, 0)
+  assert.equal(edits.at(-1)?.messageId, 50)
+  assert.equal(edits.at(-1)?.text, 'Найдено: 1')
+})
+
+test('flow device offers deletion; team device also offers replacement with user icons', async (t) => {
+  const { ProPresenterDeviceModel } = await import('../src/models/ProPresenterDevice.js')
+  const { handleDeviceCallback } = await import('../src/handlers/proPresenterDevice.handlers.js')
+  t.mock.method(ProPresenterDeviceModel as any, 'findById', async () => ({ id: 'device-1', teamId: 'team-1', status: 'active', flowNumber: 10, name: 'PC', history: [] }))
+  t.mock.method(TeamModel as any, 'findById', async () => ({ name: 'Team' }))
+  for (const suffix of ['', ':t']) {
+    const { ctx, edits } = callbackContext(111, `dv:ad:device-1${suffix}`)
+    await handleDeviceCallback(ctx, `dv:ad:device-1${suffix}`)
+    const buttons: any[] = keyboardButtons(edits[0])
+    assert.equal(buttons.find(b => b.text === 'Удалить устройство').icon_custom_emoji_id, '5300821986451148615')
+    assert.equal(buttons.some(b => b.text === 'Заменить устройство'), suffix === ':t')
+    if (suffix) assert.equal(buttons.find(b => b.text === 'Заменить устройство').icon_custom_emoji_id, '5303174911269818848')
+    assert.equal(buttons.some(b => b.text === 'Перенести'), false)
+  }
+})
+
+test('admin replacement keeps the device, flow, and payment and records the old name', async (t) => {
+  const { ProPresenterDeviceModel, ProPresenterDeviceRequestModel } = await import('../src/models/ProPresenterDevice.js')
+  const { ProPresenterRenewalSeatModel } = await import('../src/models/ProPresenterRenewal.js')
+  const { adminReplaceDevice } = await import('../src/services/adminDevice.service.js')
+  const id = '507f1f77bcf86cd799439011'
+  t.mock.method(ProPresenterDeviceRequestModel as any, 'exists', async () => null)
+  t.mock.method(ProPresenterRenewalSeatModel as any, 'exists', async () => null)
+  t.mock.method(ProPresenterDeviceModel as any, 'findOne', async () => ({ _id: id, name: 'Old', flowNumber: 10, updatedAt: new Date(0) }))
+  t.mock.method(ProPresenterDeviceModel as any, 'findOneAndUpdate', async (filter: any, update: any) => {
+    assert.equal(filter._id, id)
+    assert.deepEqual(update.$set, { name: 'New' })
+    assert.equal(update.$push.history.previousName, 'Old')
+    assert.equal(update.$push.history.fromFlow, 10)
+    return { id, name: 'New', flowNumber: 10 }
+  })
+  const result = await adminReplaceDevice({ deviceId: id, teamId: 'team-1', name: 'New', adminId: 111 })
+  assert.equal(result?.flowNumber, 10)
+})
+
+test('admin device name validation edits its prompt and deletes invalid input in a group', async () => {
+  const { handleDeviceNameText } = await import('../src/handlers/proPresenterDevice.handlers.js')
+  const edits: RecordedEdit[] = []
+  const session = { deviceDraft: { mode: 'admin_name', teamId: 'team-1', flowNumber: 10, adminMessageId: 50, returnToTeam: true } }
+  const { ctx, replies } = textContext(111, 'x', session, edits)
+  let deleted = false
+  ctx.deleteMessage = async () => { deleted = true }
+  assert.equal(await handleDeviceNameText(ctx), true)
+  assert.equal(deleted, true)
+  assert.equal(replies.length, 0)
+  assert.equal(edits[0].messageId, 50)
+  assert.match(edits[0].text, /от 2 до 80/)
+  assert.equal(keyboardButtons(edits[0])[0].callback_data, 'dv:team_devices:team-1')
 })
