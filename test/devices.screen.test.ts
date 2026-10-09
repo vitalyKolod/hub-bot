@@ -19,10 +19,10 @@ test('owner device screen uses the supplied image and one compact action menu', 
   assert.match(screen.caption, /MacBook — поток №2/)
   const buttons = screen.keyboard.inline_keyboard.flat()
   assert.deepEqual(buttons.map((button) => button.text), [
-    'Добавить устройство', 'Отказаться от устройства', '◀️ НАЗАД',
+    'Добавить устройство', 'Заменить устройство', 'Отказаться от устройства', '◀️ НАЗАД',
   ])
-  assert.deepEqual(buttons.slice(0, 2).map((button) => button.icon_custom_emoji_id), [
-    '5260251205682079529', '5300821986451148615',
+  assert.deepEqual(buttons.slice(0, 3).map((button) => button.icon_custom_emoji_id), [
+    '5260251205682079529', '5303174911269818848', '5300821986451148615',
   ])
 })
 
@@ -76,4 +76,25 @@ test('old user move buttons cannot start a transfer', async () => {
   }, 'dv:ms:507f1f77bcf86cd799439010')
   assert.equal(handled, true)
   assert.match(answers[0].text, /недоступен/)
+})
+
+test('replacement is unavailable without devices and reserves devices with pending replacements', async (t) => {
+  t.mock.method(TeamModel as any, 'findById', async () => ({ ownerId: 10, name: 'Команда' }))
+  const find = t.mock.method(ProPresenterDeviceModel as any, 'find', () => ({ sort: async () => [] }))
+  t.mock.method(ProPresenterDeviceRequestModel as any, 'find', () => ({ sort: async () => [{ replacesDeviceId: '507f1f77bcf86cd799439011' }] }))
+  const empty = await devicesScreen(10, '507f1f77bcf86cd799439010')
+  assert.ok(empty.keyboard.inline_keyboard.flat().some((button: any) => button.callback_data?.startsWith('dv:xn:')))
+  find.mock.mockImplementation(() => ({ sort: async () => [{ id: '507f1f77bcf86cd799439011', name: 'MacBook', flowNumber: 2 }] }))
+  const selection = await devicesScreen(10, { teamId: '507f1f77bcf86cd799439010', step: 'replace_select' })
+  assert.equal(selection.keyboard.inline_keyboard.flat().length, 1)
+})
+
+test('replacement selects exactly one device and confirmation has explicit cancellation', async (t) => {
+  t.mock.method(TeamModel as any, 'findById', async () => ({ ownerId: 10, name: 'Команда' }))
+  t.mock.method(ProPresenterDeviceModel as any, 'find', () => ({ sort: async () => [{ id: '507f1f77bcf86cd799439011', name: 'MacBook', flowNumber: 2, paidThrough: new Date('2099-01-01') }] }))
+  t.mock.method(ProPresenterDeviceRequestModel as any, 'find', () => ({ sort: async () => [] }))
+  const screen = await devicesScreen(10, { teamId: '507f1f77bcf86cd799439010', step: 'replace_confirm', deviceId: '507f1f77bcf86cd799439011', name: 'Windows' })
+  assert.match(screen.caption, /☑ MacBook/)
+  assert.match(screen.caption, /Windows/)
+  assert.deepEqual(screen.keyboard.inline_keyboard.flat().map((button) => button.text), ['✅ Да, заменить', 'Нет, отмена'])
 })
