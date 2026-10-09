@@ -13,6 +13,9 @@ import {
 export type DeviceScreenParams = {
   teamId: string
   step?:
+    | 'replace_select'
+    | 'replace_name'
+    | 'replace_confirm'
     | 'home'
     | 'add_name'
     | 'add_confirm'
@@ -49,7 +52,9 @@ export async function devicesScreen(
     throw new Error('Действия с устройствами доступны только владельцу команды')
   const devices = await listTeamDevices(params.teamId)
   const pending = await listTeamDeviceRequests(params.teamId)
-  const busy = new Set(pending.map((request) => request.deviceId).filter(Boolean))
+  const busy = new Set(
+    pending.flatMap((request) => [request.deviceId, request.replacesDeviceId]).filter(Boolean)
+  )
   const step = params.step || 'home'
   const kb = new InlineKeyboard()
   const home = `dv:h:${params.teamId}`
@@ -80,6 +85,12 @@ export async function devicesScreen(
           .join('\n')
     if (isOwner) {
       kb.text('Добавить устройство', `dv:af:${params.teamId}`).icon(ADD_DEVICE_ICON).row()
+      kb.text(
+        'Заменить устройство',
+        `dv:${devices.some((device) => !busy.has(device.id)) ? 'xs' : 'xn'}:${params.teamId}`
+      )
+        .icon('5303174911269818848')
+        .row()
       if (devices.some((device) => !busy.has(device.id))) {
         kb.text('Отказаться от устройства', `dv:rs:${params.teamId}`)
           .icon(RELEASE_DEVICE_ICON)
@@ -87,23 +98,34 @@ export async function devicesScreen(
       }
     }
     kb.text('◀️ НАЗАД', packCb({ a: 'back' }))
+  } else if (step === 'replace_select') {
+    caption += 'Выберите одно устройство для замены:'
+    for (const device of devices.filter((item) => !busy.has(item.id)))
+      kb.text(
+        `☐ ${device.name} · поток №${device.flowNumber}`.slice(0, 58),
+        `dv:xt:${params.teamId}:${device.id}`
+      ).row()
+    back()
+  } else if (step === 'replace_name' || step === 'replace_confirm') {
+    const device = devices.find((item) => item.id === params.deviceId && !busy.has(item.id))
+    if (!device) throw new Error('Устройство больше не доступно для замены')
+    caption += `☑ ${device.name} · поток №${device.flowNumber}\n\n`
+    if (step === 'replace_name') caption += 'Напишите название нового устройства одним сообщением.'
+    else {
+      caption += `Заменить «${device.name}» на «${params.name}»? Поток и оплата сохранятся.`
+      kb.text('✅ Да, заменить', `dv:xc:${params.teamId}:${device.id}`).row()
+    }
+    kb.text('Нет, отмена', home)
   } else if (step === 'add_name') {
     caption += `Поток №${params.flowNumber}. Напишите название устройства одним сообщением. Сообщение с названием бот удалит.`
     back()
   } else if (step === 'add_confirm') {
-    caption += `«${params.name}» в поток №${params.flowNumber}: это новое устройство или замена существующего? Заявка уйдёт администраторам.`
+    caption += `Добавить «${params.name}» в поток №${params.flowNumber}? Заявка уйдёт администраторам.`
     if ((await availableDeviceFlows()).some((stream) => stream.flowNumber === params.flowNumber))
       kb.text('✅ Новое устройство · отправить заявку', `dv:ac:${params.teamId}`).row()
-    else caption += '\nПоток заполнен: можно только заменить существующее устройство.'
-    if (
-      devices.some(
-        (device) =>
-          device.flowNumber === params.flowNumber &&
-          !busy.has(device.id) &&
-          (!device.paidThrough || new Date(device.paidThrough).getTime() <= Date.now())
-      )
-    )
-      kb.text('🔄 Заменить существующее', `dv:axs:${params.teamId}`).row()
+    else
+      caption +=
+        '\nПоток заполнен. Для замены вернитесь к устройствам и нажмите «Заменить устройство».'
     back()
   } else if (step === 'add_replace_select') {
     caption += `Выберите устройство потока №${params.flowNumber}, которое заменяете на «${params.name}»:`

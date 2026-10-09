@@ -42,7 +42,7 @@ export type SessionData = {
   }
   waitingForPaymentRejectReason?: boolean
   activeConversationId?: string
-  deviceDraft?: { mode: 'user_name' | 'admin_name'; teamId: string; flowNumber: number; name?: string; adminMessageId?: number }
+  deviceDraft?: { mode: 'user_name' | 'replace_name' | 'admin_name'; teamId: string; flowNumber: number; name?: string; deviceId?: string; adminMessageId?: number }
 }
 
 export type MyContext = Context & SessionFlavor<SessionData>

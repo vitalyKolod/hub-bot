@@ -8,3 +8,6 @@ export const LOG_THREADS = {
   access: Number(process.env.LOG_THREAD_ACCESS || 10),
   errors: Number(process.env.LOG_THREAD_ERRORS || 12),
 } as const
+
+// Optional HUB topic; device events also go to the existing Teams topic.
+export const HUB_DEVICE_LOG_THREAD_ID = Number(process.env.LOG_THREAD_HUB || 0)
