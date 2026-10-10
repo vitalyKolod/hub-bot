@@ -114,7 +114,7 @@ export async function attachPaymentTelegramLocation(
   )
 }
 
-export async function acceptPayment(paymentId: string, adminId: number): Promise<PaymentDecisionResult> {
+export async function acceptPayment(paymentId: string, adminId: number, source: 'telegram' | 'api' = 'telegram'): Promise<PaymentDecisionResult> {
   const payment = await PaymentModel.findOneAndUpdate(
     { _id: paymentId, status: 'pending' },
     { $set: { status: 'processing', adminId, decisionError: null } },
@@ -152,6 +152,7 @@ export async function acceptPayment(paymentId: string, adminId: number): Promise
     if (payment.cartItemId) await setCartItemStatus(payment.teamId, payment.cartItemId, 'active')
     payment.status = 'accepted'
     payment.acceptedAt = new Date()
+    if (source === 'api') payment.apiNotification = { pending: true, isExtension, teamInviteCode } as any
     await payment.save()
     await auditLogService.createLog({
       type: 'payment.approved',
@@ -177,12 +178,12 @@ export async function acceptPayment(paymentId: string, adminId: number): Promise
   }
 }
 
-export async function rejectPayment(paymentId: string, adminId: number, reason: string): Promise<PaymentDecisionResult> {
+export async function rejectPayment(paymentId: string, adminId: number, reason: string, source: 'telegram' | 'api' = 'telegram'): Promise<PaymentDecisionResult> {
   const rejectionReason = reason.trim()
   if (!rejectionReason) throw new Error('Payment rejection reason is required')
   const payment = await PaymentModel.findOneAndUpdate(
     { _id: paymentId, status: 'pending' },
-    { $set: { status: 'rejected', adminId, rejectedBy: adminId, rejectedAt: new Date(), rejectionReason, decisionError: null } },
+    { $set: { status: 'rejected', adminId, rejectedBy: adminId, rejectedAt: new Date(), rejectionReason, decisionError: null, ...(source === 'api' ? { apiNotification: { pending: true } } : {}) } },
     { new: true }
   )
   if (!payment) {

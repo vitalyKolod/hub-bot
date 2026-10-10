@@ -6,7 +6,7 @@ import { ToastProvider } from './toast'
 import { initializeTelegramWebApp, telegramWebApp } from '@/lib/telegram'
 
 export function Providers({children}:{children:React.ReactNode}) {
-  const [client]=useState(()=>new QueryClient({defaultOptions:{queries:{staleTime:30_000,retry:1}}}))
+  const [client]=useState(()=>new QueryClient({defaultOptions:{queries:{staleTime:5_000,refetchInterval:5_000,retry:1}}}))
   const loadTelegramSdk=process.env.NODE_ENV==='production'||process.env.NEXT_PUBLIC_ALLOW_DEV_AUTH!=='true'
   const initializeTelegram=()=>{
     const telegram=telegramWebApp()

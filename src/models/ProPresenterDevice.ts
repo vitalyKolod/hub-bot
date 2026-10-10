@@ -14,8 +14,8 @@ const deviceSchema = new mongoose.Schema({
 const requestSchema = new mongoose.Schema({
   action: { type: String, enum: ['add', 'release', 'move'], required: true },
   status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending', index: true },
-  deviceId: { type: String, default: null, index: true },
-  replacesDeviceId: { type: String, default: null, index: true },
+  deviceId: { type: String, default: null },
+  replacesDeviceId: { type: String, default: null },
   deviceName: { type: String, required: true },
   teamId: { type: String, required: true, index: true },
   fromFlow: { type: Number, default: null },
