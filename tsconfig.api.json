@@ -3,6 +3,20 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["api.ts", "db.ts", "src/api/**/*.ts"],
-  "exclude": ["test", "src/bot.ts", "src/handlers", "src/screens", "src/scripts"]
+  "include": [
+    "api.ts",
+    "db.ts",
+    "src/api/**/*.ts",
+    "scripts/api-demo.ts",
+    "scripts/dev-api-demo.ts",
+    "scripts/check-api-indexes.ts",
+    "scripts/dev-app-demo.ts"
+  ],
+  "exclude": [
+    "test",
+    "src/bot.ts",
+    "src/handlers",
+    "src/screens",
+    "src/scripts"
+  ]
 }

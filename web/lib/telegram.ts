@@ -36,12 +36,10 @@ function telegramInitData() {
 export function authHeader() {
   const initData = telegramInitData()
   if (initData) {
-    console.info('[HUB auth] Telegram initData found', telegramDiagnostics())
     return `tma ${initData}`
   }
   if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ALLOW_DEV_AUTH === 'true' && process.env.NEXT_PUBLIC_DEV_AUTH_USER_ID) {
-    console.warn('[HUB auth] Using browser-only dev auth')
-    return `dev ${process.env.NEXT_PUBLIC_DEV_AUTH_USER_ID}`
+    return `dev ${sessionStorage.getItem('hub-demo-user') || process.env.NEXT_PUBLIC_DEV_AUTH_USER_ID}`
   }
   const diagnostics = telegramDiagnostics()
   console.error('[HUB auth] Telegram initData is missing', diagnostics)

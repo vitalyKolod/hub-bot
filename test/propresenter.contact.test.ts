@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { ProPresenterVerificationModel } from '../src/models/ProPresenterVerification.js'
 import { TeamModel } from '../src/models/Team.js'
 import { UserModel } from '../src/models/User.js'
 import { ConversationModel } from '../src/models/Conversation.js'
@@ -18,9 +19,11 @@ for (const kind of ['request', 'confirmation'] as const) {
     t.mock.method(ProPresenterStreamModel as any, 'findOne', () => ({ sort: async () => null }))
     t.mock.method(ProPresenterWaitlistModel as any, 'countDocuments', async () => 1)
     t.mock.method(ProPresenterWaitlistModel as any, 'create', async (entry: any) => ({ ...entry, id: teamId, createdAt: new Date() }))
+    t.mock.method(ProPresenterVerificationModel as any, 'findOneAndUpdate', async () => ({ _id: teamId }))
+    t.mock.method(ProPresenterVerificationModel as any, 'updateOne', async () => ({ modifiedCount: 1 }))
     const sent: any[] = []
     const ctx: any = {
-      api: { sendMessage: async (...args: any[]) => sent.push(args) },
+      api: { sendMessage: async (...args: any[]) => (sent.push(args), { message_id: 1 }) },
       editMessageCaption: async () => {}, answerCallbackQuery: async () => {},
     }
     if (kind === 'request') await handlePropNoStreamConfirm(ctx, 42, teamId)

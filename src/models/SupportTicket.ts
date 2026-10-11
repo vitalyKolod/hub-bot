@@ -10,7 +10,7 @@ const supportTicketSchema = new mongoose.Schema(
       teamId: String,
       productIds: { type: [String], default: undefined },
     },
-    userId: { type: Number, required: true, index: true },
+    userId: { type: Number, required: true },
     threadId: { type: Number, required: true, unique: true, index: true },
     cardMessageId: { type: Number, default: null },
     status: { type: String, enum: ['open', 'closed'], default: 'open', index: true },
