@@ -420,13 +420,37 @@ export async function handleReceiptUpload(ctx: MyContext) {
     const currency = payment?.method === 'crypto' || payment?.network ? 'usd' as const : 'rub' as const
     const createdPayments: any[] = []
 
+    // A receipt must never fall back to the forum's general/registration topic.
+    // Create its topic before changing payments or moving cart items into review.
+    const createReceiptTopic = async (operation: string): Promise<number> => {
+      const title = `${operation.replace(/^[^А-Яа-яA-Za-z]+/, '').trim()} — ${username}`.slice(0, 128)
+      try {
+        const topic = await ctx.api.createForumTopic(ADMIN_GROUP_ID, title)
+        if (!Number.isSafeInteger(topic.message_thread_id) || topic.message_thread_id <= 0) {
+          throw new Error('Telegram returned an invalid payment topic ID')
+        }
+        return topic.message_thread_id
+      } catch (error) {
+        console.error('Payment topic creation failed:', {
+          userId, teamId: validTeamId, product: payment?.product,
+          renewalCampaignId: payment?.renewalCampaignId, title,
+        }, error)
+        ctx.session.waitingForReceipt = true
+        throw new Error('Не удалось создать тему для проверки оплаты. Чек не отправлен администратору. Попробуйте отправить его ещё раз позже.')
+      }
+    }
+    let threadId: number
+
     if (payment?.product === 'cart' && teamId) {
+      const pendingCart = await getOrCreateCart(teamId)
+      const operations = pendingCart.items
+        .filter((item: any) => ['pending', 'in_review'].includes(item.status))
+        .map((item: any) => operationFor(item.product))
+      operationText = new Set(operations).size === 1 ? operations[0] : '📦 Смешанный заказ'
+      threadId = await createReceiptTopic(operationText)
       const cart = await markCartInReview(teamId)
       const items = cart.items.filter((i: any) => i.status === 'in_review')
-      const operations = items.map((i: any) => operationFor(i.product))
-
       productsText = items.map((i: any) => i.product).join(',')
-      operationText = new Set(operations).size === 1 ? operations[0] : '📦 Смешанный заказ'
 
       for (const item of items) {
         const persistentPayment = await createPayment({
@@ -454,6 +478,10 @@ export async function handleReceiptUpload(ctx: MyContext) {
         kb.url('👤 Открыть Telegram-профиль', `tg://user?id=${userId}`)
       }
     } else {
+      operationText = payment?.renewalCampaignId
+        ? `🔄 Продление ProPresenter · поток №${(await getRenewalCampaign(payment.renewalCampaignId))?.flowNumber} · ${payment.renewalDeviceIds?.length || 0} устройств`
+        : operationFor(payment?.product)
+      threadId = await createReceiptTopic(operationText)
       let paymentId = payment?.paymentId || new Types.ObjectId().toString()
       if (validTeamId && getProduct(payment?.product || '')) {
         const persistentPayment = await createPayment({
@@ -466,9 +494,6 @@ export async function handleReceiptUpload(ctx: MyContext) {
         paymentId = persistentPayment.id
         if (payment) payment.paymentId = paymentId
       }
-      operationText = payment?.renewalCampaignId
-        ? `🔄 Продление ProPresenter · поток №${(await getRenewalCampaign(payment.renewalCampaignId))?.flowNumber} · ${payment.renewalDeviceIds?.length || 0} устройств`
-        : operationFor(payment?.product)
       productsText = payment?.product || ''
       kb.text('✅ Подтвердить', packCb({ a: 'accept', p: teamId }))
         .text('❌ Отклонить', packCb({ a: 'reject', p: paymentId }))
@@ -489,17 +514,6 @@ export async function handleReceiptUpload(ctx: MyContext) {
       const devices = await ProPresenterDeviceModel.find({ _id: { $in: payment.renewalDeviceIds || [] } })
       const names = devices.slice(0, 8).map((device) => device.name.slice(0, 35)).join(', ')
       adminText = adminText.plain(`\n\n🖥 Устройства (${devices.length}): ${names}${devices.length > 8 ? ` и ещё ${devices.length - 8}` : ''}\nК оплате: ${createdPayments[0].amount} ${createdPayments[0].currency === 'rub' ? '₽' : 'USDT'}`)
-    }
-
-    let threadId: number | undefined
-    try {
-      const topic = await ctx.api.createForumTopic(
-        ADMIN_GROUP_ID,
-        `${operationText.replace(/[^А-Яа-яA-Za-z ]/g, '').trim()} — ${username}`
-      )
-      threadId = topic.message_thread_id
-    } catch (err) {
-      console.error('Ошибка создания темы:', err)
     }
 
     let sentMessage: { message_id: number } | null = null
