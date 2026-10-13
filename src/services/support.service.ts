@@ -467,9 +467,10 @@ export async function autoCloseInactiveSupportTickets(api: Api, now = new Date()
     if (!ticket) continue
     await syncSupportConversation(ticket)
     closed += 1
-    await updateSupportTopicKeyboard(api, ticket, 'closed').catch((error) =>
+    const cardUpdated = await updateSupportTopicKeyboard(api, ticket, 'closed').catch((error) => {
       console.error('Не удалось обновить клавиатуру support-карточки:', error)
-    )
+      return false
+    })
     let userNotified = true
     await api
       .sendMessage(
@@ -488,7 +489,15 @@ export async function autoCloseInactiveSupportTickets(api: Api, now = new Date()
             ? 'Пользователь уведомлён.'
             : '⚠️ Не удалось доставить уведомление пользователю.'
         }`,
-        { message_thread_id: ticket.threadId }
+        {
+          message_thread_id: ticket.threadId,
+          ...(!cardUpdated && {
+            reply_markup: new InlineKeyboard().text(
+              '🔓 Возобновить обращение',
+              `support:reopen:${ticket.id}`
+            ),
+          }),
+        }
       )
       .catch((error) => console.error('Не удалось уведомить support topic об auto-close:', error))
     await api
