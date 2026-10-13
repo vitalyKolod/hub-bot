@@ -72,7 +72,7 @@ test('ProPresenter and content details keep chats and purchases in their own scr
   assert.ok(buttons(content).some((button: any) => button.text === '◀️ НАЗАД'))
 })
 
-test('content chat button is hidden when user is not in the Telegram chat', async (t) => {
+test('active subscription keeps a chat button before joining the Telegram chat', async (t) => {
   setup(t)
   const product = getProduct('procontent')!
   const oldGroupId = product.groupId
@@ -82,7 +82,9 @@ test('content chat button is hidden when user is not in the Telegram chat', asyn
     getChatMember: async () => ({ status: 'left' }),
     getChat: async () => { throw new Error('Should not fetch chat') },
   } })
-  assert.ok(!buttons(screen).some((button: any) => button.text === 'Чат — ProContent'))
+  const button = buttons(screen).find((button: any) => button.text === 'Чат — ProContent')
+  assert.deepEqual(parseCb(button.callback_data), { a: 'content_chat', p: teamId, m: 'procontent', s: undefined })
+  assert.ok(Buffer.byteLength(button.callback_data) <= 64)
 })
 
 test('ProPresenter credentials are restricted to team members', async (t) => {
@@ -108,4 +110,42 @@ test('a paid invite remains valid when the team already has five members', async
   const check = await validateInvite('paid-code')
   assert.equal(check.ok, true)
   assert.equal(check.team, team)
+})
+
+for (const state of ['left', 'kicked', 'error']) {
+  test(`CMG chat button remains visible for an active subscription with Telegram state ${state}`, async (t) => {
+    const team = setup(t)
+    team.subscriptions.set('cmg', { status: 'active', expiresAt: new Date(Date.now() + 86_400_000) })
+    const product = getProduct('cmg')!
+    const oldGroupId = product.groupId
+    product.groupId = -1009876543210
+    t.after(() => { product.groupId = oldGroupId })
+    const screen = await teamContentScreen(10, teamId, { api: {
+      getChatMember: async () => { if (state === 'error') throw new Error('Telegram unavailable'); return { status: state } },
+      getChat: async () => { throw new Error('Should not fetch chat') },
+    } })
+    const button = buttons(screen).find((button: any) => button.text === 'Чат — Church Motion Graphics')
+    assert.equal(parseCb(button.callback_data)?.a, 'content_chat')
+    assert.equal(parseCb(button.callback_data)?.m, 'cmg')
+  })
+}
+
+test('chat buttons depend on current subscription and active team membership', async (t) => {
+  const team = setup(t, 2)
+  assert.ok(buttons(await teamContentScreen(11, teamId)).some((button: any) => button.text === 'Чат — ProContent'))
+  assert.ok(!buttons(await teamContentScreen(999, teamId)).some((button: any) => button.text.startsWith('Чат —')))
+  team.members[1].status = 'pending'
+  assert.ok(!buttons(await teamContentScreen(11, teamId)).some((button: any) => button.text.startsWith('Чат —')))
+  team.subscriptions.get('procontent').expiresAt = new Date(0)
+  assert.ok(!buttons(await teamContentScreen(10, teamId)).some((button: any) => button.text.startsWith('Чат —')))
+})
+
+test('all content products have callbacks within the Telegram limit before joining', async (t) => {
+  const team = setup(t)
+  for (const id of ['procontent', 'cmg', 'sunday_screens', 'cgs', 'storyloops']) {
+    team.subscriptions.set(id, { status: 'active', expiresAt: new Date(Date.now() + 86_400_000) })
+  }
+  const chats = buttons(await teamContentScreen(10, teamId)).filter((button: any) => button.text.startsWith('Чат —'))
+  assert.equal(chats.length, 5)
+  for (const button of chats) assert.ok(Buffer.byteLength(button.callback_data) <= 64)
 })
