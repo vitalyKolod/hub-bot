@@ -65,6 +65,7 @@ import {
 } from './services/team.service.js'
 import { createTeamInvite } from './services/teamInvite.service.js'
 import { getPendingBatches } from './services/proPresenterWaitlist.service.js'
+import { handleContentChat } from './handlers/contentChat.handlers.js'
 import { handleBack, handleHome, handleOpen } from './handlers/navigation.hadlers.js'
 import {
   handleConfirmRegistration,
@@ -1103,6 +1104,11 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     if (parsed.a === 'prop_no_stream_confirm' && parsed.p) {
       await handlePropNoStreamConfirm(ctx, userId, String(parsed.p))
+      return
+    }
+
+    if (parsed.a === 'content_chat') {
+      await handleContentChat(ctx, userId, parsed)
       return
     }
 

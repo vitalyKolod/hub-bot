@@ -1,6 +1,7 @@
 import type { ScreenId } from '../state/ui.js'
 
 export type ActionId =
+  | 'content_chat'
   | 'open' // открыть экран
   | 'back' // назад
   | 'home' // на главную
