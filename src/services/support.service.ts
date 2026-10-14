@@ -409,6 +409,7 @@ export async function reopenSupportTicket(api: Api, ticketId: string, adminTeleg
         reopenedAt: now,
         reopenedBy: adminTelegramId,
         lastActivityAt: now,
+        cardKeyboardSyncPending: false,
       },
       $unset: { closedAt: '', closedBy: '', closeReason: '' },
     },
@@ -443,9 +444,45 @@ export async function reopenSupportTicket(api: Api, ticketId: string, adminTeleg
   return ticket
 }
 
+async function syncAutoClosedCard(api: Api, ticket: any, retry = false) {
+  try {
+    if (await updateSupportTopicKeyboard(api, ticket, 'closed')) {
+      await SupportTicketModel.updateOne(
+        { _id: ticket.id, status: 'closed' },
+        { $set: { cardKeyboardSyncPending: false } }
+      )
+      return true
+    }
+  } catch (error) {
+    console.error(
+      retry
+        ? 'Не удалось повторно обновить клавиатуру support-карточки:'
+        : 'Не удалось обновить клавиатуру support-карточки:',
+      error
+    )
+    // A missing/deleted Telegram message cannot be repaired by another attempt.
+    if ((error as { error_code?: number })?.error_code === 400) {
+      await SupportTicketModel.updateOne(
+        { _id: ticket.id, status: 'closed' },
+        { $set: { cardKeyboardSyncPending: false } }
+      )
+    }
+  }
+  return false
+}
+
 /** Атомарно забирает только ещё открытые просроченные обращения. Поэтому
  * параллельные/повторные worker runs не дублируют закрытие и уведомления. */
 export async function autoCloseInactiveSupportTickets(api: Api, now = new Date()) {
+  // A previous run may have closed the ticket while Telegram was unreachable.
+  const pendingCards = await SupportTicketModel.find({
+    status: 'closed',
+    cardKeyboardSyncPending: true,
+    cardMessageId: { $ne: null },
+  })
+  for (const ticket of pendingCards) {
+    await syncAutoClosedCard(api, ticket, true)
+  }
   const cutoff = new Date(now.getTime() - SUPPORT_AUTO_CLOSE_HOURS * 60 * 60 * 1000)
   const candidates = await SupportTicketModel.find({
     status: 'open',
@@ -461,16 +498,13 @@ export async function autoCloseInactiveSupportTickets(api: Api, now = new Date()
   for (const candidate of candidates) {
     const ticket = await SupportTicketModel.findOneAndUpdate(
       { _id: candidate._id, status: 'open' },
-      { $set: { status: 'closed', closedBy: 'system', closeReason: 'inactivity', closedAt: now } },
+      { $set: { status: 'closed', closedBy: 'system', closeReason: 'inactivity', closedAt: now, cardKeyboardSyncPending: true } },
       { new: true }
     )
     if (!ticket) continue
     await syncSupportConversation(ticket)
     closed += 1
-    const cardUpdated = await updateSupportTopicKeyboard(api, ticket, 'closed').catch((error) => {
-      console.error('Не удалось обновить клавиатуру support-карточки:', error)
-      return false
-    })
+    const cardUpdated = await syncAutoClosedCard(api, ticket)
     let userNotified = true
     await api
       .sendMessage(

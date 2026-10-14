@@ -13,6 +13,7 @@ const supportTicketSchema = new mongoose.Schema(
     userId: { type: Number, required: true, index: true },
     threadId: { type: Number, required: true, unique: true, index: true },
     cardMessageId: { type: Number, default: null },
+    cardKeyboardSyncPending: { type: Boolean, default: false },
     status: { type: String, enum: ['open', 'closed'], default: 'open', index: true },
     closedBy: { type: String, enum: ['user', 'admin', 'system'], default: null },
     closeReason: { type: String, enum: ['manual', 'inactivity'], default: null },
