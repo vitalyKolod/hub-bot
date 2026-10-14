@@ -1,3 +1,5 @@
+import { createStreamVerification, approveExistingTeamStream, decideStreamVerification } from '../services/proPresenterVerification.service.js'
+import { ProPresenterVerificationModel } from '../models/ProPresenterVerification.js'
 import { InlineKeyboard } from 'grammy'
 import { goTo } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
@@ -64,6 +66,7 @@ export async function handlePropConfirmStream(ctx: MyContext, userId: number, pa
     return
   }
 
+  const verification = await createStreamVerification(teamId, userId, Number(flowNumber))
   const adminText = `
 📡 *ЗАЯВКА НА ПРОВЕРКУ ПОТОКА*
 ━━━━━━━━━━━━━━
@@ -87,11 +90,13 @@ export async function handlePropConfirmStream(ctx: MyContext, userId: number, pa
     .text('❌ Отклонить', packCb({ a: 'prop_verify_reject', p: teamId }))
     .row().url('👤 Открыть Telegram-профиль', `tg://user?id=${userId}`)
 
-  await ctx.api.sendMessage(ADMIN_GROUP_ID, adminText, {
+  const sent = await ctx.api.sendMessage(ADMIN_GROUP_ID, adminText, {
     parse_mode: 'Markdown',
     message_thread_id: PROP_STREAM_VERIFY_THREAD_ID,
     reply_markup: kb,
   })
+
+  await ProPresenterVerificationModel.updateOne({ _id: verification!._id }, { $set: { adminMessageId: sent.message_id } })
 
   await ctx.editMessageCaption({
     caption:
@@ -182,54 +187,10 @@ export async function handlePropVerifyAccept(
     return
   }
 
-  const team = await getTeamById(teamId)
-
-  if (!team) {
-    await ctx.answerCallbackQuery({ text: 'Команда не найдена' })
-    return
-  }
-
-  const stream = await getStreamByNumber(flowNumber)
-
-  if (!stream) {
-    await ctx.answerCallbackQuery({ text: 'Поток не найден в базе' })
-    return
-  }
-
-  const existing = team.subscriptions.get('propresenter')
-
-  team.subscriptions.set('propresenter', {
-    status: 'active',
-    expiresAt: stream.expiresAt || existing?.expiresAt || null,
-    meta: {
-      flowNumber: stream.flowNumber,
-      email: stream.email,
-      password: stream.password,
-      chatLink: stream.chatLink,
-    },
-  } as any)
-
-  await team.save()
-
-  const auditBase = {
-    actorType: 'admin' as const,
-    actorTelegramId: ctx.from?.id,
-    targetUserId: team.ownerId,
-    targetTeamId: teamId,
-    targetSubscriptionId: buildSubscriptionTargetId(teamId, 'propresenter'),
-    metadata: {
-      teamName: team.name,
-      productId: 'propresenter',
-      productName: 'Pro Presenter',
-      flowNumber,
-      expiresAt: stream.expiresAt,
-    },
-  }
-  if (!existing || ['none', 'rejected'].includes(existing.status)) {
-    await auditLogService.createLog({ type: 'subscription.created', ...auditBase })
-  }
-  await auditLogService.createLog({ type: 'subscription.activated', ...auditBase })
-  await auditLogService.createLog({ type: 'propresenter.team_added', ...auditBase })
+  const verification = await ProPresenterVerificationModel.findOne({ teamId, flowNumber }).sort({ createdAt: -1 })
+  const decision = verification ? await decideStreamVerification(verification.id, ctx.from!.id, true) : null
+  if (decision && !decision.applied) { await ctx.answerCallbackQuery({ text: 'Заявка уже обработана или обрабатывается' }); return }
+  const { team, stream } = decision?.team && decision.stream ? { team: decision.team, stream: decision.stream } : await approveExistingTeamStream(teamId, flowNumber, ctx.from!.id)
 
   await ctx.api.sendMessage(
     team.ownerId,
@@ -253,6 +214,11 @@ export async function handlePropVerifyReject(
   caption: string,
   messageId: number
 ) {
+  const verification = await ProPresenterVerificationModel.findOne({ teamId }).sort({ createdAt: -1 })
+  if (verification) {
+    const decision = await decideStreamVerification(verification.id, ctx.from!.id, false)
+    if (!decision.applied) { await ctx.answerCallbackQuery({ text: 'Заявка уже обработана или обрабатывается' }); return }
+  }
   const team = await getTeamById(teamId)
 
   if (team) {

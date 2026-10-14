@@ -53,7 +53,7 @@ export function otherScreen(userId: number): ScreenView {
     .emoji('🎵', '5980930633298350051')
     .plain(' Всё, что связано с worship, музыкой, видео и софтом для церквей.')
 
-  message = message.blockquote(services, true).plain('\n\n')
+  message = message.blockquote(services).plain('\n\n')
 
   // ============================================================
   // ФИНАЛЬНЫЙ ТЕКСТ

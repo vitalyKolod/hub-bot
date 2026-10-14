@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema(
 
     regStep: {
       type: String,
-      enum: ['fio', 'city', 'church', 'confirm_registration'],
+      enum: ['fio', 'city', 'church', 'confirm_registration', 'done'],
       default: 'fio',
     },
     inputMode: {

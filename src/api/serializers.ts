@@ -69,3 +69,22 @@ export function serializeSupportTicket(ticket: any) {
 export function serializeSupportMessage(message: any) {
   return { id: message._id.toString(), conversationId: message.ticketId.toString(), senderType: message.senderType, senderId: message.senderId || null, text: message.text || null, attachments: message.attachments.map((a: any) => ({ type: a.type, fileName: a.fileName || null, mimeType: a.mimeType || null })), createdAt: message.createdAt }
 }
+
+export function serializeDevice(device: any) {
+  return { id: String(device._id), teamId: device.teamId, name: device.name, flowNumber: device.flowNumber, status: device.status, paidThrough: device.paidThrough || null, createdAt: device.createdAt, updatedAt: device.updatedAt }
+}
+export function serializeDeviceRequest(request: any) {
+  return { id: String(request._id), teamId: request.teamId, action: request.action, deviceId: request.deviceId || null, deviceName: request.deviceName, replacesDeviceId: request.replacesDeviceId || null, fromFlow: request.fromFlow || null, toFlow: request.toFlow || null, requestedBy: request.requestedBy, status: request.status, decidedBy: request.decidedBy || null, decidedAt: request.decidedAt || null, createdAt: request.createdAt, updatedAt: request.updatedAt }
+}
+export function serializeStream(stream: any) {
+  return { id: String(stream._id), flowNumber: stream.flowNumber, capacity: stream.capacity, status: stream.status, expiresAt: stream.expiresAt || null, createdAt: stream.createdAt, updatedAt: stream.updatedAt }
+}
+export function serializeCart(cart: any) {
+  return { id: String(cart._id), teamId: cart.teamId, items: cart.items.map((item: any) => ({ id: String(item._id), productId: item.product, status: item.status, priceRub: getProduct(item.product)?.priceRub ?? null, priceUsd: getProduct(item.product)?.priceUsd ?? null })), updatedAt: cart.updatedAt }
+}
+export function serializeLesson(lesson: any) {
+  return { id: String(lesson._id), topicId: String(lesson.topicId), title: lesson.title, description: lesson.description, published: lesson.published, order: lesson.order, mediaType: lesson.mediaType || null, mediaUrl: lesson.mediaFileId ? `/api/tutorials/lessons/${lesson._id}/media` : null, updatedAt: lesson.updatedAt }
+}
+export function serializeConversation(conversation: any) {
+  return { id: String(conversation._id), userId: conversation.userId, type: conversation.type, contextId: conversation.contextId, status: conversation.status, lastActivityAt: conversation.lastActivityAt, closedAt: conversation.closedAt || null, createdAt: conversation.createdAt, updatedAt: conversation.updatedAt }
+}

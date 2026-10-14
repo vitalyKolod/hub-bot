@@ -178,10 +178,19 @@ export async function resolveActiveConversation(userId: number) {
   return conversations.length === 1 ? conversations[0] : null
 }
 
-async function recordDelivery(conversation: any, direction: 'admin_to_user' | 'user_to_admin', senderId: number, sourceId: number, destinationId: number) {
+export function conversationAttachments(message: any) {
+  if (message.photo?.length) return [{ type: 'image', telegramFileId: message.photo.at(-1).file_id }]
+  for (const type of ['document', 'video', 'audio', 'voice']) {
+    const file = message[type]
+    if (file) return [{ type, telegramFileId: file.file_id, fileName: file.file_name, mimeType: file.mime_type }]
+  }
+  return []
+}
+
+async function recordDelivery(conversation: any, direction: 'admin_to_user' | 'user_to_admin', senderId: number, sourceId: number, destinationId: number, message: any) {
   await ConversationMessageModel.findOneAndUpdate(
     { conversationId: conversation._id, direction, telegramSourceMessageId: sourceId },
-    { $setOnInsert: { senderId, telegramDestinationMessageId: destinationId } },
+    { $setOnInsert: { senderId, telegramDestinationMessageId: destinationId, source: 'telegram', text: message.text || message.caption || null, attachments: conversationAttachments(message) } },
     { upsert: true, new: true }
   )
   conversation.lastActivityAt = new Date()
@@ -207,7 +216,7 @@ export async function relayActiveConversationMessage(ctx: any) {
       }
       conversation.userId = currentContext.userId
       const delivered = await deliverAdminMessageToUser(ctx, currentContext.userId)
-      if (delivered) await recordDelivery(conversation, 'admin_to_user', ctx.from.id, ctx.message.message_id, delivered.message_id)
+      if (delivered) await recordDelivery(conversation, 'admin_to_user', ctx.from.id, ctx.message.message_id, delivered.message_id, ctx.message)
       return true
     }
   }
@@ -217,6 +226,6 @@ export async function relayActiveConversationMessage(ctx: any) {
   const currentContext = await resolveContext(conversation.type as ConversationType, conversation.contextId)
   if (!currentContext || currentContext.userId !== ctx.from.id) return false
   const delivered = await deliverUserMessageToAdmin(ctx, conversation.adminChatId, conversation.adminThreadId || undefined)
-  if (delivered) await recordDelivery(conversation, 'user_to_admin', ctx.from.id, ctx.message.message_id, delivered.message_id)
+  if (delivered) await recordDelivery(conversation, 'user_to_admin', ctx.from.id, ctx.message.message_id, delivered.message_id, ctx.message)
   return true
 }

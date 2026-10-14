@@ -1,3 +1,6 @@
+import { BroadcastModel } from './models/Broadcast.js'
+import { resolveBroadcastRecipients } from './services/broadcast.service.js'
+import { conversationAttachments } from './services/conversation.service.js'
 import { handleYandex360Callback, handleYandex360Text } from './handlers/yandex360.handlers.js'
 import { handleTutorialAdminMessage } from './handlers/tutorialAdmin.handlers.js'
 import { bindKnownUser } from './services/yandex360.service.js'
@@ -218,6 +221,7 @@ type MyContext = Context &
       messageIds: number[]
       mediaGroupId?: string
       isSending?: boolean
+      previews?: Array<{ text: string | null; attachments: Array<{ type: string; telegramFileId: string; fileName?: string; mimeType?: string }> }>
     }
     supportUiMessageId?: number
     supportUiOpened?: boolean
@@ -347,13 +351,11 @@ async function copyBroadcastDraft(ctx: MyContext, targetChatId: number) {
 }
 
 async function getBroadcastRecipients(draft: NonNullable<MyContext['session']['broadcastDraft']>) {
-  if (draft.audience === 'stream') return adminGetUserIdsInStream(draft.flowNumber!)
-  const users = await UserModel.find({ reg: 'done' }).select({ telegramId: 1, _id: 0 }).lean()
-  return users.map((user) => user.telegramId)
+  return resolveBroadcastRecipients(draft.audience, draft.flowNumber)
 }
 
 async function handleBroadcastCallback(ctx: MyContext, data: string) {
-  if (!ctx.from || !isAdmin(ctx.from.id)) return
+  if (!ctx.from || !(await hasAdminPermission(ctx.from.id, 'broadcasts.send'))) return
   if (data === 'admin:broadcast:all') return promptBroadcastMessage(ctx, 'all')
   if (data === 'admin:broadcast:streams') return showBroadcastStreams(ctx)
   if (data.startsWith('admin:broadcast:stream:')) {
@@ -401,6 +403,9 @@ async function handleBroadcastCallback(ctx: MyContext, data: string) {
     }
     draft.isSending = true
     const recipients = await getBroadcastRecipients(draft)
+    let history: any
+    try { history = await BroadcastModel.create({ actorId: ctx.from.id, source: 'telegram', audience: draft.audience, flowNumber: draft.flowNumber, sourceChatId: draft.sourceChatId, sourceMessageIds: draft.messageIds, telegramPreviews: draft.previews || [], recipients, status: 'running' }) }
+    catch (error) { draft.isSending = false; throw error }
     await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {})
     await ctx.reply(`⏳ Начинаю рассылку для ${recipients.length} пользователей...`)
     let success = 0
@@ -413,9 +418,11 @@ async function handleBroadcastCallback(ctx: MyContext, data: string) {
         failed++
         console.error(`Broadcast delivery failed for ${telegramId}:`, error)
       }
+      await BroadcastModel.updateOne({ _id: history._id }, { $set: { success, failed, cursor: success + failed } })
       // Альбом считается несколькими сообщениями и сильнее расходует лимит Telegram.
       await new Promise((resolve) => setTimeout(resolve, 40 * draft.messageIds.length))
     }
+    await BroadcastModel.updateOne({ _id: history._id }, { $set: { status: 'completed', completedAt: new Date(), success, failed } })
     ctx.session.broadcastDraft = undefined
     ctx.session.adminMode = undefined
     await ctx.reply(`✅ Рассылка завершена\n\nОтправлено: ${success}\nОшибок: ${failed}`)
@@ -1308,8 +1315,8 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
   // Черновик рассылки должен перехватываться до более узких text/photo handlers.
   bot.on('message', async (ctx, next) => {
-    if (!ctx.from || !isAdmin(ctx.from.id)) return next()
     if (ctx.session.adminMode !== 'waiting_broadcast') return next()
+    if (!ctx.from || !(await hasAdminPermission(ctx.from.id, 'broadcasts.send'))) return next()
     if (ctx.chat.type !== 'private') return next()
 
     const draft = ctx.session.broadcastDraft
@@ -1335,6 +1342,8 @@ export function registerHandlers(bot: Bot<MyContext>) {
     draft.mediaGroupId = mediaGroupId
     if (!draft.messageIds.includes(ctx.message.message_id)) {
       draft.messageIds.push(ctx.message.message_id)
+      draft.previews ||= []
+      draft.previews.push({ text: ('text' in ctx.message ? ctx.message.text : 'caption' in ctx.message ? ctx.message.caption : null) || null, attachments: conversationAttachments(ctx.message) })
       draft.messageIds.sort((a, b) => a - b)
     }
 
