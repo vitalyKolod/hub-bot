@@ -246,7 +246,7 @@ for (const metadata of [
     assert.match(card, /Тема:/)
     assert.match(card, /@tester/)
     if (metadata.category === 'team') assert.match(card, /Спасение/)
-    if (metadata.category === 'subscription') { assert.match(card, /ProContent/); assert.match(card, /CMG/) }
+    if (metadata.category === 'subscription') { assert.match(card, /ProContent/); assert.match(card, /Church Motion Graphics/) }
     if (metadata.category === 'payment') assert.match(card, /Сумма не совпадает/)
     assert.ok(sent[0][2].reply_markup.inline_keyboard.flat().some((b: any) => b.url === 'tg://user?id=10'))
     const old = stored()

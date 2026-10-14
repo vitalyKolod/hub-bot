@@ -8,7 +8,7 @@ const deviceSchema = new mongoose.Schema({
   createdBy: { type: Number, required: true },
   releasedAt: { type: Date, default: null },
   paidThrough: { type: Date, default: null },
-  history: [{ action: { type: String, enum: ['added', 'moved', 'released'] }, fromFlow: Number, toFlow: Number, at: Date, actorId: Number, requestId: String }],
+  history: [{ action: { type: String, enum: ['added', 'moved', 'released', 'replaced'] }, previousName: String, newName: String, fromFlow: Number, toFlow: Number, at: Date, actorId: Number, requestId: String }],
 }, { timestamps: true })
 
 const requestSchema = new mongoose.Schema({

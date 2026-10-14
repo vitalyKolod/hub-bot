@@ -9,7 +9,7 @@ import {
 import { UserModel } from '../models/User.js'
 import { TeamModel } from '../models/Team.js'
 import { getProduct } from '../config/products.js'
-import { LOG_GROUP_ID, LOG_THREADS } from '../config/logs.js'
+import { LOG_GROUP_ID, LOG_THREADS, HUB_DEVICE_LOG_THREAD_ID } from '../config/logs.js'
 import { apCb, TEAM_PRODUCT_IDS } from '../constants/admin-panel.js'
 
 const TYPE_LABELS: Record<AuditLogType, { emoji: string; title: string }> = {
@@ -19,6 +19,11 @@ const TYPE_LABELS: Record<AuditLogType, { emoji: string; title: string }> = {
   'user.registered': { emoji: '🆕', title: 'Регистрация пользователя' },
   'user.profile_updated': { emoji: '✏️', title: 'Профиль изменён' },
   'user.deleted': { emoji: '🗑', title: 'Пользователь удалён' },
+  'team.device_replaced': { emoji: '🔄', title: 'Устройство заменено' },
+  'team.device_added': { emoji: '🖥', title: 'Устройство добавлено' },
+  'team.device_released': { emoji: '🖥', title: 'Отказ от устройства' },
+  'team.device_requested': { emoji: '🖥', title: 'Заявка на устройство' },
+  'team.device_decided': { emoji: '🖥', title: 'Заявка на устройство рассмотрена' },
   'team.created': { emoji: '👥', title: 'Команда создана' },
   'team.deleted': { emoji: '🗑', title: 'Команда удалена' },
   'team.member_added': { emoji: '➕', title: 'Участник добавлен' },
@@ -345,7 +350,7 @@ export class AuditLogService {
     const needsErrorTopic = log.type === 'user.registration_failed' ||
       log.type === 'payment.processing_failed' || log.type === 'subscription.reminder_failed' ||
       log.type === 'access.group_removal_failed'
-    const topics = needsErrorTopic ? [topicId, LOG_THREADS.errors] : [topicId]
+    const topics = [...new Set(needsErrorTopic ? [topicId, LOG_THREADS.errors] : log.type.startsWith('team.device_') && HUB_DEVICE_LOG_THREAD_ID ? [topicId, HUB_DEVICE_LOG_THREAD_ID] : [topicId])]
     const results = await Promise.allSettled(topics.map((message_thread_id) =>
       this.telegramApi!.sendMessage(groupId, message, {
         parse_mode: 'HTML', message_thread_id,

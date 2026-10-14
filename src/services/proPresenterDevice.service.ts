@@ -187,3 +187,23 @@ export async function applyDeviceChange(deviceId: string, action: 'release' | 'm
   await device.save()
   return device
 }
+
+/** Replace the hardware occupying a seat without losing its payment or renewal identity. */
+export async function replaceTeamDevice(input: { teamId: string; deviceId: string; requesterId: number; name: string }) {
+  await requireTeamOwner(input.teamId, input.requesterId)
+  if (!Types.ObjectId.isValid(input.deviceId)) throw new Error('Устройство не найдено')
+  await requireNoPendingPayment(input.deviceId)
+  if (await ProPresenterDeviceRequestModel.exists({ status: 'pending', $or: [{ deviceId: input.deviceId }, { replacesDeviceId: input.deviceId }] }))
+    throw new Error('По устройству уже есть заявка на проверке')
+  const device = await ProPresenterDeviceModel.findOne({ _id: input.deviceId, teamId: input.teamId, status: 'active' })
+  if (!device) throw new Error('Устройство больше не доступно')
+  const name = normalizeName(input.name)
+  if (name === device.name) throw new Error('Укажите другое название нового устройства')
+  const updated = await ProPresenterDeviceModel.findOneAndUpdate(
+    { _id: device._id, teamId: input.teamId, status: 'active', name: device.name, updatedAt: device.updatedAt },
+    { $set: { name }, $push: { history: { action: 'replaced', previousName: device.name, newName: name, fromFlow: device.flowNumber, toFlow: device.flowNumber, at: new Date(), actorId: input.requesterId } } },
+    { new: true }
+  )
+  if (!updated) throw new Error('Устройство изменилось. Начните замену заново')
+  return { device: updated, previousName: device.name }
+}

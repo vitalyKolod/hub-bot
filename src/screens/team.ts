@@ -11,10 +11,10 @@ import { getProduct } from '../config/products.js'
 
 const PRODUCTS = [
   { id: 'procontent', name: 'ProContent', icon: '5251299351375937406' },
-  { id: 'cmg', name: 'CMG', icon: '5310127020213043624' },
+  { id: 'cmg', name: 'Church Motion Graphics', icon: '5310127020213043624' },
   { id: 'sunday_screens', name: 'Sunday Screens', icon: '5291749654017381020' },
-  { id: 'cgs', name: 'CGS', icon: '5190419001703963847' },
-  { id: 'storyloops', name: 'StoryLoops', icon: '5190877553887323413' },
+  { id: 'cgs', name: 'Church Goods Studio', icon: '5190419001703963847' },
+  { id: 'storyloops', name: 'Story Loop', icon: '5190877553887323413' },
 ] as const
 type Subscription = { status?: string; expiresAt?: Date | null; meta?: any } | undefined
 type Payment = { status?: string; rejectionReason?: string | null } | undefined
@@ -77,6 +77,7 @@ export async function teamScreen(userId: number, input: string | { teamId: strin
   kb.text('ProPresenter', packCb({ a: 'open', s: 'team_propresenter', p: teamId })).icon('5251272469175631339').row()
   kb.text('КОНТЕНТ ДЛЯ ЭКРАНОВ', packCb({ a: 'open', s: 'team_content', p: teamId })).icon('5373330964372004748').row()
   kb.text('КОМАНДА', packCb({ a: 'open', s: 'team_members', p: teamId })).icon('5296533616224906961').row()
+  kb.text('ПОМОЩЬ', packCb({ a: 'open', s: 'support' })).icon('5238025132177369293').row()
   navigation(kb)
   return { photo: './public/my-teams.png', caption: message.caption, caption_entities: message.caption_entities, keyboard: kb }
 }
@@ -106,8 +107,8 @@ export async function teamProPresenterScreen(userId: number, teamId: string): Pr
     if (prop?.expiresAt) quote = quote.plain(`\n┗ До: ${dateText(prop.expiresAt)}`)
   }
   quote = quote.plain('\n').emoji('🖥', DEVICE_ICON).plain(` Устройства: ${devices.length}`)
-  for (const device of devices.slice(0, 5)) quote = quote.plain(`\n┗ ${device.name} · поток №${device.flowNumber}`)
-  if (devices.length > 5) quote = quote.plain(`\n┗ Ещё ${devices.length - 5} — в разделе «Устройства»`)
+  for (const device of devices.slice(0, 5)) quote = quote.plain(`\n   ┗ ${device.name} · поток №${device.flowNumber}`)
+  if (devices.length > 5) quote = quote.plain(`\n   ┗ Ещё ${devices.length - 5} — в разделе «Устройства»`)
   const message = header(team.name).bold('⛪ ПОДПИСКИ\n\n').expandableBlockquote(quote)
   const kb = new InlineKeyboard()
   if (devices.length || ['active', 'expired'].includes(prop?.status || '')) kb.text('УСТРОЙСТВА', packCb({ a: 'open', s: 'devices', p: teamId })).icon(DEVICE_ICON).row()
@@ -122,24 +123,32 @@ export async function teamProPresenterScreen(userId: number, teamId: string): Pr
 
 export async function teamContentScreen(userId: number, teamId: string, ctx?: { api: { getChatMember: (chatId: number, userId: number) => Promise<any>; getChat: (chatId: number) => Promise<any> } }): Promise<ScreenView> {
   const { team, byProduct } = await data(teamId)
+  const belongs = team.ownerId === userId || team.members.some(member => member.telegramId === userId && member.status === 'active')
   const activeContentCount = PRODUCTS.filter(product => active(team.subscriptions.get(product.id))).length
   let quote = new FormattedString('').emoji('🖥', '5373330964372004748').plain(' Контент для экранов\n\n').bold(`Подписок ${activeContentCount}/${PRODUCTS.length}\n`)
   for (const product of PRODUCTS) quote = quote.plain('\n').concat(productLine(product.name, product.icon, team.subscriptions.get(product.id), byProduct.get(product.id), true)).plain('\n')
   const message = header(team.name).expandableBlockquote(quote)
   const kb = new InlineKeyboard()
   const chatLinks = await Promise.all(PRODUCTS.map(async product => {
-    if (!ctx || !active(team.subscriptions.get(product.id))) return null
+    if (!belongs || !active(team.subscriptions.get(product.id))) return null
+    const entry = { product, url: null as string | null }
+    if (!ctx) return entry
     const chatId = Number(getProduct(product.id)?.groupId)
-    if (!Number.isSafeInteger(chatId) || chatId >= 0) return null
+    if (!Number.isSafeInteger(chatId) || chatId >= 0) return entry
     try {
       const member = await ctx.api.getChatMember(chatId, userId)
-      if (!['creator', 'administrator', 'member'].includes(member.status) && !(member.status === 'restricted' && member.is_member)) return null
+      if (!['creator', 'administrator', 'member'].includes(member.status) && !(member.status === 'restricted' && member.is_member)) return entry
       const chat = await ctx.api.getChat(chatId).catch(() => null)
       const url = chat?.username ? `https://t.me/${chat.username}` : chat?.invite_link || (String(chatId).startsWith('-100') ? `https://t.me/c/${String(chatId).slice(4)}/1` : null)
-      return url ? { product, url } : null
-    } catch { return null }
+      return { product, url }
+    } catch { return entry }
   }))
-  for (const entry of chatLinks) if (entry) kb.url(`Чат — ${entry.product.name}`, entry.url).icon(entry.product.icon).row()
+  for (const entry of chatLinks) if (entry) {
+    const label = `Чат — ${entry.product.name}`
+    if (entry.url) kb.url(label, entry.url)
+    else kb.text(label, packCb({ a: 'content_chat', p: teamId, m: entry.product.id }))
+    kb.icon(entry.product.icon).row()
+  }
   if (team.ownerId === userId) {
     for (const product of PRODUCTS) if (shouldShowRenewal(team.subscriptions.get(product.id))) {
       kb.text(`Продлить ${getProduct(product.id)?.name || product.name}`, packCb({ a: 'open', s: product.id, p: teamId })).icon('5346321684574003384').row()

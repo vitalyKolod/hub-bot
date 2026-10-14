@@ -451,6 +451,7 @@ async function syncAutoClosedCard(api: Api, ticket: any, retry = false) {
         { _id: ticket.id, status: 'closed' },
         { $set: { cardKeyboardSyncPending: false } }
       )
+      return true
     }
   } catch (error) {
     console.error(
@@ -467,6 +468,7 @@ async function syncAutoClosedCard(api: Api, ticket: any, retry = false) {
       )
     }
   }
+  return false
 }
 
 /** Атомарно забирает только ещё открытые просроченные обращения. Поэтому
@@ -502,7 +504,7 @@ export async function autoCloseInactiveSupportTickets(api: Api, now = new Date()
     if (!ticket) continue
     await syncSupportConversation(ticket)
     closed += 1
-    await syncAutoClosedCard(api, ticket)
+    const cardUpdated = await syncAutoClosedCard(api, ticket)
     let userNotified = true
     await api
       .sendMessage(
@@ -521,7 +523,15 @@ export async function autoCloseInactiveSupportTickets(api: Api, now = new Date()
             ? 'Пользователь уведомлён.'
             : '⚠️ Не удалось доставить уведомление пользователю.'
         }`,
-        { message_thread_id: ticket.threadId }
+        {
+          message_thread_id: ticket.threadId,
+          ...(!cardUpdated && {
+            reply_markup: new InlineKeyboard().text(
+              '🔓 Возобновить обращение',
+              `support:reopen:${ticket.id}`
+            ),
+          }),
+        }
       )
       .catch((error) => console.error('Не удалось уведомить support topic об auto-close:', error))
     await api

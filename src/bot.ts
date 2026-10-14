@@ -65,6 +65,7 @@ import {
 } from './services/team.service.js'
 import { createTeamInvite } from './services/teamInvite.service.js'
 import { getPendingBatches } from './services/proPresenterWaitlist.service.js'
+import { handleContentChat } from './handlers/contentChat.handlers.js'
 import { handleBack, handleHome, handleOpen } from './handlers/navigation.hadlers.js'
 import {
   handleConfirmRegistration,
@@ -234,7 +235,7 @@ type MyContext = Context &
     }
     waitingForPaymentRejectReason?: boolean
     activeConversationId?: string
-    deviceDraft?: { mode: 'user_name' | 'admin_name'; teamId: string; flowNumber: number; name?: string; adminMessageId?: number }
+    deviceDraft?: { mode: 'user_name' | 'replace_name' | 'admin_name'; teamId: string; flowNumber: number; name?: string; deviceId?: string; adminMessageId?: number }
 
     adminPanelInput?: any
     tutorialAdminInput?: any
@@ -1106,6 +1107,11 @@ export function registerHandlers(bot: Bot<MyContext>) {
       return
     }
 
+    if (parsed.a === 'content_chat') {
+      await handleContentChat(ctx, userId, parsed)
+      return
+    }
+
     // Обычная навигация + оплата
     if (parsed.a === 'open' && parsed.s) {
       if (parsed.s === 'add_volunteer') {
@@ -1360,6 +1366,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
     const userId = ctx.from?.id
     if (!userId) return
 
+    if (await handleAdminPanelText(ctx)) return
     if (await handleYandex360Text(ctx)) return
     if (await handleDeviceNameText(ctx)) return
     if (await handleCustomPaymentRejectText(ctx)) return
@@ -1367,7 +1374,6 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     // В топике поддержки ввод из админ-панели (дата, имя, статус и т.д.)
     // должен обрабатываться раньше, чем обычный ответ пользователю.
-    if (await handleAdminPanelText(ctx)) return
     if (await relayAdminMessage(ctx)) return
 
     const profile = await getOrCreateUser(userId)

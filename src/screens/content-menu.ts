@@ -17,12 +17,12 @@ export async function contentMenuScreen(userId: number, teamId: string): Promise
   kb.text('Sunday Screens', packCb({ a: 'open', s: 'sunday_screens', p: teamId }))
     .icon(getProduct('sunday_screens')!.customEmojiId!)
     .row()
-  kb.text('StoryLoop', packCb({ a: 'open', s: 'storyloops', p: teamId }))
+  kb.text(getProduct('storyloops')!.name, packCb({ a: 'open', s: 'storyloops', p: teamId }))
     .icon(getProduct('storyloops')!.customEmojiId!)
     .row()
-  kb.text('CMG', packCb({ a: 'open', s: 'cmg', p: teamId })).icon(getProduct('cmg')!.customEmojiId!)
+  kb.text(getProduct('cmg')!.name, packCb({ a: 'open', s: 'cmg', p: teamId })).icon(getProduct('cmg')!.customEmojiId!)
 
-  kb.text('CGS', packCb({ a: 'open', s: 'cgs', p: teamId }))
+  kb.text(getProduct('cgs')!.name, packCb({ a: 'open', s: 'cgs', p: teamId }))
     .icon(getProduct('cgs')!.customEmojiId!)
     .row()
 
@@ -44,16 +44,16 @@ export async function contentMenuScreen(userId: number, teamId: string): Promise
     .plain(' ProContent\n')
 
     .emoji('🎨', getProduct('cmg')!.customEmojiId!)
-    .plain(' CMG\n')
+    .plain(` ${getProduct('cmg')!.name}\n`)
 
     .emoji('📺', getProduct('sunday_screens')!.customEmojiId!)
     .plain(' Sunday Screens\n')
 
     .emoji('✨', getProduct('cgs')!.customEmojiId!)
-    .plain(' CGS\n')
+    .plain(` ${getProduct('cgs')!.name}\n`)
 
     .emoji('🎞', getProduct('storyloops')!.customEmojiId!)
-    .plain(' StoryLoop')
+    .plain(` ${getProduct('storyloops')!.name}`)
 
   message = message
     .blockquote(directions, true)

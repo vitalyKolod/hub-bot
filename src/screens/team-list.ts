@@ -33,6 +33,10 @@ export async function teamListScreen(userId: number): Promise<ScreenView> {
     .icon('5436113877181941026')
     .row()
 
+  kb.text('ПОМОЩЬ', packCb({ a: 'open', s: 'support' }))
+    .icon('5238025132177369293')
+    .row()
+
   kb.text('◀️ НАЗАД', packCb({ a: 'home' }))
 
   // ─────────────────────────────────────────────

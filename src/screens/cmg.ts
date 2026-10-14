@@ -19,7 +19,7 @@ export async function cmgScreen(userId: number, teamId: string): Promise<ScreenV
   message = message
     .emoji('🛜', product.customEmojiId!)
     .plain(' ')
-    .bold('CHURCH MOTION GRAPHICS (CMG)')
+    .bold(product.name)
     .plain('\n\n')
 
   message = message
