@@ -561,7 +561,9 @@ async function publishWaitlistStream(ctx: Context, flowNumber: number, draft: Re
     chatLink: draft.chatLink, expiresAt: new Date(draft.expiresAt), adminTelegramId: ctx.from?.id,
   })
   getSession(ctx).adminPanelInput = undefined
-  const recipients = [...new Set(entries.map((entry: any) => entry.requestedBy as number))]
+  const recipients = [...new Set(await Promise.all(entries.map(async (entry: any) =>
+    (await ap.adminGetTeam(entry.teamId))?.ownerId || entry.requestedBy as number
+  )))]
   for (const telegramId of recipients) {
     await ctx.api.sendMessage(telegramId,
       `✅ Поток ProPresenter №${stream.flowNumber} создан!\n\n` +
@@ -569,6 +571,18 @@ async function publishWaitlistStream(ctx: Context, flowNumber: number, draft: Re
       (stream.chatLink ? `💬 Чат: ${stream.chatLink}\n` : '') +
       `📅 Доступ до: ${formatDate(stream.expiresAt)}\n\nДоступ уже появился в профиле команды.`
     ).catch((error) => console.error(`Не удалось уведомить ${telegramId}:`, error))
+  }
+  const communityGroupId = Number(process.env.HUB_COMMUNITY_GROUP_ID || 0)
+  if (communityGroupId) {
+    const notice = new FormattedString('')
+      .emoji('🎬', '5251272469175631339')
+      .bold(` ProPresenter · поток №${stream.flowNumber} открыт`)
+      .plain(`\nМеста для устройств: ${countRequestedDevices(entries)}/${PROPRESENTER_BATCH_SIZE}\n`)
+      .plain(`Доступ до ${formatDate(stream.expiresAt)}. Участники получили данные в боте.`)
+    await ctx.api.sendMessage(communityGroupId, notice.text, {
+      entities: notice.entities,
+      message_thread_id: Number(process.env.HUB_COMMUNITY_PROPRESENTER_THREAD_ID || 2),
+    }).catch((error) => console.error('Не удалось объявить поток в Hub Community:', error))
   }
   await ctx.reply(`✅ Поток №${stream.flowNumber} создан: ${countRequestedDevices(entries)} устройств, ${entries.length} команд.`)
   await showStreamCard(replyOnlyCtx(ctx), stream.flowNumber)
