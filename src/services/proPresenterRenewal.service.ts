@@ -7,6 +7,7 @@ import { ProPresenterRenewalCampaignModel, ProPresenterRenewalSeatModel } from '
 import { ProPresenterDeviceModel } from '../models/ProPresenterDevice.js'
 import { PaymentModel } from '../models/Payment.js'
 import { adminSetStreamExpiry } from './adminPanel.service.js'
+import { PROPRESENTER_BATCH_SIZE } from './proPresenterWaitlist.service.js'
 
 export const PROP_RENEWAL_STATS_THREAD_ID = Number(process.env.PROP_RENEWAL_STATS_THREAD_ID || 0)
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
@@ -367,6 +368,7 @@ export async function syncRenewalSummary(api: Api, campaignId: string, allowRecr
   const summaryText = [
     `📡 ProPresenter · поток №${campaign.flowNumber}`,
     `Период: до ${campaign.cycleEndsAt.toLocaleDateString('ru-RU')}`,
+    `После продления: ${renewalTargetDate(campaign).toLocaleDateString('ru-RU')}`,
     `Статус сбора: ${campaign.status === 'completed' ? 'завершён' : 'идёт'}`,
     `Устройств в сборе: ${stats.total}`,
     '',
@@ -385,6 +387,7 @@ export async function syncRenewalSummary(api: Api, campaignId: string, allowRecr
     : new InlineKeyboard().text('👥 Списки', `pr:a:lists:${campaign.id}`)
   if (listsView && campaign.status === 'active') {
     kb.row().text('✅ Подтвердить продление всего потока', `pr:a:finish:${campaign.id}`)
+    kb.row().text('📅 Указать дату продления', `pr:a:date:${campaign.id}`)
   }
   if (listsView && campaign.billingMode !== 'device' && campaign.status === 'active') {
     kb.row().text('🖥 Перейти на учёт устройств', `pr:a:convert:${campaign.id}`)
@@ -411,6 +414,11 @@ export async function completeRenewal(api: Api, campaignId: string, adminId: num
   if (!campaign || campaign.status !== 'active') throw new Error('Активный сбор не найден')
   const stream = await ProPresenterStreamModel.findOne({ flowNumber: campaign.flowNumber })
   if (!stream) throw new Error('Поток не найден')
+  await reconcileRenewalDevices(campaign)
+  const stats = renewalStats(await ProPresenterRenewalSeatModel.find({ campaignId }))
+  if (stats.total < PROPRESENTER_BATCH_SIZE || stats.paid !== stats.total) {
+    throw new Error(`Нельзя продлить поток: оплачено ${stats.paid}/${stats.total}, нужно подтвердить все места (не менее ${PROPRESENTER_BATCH_SIZE})`)
+  }
   if (!campaign.targetEndsAt && stream.expiresAt?.getTime() !== campaign.cycleEndsAt.getTime()) {
     throw new Error('Дата потока изменилась после запуска сбора; проверьте её в карточке потока')
   }
@@ -425,11 +433,25 @@ export async function completeRenewal(api: Api, campaignId: string, adminId: num
     throw new Error('Дата потока изменена вручную. Проверьте её перед завершением сбора')
   }
   await adminSetStreamExpiry(campaign.flowNumber, next, adminId)
+  const paidSeats = await ProPresenterRenewalSeatModel.find({ campaignId })
+  const paidDeviceIds = paidSeats.flatMap((seat) => seat.devices.filter((device) => device.active !== false && device.paymentStatus === 'paid').map((device) => device.deviceId))
+  await ProPresenterDeviceModel.updateMany({ _id: { $in: paidDeviceIds } }, { $max: { paidThrough: next } })
   campaign.status = 'completed'
   campaign.completedAt = new Date()
   await campaign.save()
   await syncRenewalSummary(api, campaign.id).catch((error) => console.error('Renewal summary update failed:', error))
   return next
+}
+
+export async function setRenewalTargetDate(campaignId: string, targetEndsAt: Date) {
+  const campaign = await getRenewalCampaign(campaignId)
+  if (!campaign || campaign.status !== 'active') throw new Error('Активный сбор не найден')
+  if (!Number.isFinite(targetEndsAt.getTime()) || targetEndsAt <= campaign.cycleEndsAt || targetEndsAt <= new Date()) {
+    throw new Error('Новая дата должна быть позже текущей даты окончания потока и сегодняшнего дня')
+  }
+  campaign.targetEndsAt = targetEndsAt
+  await campaign.save()
+  return campaign
 }
 
 export async function renewalPromptCandidates() {

@@ -1,4 +1,5 @@
 import { InlineKeyboard } from 'grammy'
+import { FormattedString } from '@grammyjs/parse-mode'
 import { goTo } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
 import { packCb } from '../core/callback.js'
@@ -34,8 +35,46 @@ async function stopIfTeamAlreadyHasStream(ctx: MyContext, teamId: string) {
 
 export async function handlePropNoStream(ctx: MyContext, userId: number, teamId: string) {
   if (await stopIfTeamAlreadyHasStream(ctx, teamId)) return
+  const team = await getTeamById(teamId)
+  if (!team || team.ownerId !== userId) {
+    await ctx.answerCallbackQuery({ text: 'Подать заявку может только владелец команды', show_alert: true })
+    return
+  }
+  ctx.session.propWaitlistDraft = { teamId, step: 'count' }
   goTo(userId, 'propresenter_no_stream', teamId)
-  await renderScreen(ctx, userId, 'propresenter_no_stream', teamId)
+  await renderScreen(ctx, userId, 'propresenter_no_stream', ctx.session.propWaitlistDraft)
+}
+
+export async function handlePropWaitlistDeviceCountText(ctx: MyContext): Promise<boolean> {
+  const draft = ctx.session.propWaitlistDraft
+  if (!draft || draft.step !== 'count' || ctx.chat?.type !== 'private' || !ctx.message?.text) return false
+  if (ctx.message.text.startsWith('/')) {
+    ctx.session.propWaitlistDraft = undefined
+    return false
+  }
+  const raw = ctx.message.text.trim()
+  await ctx.deleteMessage().catch(() => {})
+  const count = /^\d{1,2}$/.test(raw) ? Number(raw) : 0
+  if (count < 1 || count > PROPRESENTER_BATCH_SIZE) {
+    await ctx.reply(`Отправьте число от 1 до ${PROPRESENTER_BATCH_SIZE} цифрами.`)
+    return true
+  }
+  draft.deviceCount = count
+  draft.step = 'confirm'
+  await renderScreen(ctx, ctx.from!.id, 'propresenter_no_stream', draft)
+  return true
+}
+
+export async function handlePropWaitlistCountChoice(ctx: MyContext, teamId: string, confirmed: boolean) {
+  const draft = ctx.session.propWaitlistDraft
+  if (!draft || draft.teamId !== teamId || (confirmed && draft.step !== 'confirm')) {
+    await ctx.answerCallbackQuery({ text: 'Начните заявку заново', show_alert: true })
+    return
+  }
+  draft.step = confirmed ? 'final' : 'count'
+  if (!confirmed) draft.deviceCount = undefined
+  await renderScreen(ctx, ctx.from!.id, 'propresenter_no_stream', draft)
+  await ctx.answerCallbackQuery()
 }
 
 export async function handlePropHasStream(ctx: MyContext, userId: number, teamId: string) {
@@ -106,35 +145,58 @@ export async function handlePropConfirmStream(ctx: MyContext, userId: number, pa
 
 export async function handlePropNoStreamConfirm(ctx: MyContext, userId: number, teamId: string) {
   if (await stopIfTeamAlreadyHasStream(ctx, teamId)) return
-  const { entry, position, created } = await addToWaitlist(teamId, userId)
+  const draft = ctx.session.propWaitlistDraft
+  if (!draft || draft.teamId !== teamId || draft.step !== 'final' || !draft.deviceCount) {
+    await ctx.answerCallbackQuery({ text: 'Сначала укажите количество устройств', show_alert: true })
+    return
+  }
+  const { entry, position, created } = await addToWaitlist(teamId, userId, draft.deviceCount)
+  ctx.session.propWaitlistDraft = undefined
 
   const team = await getTeamById(teamId)
   const owner = await getOrCreateUser(userId)
   const flowNumber = entry.assignedFlowNumber!
+  const deviceCount = entry.deviceCount || 1
 
-  const kb = new InlineKeyboard().url('👤 Открыть Telegram-профиль', `tg://user?id=${userId}`)
+  const kb = new InlineKeyboard()
+    .text('👥 Открыть команду', `ap:wt:${teamId}:${flowNumber}`).row()
+    .url('👤 Открыть Telegram-профиль', `tg://user?id=${userId}`)
 
   if (created) {
-    await ctx.api.sendMessage(
-      ADMIN_GROUP_ID,
-      `📋 *Новая заявка на поток ProPresenter №${flowNumber}*\n\n` +
-        `👤 ${owner.fio || 'не указано'}\n` +
-        `👥 Команда: ${team?.name || 'неизвестно'}\n` +
-        `🆔 Team ID: \`${teamId}\`\n\n` +
-        `Заполнено: *${position}/${PROPRESENTER_BATCH_SIZE}*.`,
-      {
-        parse_mode: 'Markdown',
-        message_thread_id: PROP_WAITLIST_THREAD_ID,
-        reply_markup: kb,
-      }
-    )
+    const notice = new FormattedString('')
+      .emoji('🎬', '5251272469175631339').plain(' ')
+      .bold(`Новая заявка на поток ProPresenter №${flowNumber}`)
+      .plain(`\n\n👤 ${owner.fio || 'не указано'}\n`)
+      .plain(`😎 ${owner.username ? '@' + owner.username.replace(/^@/, '') : 'Без username'}\n`)
+      .plain(`🆔 Telegram ID: ${userId}\n`)
+      .plain(`👥 Команда: ${team?.name || 'неизвестно'}\n`)
+      .plain(`🆔 Team ID: ${teamId}\n`)
+      .plain(`🖥 Устройств: ${deviceCount}\n\n`)
+      .bold(`Заполнено: ${position}/${PROPRESENTER_BATCH_SIZE}`)
+    await ctx.api.sendMessage(ADMIN_GROUP_ID, notice.text, {
+      entities: notice.entities,
+      message_thread_id: PROP_WAITLIST_THREAD_ID,
+      reply_markup: kb,
+    })
+    const communityGroupId = Number(process.env.HUB_COMMUNITY_GROUP_ID || 0)
+    if (communityGroupId) {
+      const communityNotice = new FormattedString('')
+        .emoji('🎬', '5251272469175631339')
+        .bold(` ProPresenter · будущий поток №${flowNumber}`)
+        .plain('\nЗанято мест для устройств: ')
+        .bold(`${position}/${PROPRESENTER_BATCH_SIZE}`)
+      await ctx.api.sendMessage(communityGroupId, communityNotice.text, {
+        entities: communityNotice.entities,
+        message_thread_id: Number(process.env.HUB_COMMUNITY_PROPRESENTER_THREAD_ID || 2),
+      }).catch((error) => console.error('Не удалось отправить статистику в Hub Community:', error))
+    }
   }
 
   if (await claimBatchReadyNotification(flowNumber)) {
     await ctx.api.sendMessage(
       ADMIN_GROUP_ID,
       `✅ *Поток ProPresenter №${flowNumber} собран!*\n\n` +
-        `В очереди ${PROPRESENTER_BATCH_SIZE}/${PROPRESENTER_BATCH_SIZE} команд. Можно создавать поток.`,
+        `Занято ${PROPRESENTER_BATCH_SIZE}/${PROPRESENTER_BATCH_SIZE} мест для устройств. Можно создавать поток.`,
       {
         parse_mode: 'Markdown',
         message_thread_id: PROP_WAITLIST_THREAD_ID,
@@ -150,7 +212,8 @@ export async function handlePropNoStreamConfirm(ctx: MyContext, userId: number, 
     caption:
       `${created ? '✅ *Заявка отправлена!*' : 'ℹ️ *Вы уже находитесь в очереди.*'}\n\n` +
       `Будущий поток: *№${flowNumber}*\n` +
-      `Ваше место: *${position} из ${PROPRESENTER_BATCH_SIZE}*\n\n` +
+      `Устройств: *${deviceCount}*\n` +
+      `Занято мест: *${position} из ${PROPRESENTER_BATCH_SIZE}*\n\n` +
       'Как только поток будет создан, мы сообщим и выдадим доступ.',
     parse_mode: 'Markdown',
     reply_markup: new InlineKeyboard().text('🏠 Главное меню', packCb({ a: 'home' })),

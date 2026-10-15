@@ -92,6 +92,8 @@ import {
   handlePropHasStream,
   handlePropNoStream,
   handlePropNoStreamConfirm,
+  handlePropWaitlistCountChoice,
+  handlePropWaitlistDeviceCountText,
   handlePropSelectStream,
   handlePropVerifyAccept,
   handlePropVerifyReject,
@@ -145,7 +147,7 @@ import {
   reopenSupportTicket,
 } from './services/support.service.js'
 import { auditLogService, recordOperationalEvent } from './services/auditLog.service.js'
-import { bindStreamChat } from './services/proPresenterRenewal.service.js'
+import { bindStreamChat, setRenewalTargetDate, syncRenewalSummary } from './services/proPresenterRenewal.service.js'
 import { handleRenewalCallback, showRenewalEntry, runRenewalAdminPrompts, runRenewalParticipantReminders } from './handlers/proPresenterRenewal.handlers.js'
 import { handleDeviceCallback, handleDeviceNameText } from './handlers/proPresenterDevice.handlers.js'
 
@@ -235,7 +237,8 @@ type MyContext = Context &
     }
     waitingForPaymentRejectReason?: boolean
     activeConversationId?: string
-    deviceDraft?: { mode: 'user_name' | 'replace_name' | 'admin_name'; teamId: string; flowNumber: number; name?: string; deviceId?: string; adminMessageId?: number }
+    deviceDraft?: { mode: 'user_name' | 'replace_name' | 'admin_name' | 'admin_replace' | 'slot_name' | 'seats_name'; teamId: string; flowNumber: number; name?: string; deviceId?: string; adminMessageId?: number }
+    propWaitlistDraft?: { teamId: string; step: 'count' | 'confirm' | 'final'; deviceCount?: number }
 
     adminPanelInput?: any
     tutorialAdminInput?: any
@@ -622,6 +625,24 @@ export function registerHandlers(bot: Bot<MyContext>) {
     await showAdminRootMenu(ctx)
   })
 
+  bot.command('pr_date', async (ctx) => {
+    if (!(await hasAdminPermission(ctx.from.id, 'streams.edit'))) return
+    const match = String(ctx.match || '').trim().match(/^([a-f\d]{24})\s+(\d{2})\.(\d{2})\.(\d{4})$/i)
+    if (!match) return ctx.reply('Формат: /pr_date ID_СБОРА ДД.ММ.ГГГГ')
+    const [, campaignId, day, month, year] = match
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12))
+    if (date.getUTCDate() !== Number(day) || date.getUTCMonth() !== Number(month) - 1 || date.getUTCFullYear() !== Number(year)) {
+      return ctx.reply('Дата некорректна')
+    }
+    try {
+      const campaign = await setRenewalTargetDate(campaignId, date)
+      await syncRenewalSummary(ctx.api, campaignId)
+      await ctx.reply(`✅ Для потока №${campaign.flowNumber} установлена дата ${date.toLocaleDateString('ru-RU')}. После оплаты всех мест подтвердите продление.`)
+    } catch (error) {
+      await ctx.reply(error instanceof Error ? error.message : 'Не удалось установить дату')
+    }
+  })
+
   // ====================== CALLBACK QUERY ======================
   bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data
@@ -631,6 +652,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
     }
     if (data !== 'ap:tuts' && !data.startsWith('ap:tuts:')) ctx.session.tutorialAdminInput = undefined
     if (!data.startsWith('dv:') && ctx.session.deviceDraft) ctx.session.deviceDraft = undefined
+    if (ctx.session.propWaitlistDraft && !data.includes('prop_waitlist_count_') && !data.includes('prop_no_stream_confirm')) ctx.session.propWaitlistDraft = undefined
     if (ctx.session.supportDraft && !data.startsWith('s2:') && !data.startsWith('support:')) {
       ctx.session.supportDraft = undefined
       ctx.session.inSupportMode = false
@@ -1106,6 +1128,14 @@ export function registerHandlers(bot: Bot<MyContext>) {
       await handlePropNoStreamConfirm(ctx, userId, String(parsed.p))
       return
     }
+    if (parsed.a === 'prop_waitlist_count_yes' && parsed.p) {
+      await handlePropWaitlistCountChoice(ctx, String(parsed.p), true)
+      return
+    }
+    if (parsed.a === 'prop_waitlist_count_no' && parsed.p) {
+      await handlePropWaitlistCountChoice(ctx, String(parsed.p), false)
+      return
+    }
 
     if (parsed.a === 'content_chat') {
       await handleContentChat(ctx, userId, parsed)
@@ -1369,6 +1399,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
     if (await handleAdminPanelText(ctx)) return
     if (await handleYandex360Text(ctx)) return
     if (await handleDeviceNameText(ctx)) return
+    if (await handlePropWaitlistDeviceCountText(ctx)) return
     if (await handleCustomPaymentRejectText(ctx)) return
     if (await relayActiveConversationMessage(ctx)) return
 
