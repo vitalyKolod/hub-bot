@@ -783,6 +783,8 @@ export async function adminCreateStreamFromWaitlist(data: {
     assignedFlowNumber: data.flowNumber,
   }).sort({ createdAt: 1 })
   if (!entries.length) throw new Error('В этой партии нет заявок')
+  const requestedSeats = entries.reduce((total, entry) => total + (entry.deviceCount || 1), 0)
+  if (requestedSeats !== 20) throw new Error(`Поток не заполнен устройствами: ${requestedSeats}/20`)
 
   const stream = await ProPresenterStreamModel.create({
     flowNumber: data.flowNumber,
