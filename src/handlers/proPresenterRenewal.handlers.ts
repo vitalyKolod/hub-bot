@@ -1,7 +1,7 @@
 import { InlineKeyboard, type Api, type Context } from 'grammy'
 import { ProPresenterRenewalCampaignModel, ProPresenterRenewalSeatModel } from '../models/ProPresenterRenewal.js'
 import { TeamModel } from '../models/Team.js'
-import { getRenewalCampaign, eligibleSeats, launchRenewal, renewalPreview, renewalPromptCandidates, renewalStartLink, renewalStats, voteForDevice, declineTeamDevices, completeRenewal, syncRenewalSummary, renewalAcceptsNewPayments, setRenewalSummaryView, syncRenewalPollKeyboard, convertLegacyRenewal } from '../services/proPresenterRenewal.service.js'
+import { getRenewalCampaign, eligibleSeats, launchRenewal, renewalPreview, renewalPromptCandidates, renewalStartLink, renewalStats, voteForDevice, declineTeamDevices, completeRenewal, setRenewalTargetDate, syncRenewalSummary, renewalAcceptsNewPayments, setRenewalSummaryView, syncRenewalPollKeyboard, convertLegacyRenewal } from '../services/proPresenterRenewal.service.js'
 import { hasAdminPermission, listAdminAccess } from '../services/adminAccess.service.js'
 import { startRenewalCheckout } from './payment.handlers.js'
 import { apCb } from '../constants/admin-panel.js'
@@ -134,11 +134,18 @@ export async function handleRenewalCallback(ctx: any, data: string): Promise<boo
         await convertLegacyRenewal(ctx.api, value)
         await answer(ctx, 'Сбор пересчитан по устройствам')
       }
+      else if (action === 'date') {
+        const campaign = await getRenewalCampaign(value)
+        if (!campaign || campaign.status !== 'active') throw new Error('Активный сбор не найден')
+        await ctx.reply(`Отправьте дату командой:\n/pr_date ${value} ДД.ММ.ГГГГ`)
+      }
       else if (action === 'finish') {
         const campaign = await getRenewalCampaign(value)
         if (!campaign) throw new Error('Сбор не найден')
         const stats = renewalStats(await ProPresenterRenewalSeatModel.find({ campaignId: value }))
-        const prompt = `Продлить поток №${campaign.flowNumber} на год? Подтверждено ${stats.paid}/${stats.total} взносов. Это изменит общую дату подписки.`
+        if (!stats.total || stats.paid !== stats.total) throw new Error(`Сначала подтвердите оплату всех устройств: ${stats.paid}/${stats.total}`)
+        const target = campaign.targetEndsAt?.toLocaleDateString('ru-RU') || 'на один год'
+        const prompt = `Продлить поток №${campaign.flowNumber} ${target}? Подтверждено ${stats.paid}/${stats.total} взносов. Это изменит общую дату подписки.`
         const replyMarkup = new InlineKeyboard()
           .text('✅ Подтверждаю продление', `pr:a:finishok:${value}`).row()
           .text('Отмена', `pr:a:lists:${value}`)

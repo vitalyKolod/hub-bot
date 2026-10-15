@@ -10,6 +10,8 @@ export type ActionId =
   | 'pay_product'
   | 'crypto_selected'
   | 'prop_no_stream_confirm'
+  | 'prop_waitlist_count_yes'
+  | 'prop_waitlist_count_no'
   | 'prop_confirm_stream'
   | 'prop_verify_accept'
   | 'prop_verify_reject'

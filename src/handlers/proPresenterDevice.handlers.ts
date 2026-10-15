@@ -16,6 +16,8 @@ import { ProPresenterRenewalCampaignModel } from '../models/ProPresenterRenewal.
 import { syncRenewalSummary } from '../services/proPresenterRenewal.service.js'
 import {
   replaceTeamDevice,
+  assignReservedDevice,
+  reduceReservedSeats,
   applyDeviceChange,
   availableDeviceFlows,
   createApprovedDevice,
@@ -28,7 +30,7 @@ import {
 } from '../services/proPresenterDevice.service.js'
 
 type Draft = {
-  mode: 'user_name' | 'replace_name' | 'admin_name' | 'admin_replace'
+  mode: 'user_name' | 'replace_name' | 'admin_name' | 'admin_replace' | 'slot_name' | 'seats_name'
   teamId: string
   flowNumber: number
   name?: string
@@ -180,7 +182,7 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
       await ctx.answerCallbackQuery({ text: 'Перенос устройства недоступен', show_alert: true })
       return true
     }
-    if (!['ac', 'axs', 'ax', 'axc', 'at', 'xc', 'axok'].includes(action)) ctx.session.deviceDraft = undefined
+    if (!['ac', 'axs', 'ax', 'axc', 'at', 'xc', 'axok', 'slotok', 'seatsok'].includes(action)) ctx.session.deviceDraft = undefined
     if (action === 'team_devices') {
       if (!(await hasAdminPermission(ctx.from.id, 'teams.view')))
         throw new Error('Нет прав на просмотр команды')
@@ -368,7 +370,22 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
         throw new Error('Устройства доступны только участникам команды')
     } else if (team.ownerId !== ctx.from.id)
       throw new Error('Действия с устройствами доступны только владельцу команды')
-    if (action === 'xn') throw new Error('Нет доступных устройств для замены')
+    if (action === 'slot' || action === 'seats') {
+      const flowNumber = Number(second)
+      if (!Number.isSafeInteger(flowNumber) || flowNumber < 1) throw new Error('Поток не найден')
+      ctx.session.deviceDraft = { mode: action === 'slot' ? 'slot_name' : 'seats_name', teamId: first, flowNumber } satisfies Draft
+      await showUser(ctx, first, action === 'slot' ? 'slot_name' : 'seats_name', { flowNumber })
+    } else if (action === 'slotok' || action === 'seatsok') {
+      const draft: Draft | undefined = ctx.session.deviceDraft
+      if (!draft || draft.teamId !== first || draft.flowNumber !== Number(second) || !draft.name || draft.mode !== (action === 'slotok' ? 'slot_name' : 'seats_name'))
+        throw new Error('Данные устарели. Начните заново')
+      if (action === 'slotok') {
+        const device = await assignReservedDevice(first, ctx.from.id, draft.flowNumber, draft.name)
+        await logDeviceEvent('team.device_added', first, ctx.from.id, 'user', device.name, draft.flowNumber)
+      } else await reduceReservedSeats(first, ctx.from.id, draft.flowNumber, Number(draft.name))
+      ctx.session.deviceDraft = undefined
+      await showUser(ctx, first)
+    } else if (action === 'xn') throw new Error('Нет доступных устройств для замены')
     if (action === 'xs') await showUser(ctx, first, 'replace_select')
     else if (action === 'xt') {
       const device = await ProPresenterDeviceModel.findOne({ _id: second, teamId: first, status: 'active' })
@@ -499,6 +516,13 @@ export async function handleDeviceNameText(ctx: any): Promise<boolean> {
     } else await ctx.reply(text)
   }
   const name = ctx.message.text.replace(/\s+/g, ' ').trim()
+  if (draft.mode === 'seats_name') {
+    await ctx.deleteMessage().catch(() => {})
+    if (!/^\d{1,2}$/.test(name)) { await ctx.reply('Введите количество мест цифрами.'); return true }
+    draft.name = name
+    await showUser(ctx, draft.teamId, 'seats_confirm', { flowNumber: draft.flowNumber, name })
+    return true
+  }
   if (name.length < 2 || name.length > 80) {
     await showInputError('Название должно содержать от 2 до 80 символов. Введите название ещё раз.')
     return true
@@ -536,6 +560,9 @@ export async function handleDeviceNameText(ctx: any): Promise<boolean> {
           draft.flowNumber
         )
       }
+    } else if (draft.mode === 'slot_name') {
+      draft.name = name
+      await showUser(ctx, draft.teamId, 'slot_confirm', { flowNumber: draft.flowNumber, name })
     } else {
       draft.name = name
       await showUser(ctx, draft.teamId, draft.mode === 'replace_name' ? 'replace_confirm' : 'add_confirm', { flowNumber: draft.flowNumber, deviceId: draft.deviceId, name })

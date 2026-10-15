@@ -9,17 +9,19 @@ import { handlePropConfirmStream, handlePropNoStreamConfirm } from '../src/handl
 
 for (const kind of ['request', 'confirmation'] as const) {
   test(`ProPresenter ${kind} retains profile and business actions without creating conversation`, async (t) => {
+    process.env.HUB_COMMUNITY_GROUP_ID = '0'
     const teamId = '507f1f77bcf86cd799439011'
     t.mock.method(TeamModel as any, 'findById', async () => ({ name: 'Team', ownerId: 42, subscriptions: new Map() }))
     t.mock.method(UserModel as any, 'findOne', async () => ({ fio: 'User' }))
     t.mock.method(ConversationModel as any, 'findOneAndUpdate', () => { assert.fail('Must not create conversation') })
-    t.mock.method(ProPresenterWaitlistModel as any, 'find', () => ({ sort: async () => [] }))
+    t.mock.method(ProPresenterWaitlistModel as any, 'find', () => ({ sort: async () => [], then: (resolve: any) => Promise.resolve([]).then(resolve) }))
     t.mock.method(ProPresenterWaitlistModel as any, 'findOne', (filter: any) => filter.teamId ? null : ({ sort: async () => null }))
     t.mock.method(ProPresenterStreamModel as any, 'findOne', () => ({ sort: async () => null }))
     t.mock.method(ProPresenterWaitlistModel as any, 'countDocuments', async () => 1)
     t.mock.method(ProPresenterWaitlistModel as any, 'create', async (entry: any) => ({ ...entry, id: teamId, createdAt: new Date() }))
     const sent: any[] = []
     const ctx: any = {
+      session: { propWaitlistDraft: { teamId, step: 'final', deviceCount: 1 } },
       api: { sendMessage: async (...args: any[]) => sent.push(args) },
       editMessageCaption: async () => {}, answerCallbackQuery: async () => {},
     }

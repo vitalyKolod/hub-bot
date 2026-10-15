@@ -13,6 +13,8 @@ const proPresenterWaitlistSchema = new mongoose.Schema(
       required: true,
     },
 
+    deviceCount: { type: Number, required: true, min: 1, max: 20, default: 1 },
+
     status: {
       type: String,
       enum: ['pending', 'assigned', 'cancelled'],

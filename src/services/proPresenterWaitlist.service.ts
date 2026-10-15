@@ -6,6 +6,15 @@ import { auditLogService } from './auditLog.service.js'
 export const PROPRESENTER_BATCH_SIZE = 20
 export const REQUEST_BATCH_TITLE_MAX_LENGTH = 100
 
+export function countRequestedDevices(entries: Array<{ deviceCount?: number | null }>) {
+  return entries.reduce((total, entry) => total + (entry.deviceCount || 1), 0)
+}
+
+async function getBatchDeviceCount(flowNumber: number) {
+  const entries = await ProPresenterWaitlistModel.find({ status: 'pending', assignedFlowNumber: flowNumber })
+  return countRequestedDevices(entries)
+}
+
 export function defaultRequestBatchTitle(flowNumber: number) {
   return `Заявки на поток №${flowNumber}`
 }
@@ -48,35 +57,34 @@ async function assignLegacyPendingEntries() {
     (lastStream?.flowNumber || 0) + 1,
     lastPendingBatch?.assignedFlowNumber || 0
   )
-  let count = await ProPresenterWaitlistModel.countDocuments({
-    status: 'pending',
-    assignedFlowNumber: flowNumber,
-  })
+  let count = await getBatchDeviceCount(flowNumber)
 
   for (const entry of legacyEntries) {
-    if (count >= PROPRESENTER_BATCH_SIZE) {
+    const seats = entry.deviceCount || 1
+    if (count + seats > PROPRESENTER_BATCH_SIZE) {
       flowNumber += 1
       count = 0
     }
     entry.assignedFlowNumber = flowNumber
     await entry.save()
-    count += 1
+    count += seats
   }
 }
 
 /**
  * Добавить команду в лист ожидания
  */
-export async function addToWaitlist(teamId: string, requestedBy: number) {
+export async function addToWaitlist(teamId: string, requestedBy: number, deviceCount: number) {
+  if (!Number.isSafeInteger(deviceCount) || deviceCount < 1 || deviceCount > PROPRESENTER_BATCH_SIZE)
+    throw new Error(`Укажите от 1 до ${PROPRESENTER_BATCH_SIZE} устройств`)
   await assignLegacyPendingEntries()
   // защита от дублей — если уже есть pending-заявка от этой команды, не плодим новые
   const existing = await ProPresenterWaitlistModel.findOne({ teamId, status: 'pending' })
   if (existing) {
-    const position = await ProPresenterWaitlistModel.countDocuments({
-      status: 'pending',
-      assignedFlowNumber: existing.assignedFlowNumber,
+    const position = countRequestedDevices(await ProPresenterWaitlistModel.find({
+      status: 'pending', assignedFlowNumber: existing.assignedFlowNumber,
       createdAt: { $lte: existing.createdAt },
-    })
+    }))
     return { entry: existing, position, created: false }
   }
 
@@ -88,22 +96,17 @@ export async function addToWaitlist(teamId: string, requestedBy: number) {
     (lastStream?.flowNumber || 0) + 1,
     lastPendingBatch?.assignedFlowNumber || 0
   )
-  const batchCount = assignedFlowNumber
-    ? await ProPresenterWaitlistModel.countDocuments({ status: 'pending', assignedFlowNumber })
-    : 0
-  if (batchCount >= PROPRESENTER_BATCH_SIZE) assignedFlowNumber += 1
+  const batchCount = await getBatchDeviceCount(assignedFlowNumber)
+  if (batchCount + deviceCount > PROPRESENTER_BATCH_SIZE) assignedFlowNumber += 1
 
   const entry = await ProPresenterWaitlistModel.create({
     teamId,
     requestedBy,
+    deviceCount,
     status: 'pending',
     assignedFlowNumber,
   })
-  const position = await ProPresenterWaitlistModel.countDocuments({
-    status: 'pending',
-    assignedFlowNumber,
-    createdAt: { $lte: entry.createdAt },
-  })
+  const position = await getBatchDeviceCount(assignedFlowNumber)
   return { entry, position, created: true }
 }
 
@@ -119,7 +122,7 @@ export async function getPendingBatches() {
   await assignLegacyPendingEntries()
   const batches = await ProPresenterWaitlistModel.aggregate<{ _id: number; count: number }>([
     { $match: { status: 'pending', assignedFlowNumber: { $ne: null } } },
-    { $group: { _id: '$assignedFlowNumber', count: { $sum: 1 } } },
+    { $group: { _id: '$assignedFlowNumber', count: { $sum: { $ifNull: ['$deviceCount', 1] } } } },
     { $sort: { _id: 1 } },
   ])
   const metadata = await ProPresenterRequestBatchModel.find({ flowNumber: { $in: batches.map((batch) => batch._id) } }).lean()
@@ -129,10 +132,7 @@ export async function getPendingBatches() {
 
 /** Атомарно помечает заполненную партию, чтобы уведомление админу ушло только один раз. */
 export async function claimBatchReadyNotification(flowNumber: number) {
-  const count = await ProPresenterWaitlistModel.countDocuments({
-    status: 'pending',
-    assignedFlowNumber: flowNumber,
-  })
+  const count = await getBatchDeviceCount(flowNumber)
   if (count < PROPRESENTER_BATCH_SIZE) return false
 
   const first = await ProPresenterWaitlistModel.findOne({
@@ -160,7 +160,8 @@ export async function getPendingWaitlist() {
  * Сколько всего человек в очереди
  */
 export async function getWaitlistCount(): Promise<number> {
-  return ProPresenterWaitlistModel.countDocuments({ status: 'pending' })
+  const entries = await ProPresenterWaitlistModel.find({ status: 'pending' })
+  return countRequestedDevices(entries)
 }
 
 /**

@@ -3,8 +3,13 @@ import test from 'node:test'
 import { TeamModel } from '../src/models/Team.js'
 import { ProPresenterDeviceModel, ProPresenterDeviceRequestModel } from '../src/models/ProPresenterDevice.js'
 import { ProPresenterStreamModel } from '../src/models/ProPresenterStream.js'
+import { ProPresenterWaitlistModel } from '../src/models/ProPresenterWaitlist.js'
 import { devicesScreen } from '../src/screens/devices.js'
 import { handleDeviceCallback } from '../src/handlers/proPresenterDevice.handlers.js'
+
+test.beforeEach((t) => {
+  t.mock.method(ProPresenterWaitlistModel as any, 'find', () => ({ sort: async () => [], then: (resolve: any) => Promise.resolve([]).then(resolve) }))
+})
 
 test('owner device screen uses the supplied image and one compact action menu', async (t) => {
   t.mock.method(TeamModel as any, 'findById', async () => ({ ownerId: 10, name: 'Команда' }))
