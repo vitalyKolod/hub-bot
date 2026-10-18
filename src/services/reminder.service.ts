@@ -5,6 +5,7 @@ import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
 import { TeamModel } from '../models/Team.js'
 import { GroupAccessRevocationModel } from '../models/GroupAccessRevocation.js'
 import { auditLogService, buildSubscriptionTargetId, recordOperationalEvent } from './auditLog.service.js'
+import { PROP_RENEWAL_STATS_THREAD_ID } from './proPresenterRenewal.service.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const REMINDER_DAYS = new Set([14, 10, 7, 5, 4, 3, 2, 1])
@@ -79,6 +80,9 @@ async function notifyAdmin(
       adminGroupId,
       `🔔 ${scope}\nДо окончания осталось ${remaining} дн.\nДата: ${expiresAt.toLocaleDateString('ru-RU')}`,
       {
+        ...(productId === 'propresenter' && PROP_RENEWAL_STATS_THREAD_ID
+          ? { message_thread_id: PROP_RENEWAL_STATS_THREAD_ID }
+          : {}),
         reply_markup: new InlineKeyboard().text(productId === 'propresenter' ? '📡 Проверить поток' : '✅ Продлил на 1 год', callbackData),
       }
     )
