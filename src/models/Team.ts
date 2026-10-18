@@ -27,6 +27,7 @@ const teamSchema = new mongoose.Schema(
     name: { type: String, required: true },
     ownerId: { type: Number, required: true },
     members: { type: [memberSchema], default: [] },
+    deviceLimit: { type: Number, min: 1, max: 20 },
 
     // Map<productId, subscription> — вместо жёстких полей.
     // Ключи = id из config/products.ts. Новый продукт = просто новый ключ,

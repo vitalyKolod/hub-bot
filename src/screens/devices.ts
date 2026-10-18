@@ -9,6 +9,7 @@ import {
   DEVICE_ICON,
   listTeamDeviceRequests,
   listTeamDevices,
+  teamDeviceLimit,
 } from '../services/proPresenterDevice.service.js'
 
 export type DeviceScreenParams = {
@@ -66,8 +67,10 @@ export async function devicesScreen(
   const home = `dv:h:${params.teamId}`
   const back = () => kb.text('‹ К устройствам', home)
   let caption = `Устройства ProPresenter · ${team.name}\n\n`
+  const limit = teamDeviceLimit(team, reservations.reduce((sum, item) => sum + (item.deviceCount || 1), 0))
 
   if (step === 'home') {
+    caption += `Лимит команды: ${devices.length}/${limit}\n\n`
     caption += devices.length
       ? devices
           .map((device) => {
@@ -89,7 +92,7 @@ export async function devicesScreen(
       caption += `\n\nПоток №${flow}: ${used}/${reservation.deviceCount || 1} устройств назначено.`
       if (remaining) caption += `\n${Array(remaining).fill('• Устройство пока не назначено').join('\n')}`
       if (isOwner) {
-        for (let index = 0; index < remaining; index++)
+        for (let index = 0; index < Math.min(remaining, Math.max(0, limit - devices.length)); index++)
           kb.text(`Назначить устройство ${used + index + 1}`, `dv:slot:${params.teamId}:${flow}`).row()
         if ((reservation.deviceCount || 1) > 1)
           kb.text(`Уменьшить число мест (${reservation.deviceCount})`, `dv:seats:${params.teamId}:${flow}`).row()
@@ -111,7 +114,7 @@ export async function devicesScreen(
         .icon('5303174911269818848')
         .row()
       if (devices.some((device) => !busy.has(device.id))) {
-        kb.text('Отказаться от устройства', `dv:rs:${params.teamId}`)
+        kb.text('Отключить устройство', `dv:rs:${params.teamId}`)
           .icon(RELEASE_DEVICE_ICON)
           .row()
       }
@@ -153,9 +156,10 @@ export async function devicesScreen(
     caption += `Поток №${params.flowNumber}. Напишите название устройства одним сообщением. Сообщение с названием бот удалит.`
     back()
   } else if (step === 'add_confirm') {
-    caption += `Добавить «${params.name}» в поток №${params.flowNumber}? Заявка уйдёт администраторам.`
-    if ((await availableDeviceFlows()).some((stream) => stream.flowNumber === params.flowNumber))
-      kb.text('✅ Новое устройство · отправить заявку', `dv:ac:${params.teamId}`).row()
+    caption += `Подключить «${params.name}» в поток №${params.flowNumber}?`
+    if (devices.length >= limit) caption += `\nЛимит ${limit} достигнут. Выберите устройство для замены.`
+    else if ((await availableDeviceFlows()).some((stream) => stream.flowNumber === params.flowNumber))
+      kb.text('✅ Подключить устройство', `dv:ac:${params.teamId}`).row()
     else
       caption +=
         '\nПоток заполнен. Для замены вернитесь к устройствам и нажмите «Заменить устройство».'
@@ -180,13 +184,13 @@ export async function devicesScreen(
     })
     if (!device || device.flowNumber !== params.flowNumber)
       throw new Error('Заменяемое устройство больше не доступно')
-    caption += `Заменить «${device.name}» на «${params.name}» в потоке №${params.flowNumber}? После подтверждения администратором старое устройство будет снято, новое добавлено.`
-    kb.text('✅ Отправить заявку', `dv:axc:${params.teamId}:${device.id}`).row()
+    caption += `Заменить «${device.name}» на «${params.name}» в потоке №${params.flowNumber}?`
+    kb.text('✅ Да, заменить', `dv:axc:${params.teamId}:${device.id}`).row()
     back()
   } else if (step === 'release_select' || step === 'move_select') {
     caption +=
       step === 'release_select'
-        ? 'Выберите устройство, от которого хотите отказаться:'
+        ? 'Выберите устройство, которое хотите отключить:'
         : 'Выберите устройство для переноса:'
     const prefix = step === 'release_select' ? 'rc' : 'mf'
     for (const device of devices.filter((item) => !busy.has(item.id))) {
@@ -205,8 +209,8 @@ export async function devicesScreen(
       status: 'active',
     })
     if (!device) throw new Error('Устройство больше не доступно')
-    caption += `Отказаться от «${device.name}» в потоке №${device.flowNumber}? Оно останется активным до решения администратора.`
-    kb.text('✅ Отправить заявку', `dv:rr:${params.teamId}:${device.id}`).row()
+    caption += `Отключить «${device.name}» в потоке №${device.flowNumber}?`
+    kb.text('✅ Да, отключить', `dv:rr:${params.teamId}:${device.id}`).row()
     back()
   } else if (step === 'move_flow') {
     const device = await ProPresenterDeviceModel.findOne({
