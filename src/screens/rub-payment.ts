@@ -148,7 +148,7 @@ export async function rubPaymentScreen(userId: number, params?: any): Promise<Sc
   // Получатель
   let receiver = new FormattedString('')
 
-  receiver = receiver.plain('Получатель: ').bold(config.PAYMENT_RECEIVER_NAME)
+  receiver = receiver.plain('Получатель: ').bold(payment.rubType === 'card' ? 'KIRILL FLAMBERG' : config.PAYMENT_RECEIVER_NAME)
 
   message = message.blockquote(receiver, true).plain('\n\n')
   message = message.bold('КОММЕНТАРИИ К ПЕРЕВОДУ ПИСАТЬ НЕ НУЖНО!').plain('\n\n')
