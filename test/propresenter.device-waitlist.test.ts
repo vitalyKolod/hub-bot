@@ -33,7 +33,7 @@ test('assigned seats appear as separate buttons and an owner can use and reduce 
   ]) }
   const reservation = { teamId: 'team', status: 'assigned', assignedFlowNumber: 6, deviceCount: 3, save: async () => {} }
   t.mock.method(TeamModel as any, 'findById', async () => team)
-  t.mock.method(ProPresenterWaitlistModel as any, 'find', () => ({ sort: async () => [reservation] }))
+  t.mock.method(ProPresenterWaitlistModel as any, 'find', () => ({ sort: async () => [reservation], then: (resolve: any) => Promise.resolve([reservation]).then(resolve) }))
   t.mock.method(ProPresenterWaitlistModel as any, 'findOne', async () => reservation)
   t.mock.method(ProPresenterDeviceModel as any, 'find', () => ({ sort: async () => [] }))
   t.mock.method(ProPresenterDeviceRequestModel as any, 'find', () => ({ sort: async () => [] }))

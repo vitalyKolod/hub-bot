@@ -7,6 +7,7 @@ import { apCb } from '../constants/admin-panel.js'
 import { showAdminTeamCard } from './adminPanel.handlers.js'
 import { hasAdminPermission } from '../services/adminAccess.service.js'
 import { TeamModel } from '../models/Team.js'
+import { UserModel } from '../models/User.js'
 import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
 import {
   ProPresenterDeviceModel,
@@ -21,16 +22,18 @@ import {
   applyDeviceChange,
   availableDeviceFlows,
   createApprovedDevice,
+  connectTeamDevice,
   createDeviceRequest,
   decideDeviceRequest,
   DEVICE_ICON,
   DEVICE_REQUEST_THREAD_ID,
   listFlowDevices,
   listTeamDevices,
+  teamDeviceLimit,
 } from '../services/proPresenterDevice.service.js'
 
 type Draft = {
-  mode: 'user_name' | 'replace_name' | 'admin_name' | 'admin_replace' | 'slot_name' | 'seats_name'
+  mode: 'user_name' | 'replace_name' | 'admin_name' | 'admin_replace' | 'admin_limit' | 'slot_name' | 'seats_name'
   teamId: string
   flowNumber: number
   name?: string
@@ -43,6 +46,24 @@ const DELETE_DEVICE_ICON = '5300821986451148615'
 const REPLACE_DEVICE_ICON = '5303174911269818848'
 const ADD_DEVICE_ICON = '5397916757333654639'
 const adminGroupId = Number(process.env.ADMIN_GROUP_ID)
+
+async function notifyDeviceChange(ctx: any, teamId: string, flowNumber: number, action: 'add' | 'replace' | 'release', name: string, previousName?: string) {
+  const team = await TeamModel.findById(teamId)
+  const owner = team?.ownerId || ctx.from.id
+  const ownerUser = await UserModel.findOne({ telegramId: owner })
+  const escape = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const mention = ownerUser?.username ? `@${escape(ownerUser.username.replace(/^@/, ''))}` : `<a href="tg://user?id=${owner}">${owner}</a>`
+  const text = `Пользователь ${mention} из команды ${escape(team?.name || teamId)} ${action === 'release' ? `отключил устройство ${escape(name)}` :
+    `подключил новое устройство ${escape(name)}${action === 'replace' ? ` вместо ${escape(previousName || '')}` : ''}`}`
+  const stream = await ProPresenterStreamModel.findOne({ flowNumber })
+  const destinations = [
+    adminGroupId && DEVICE_REQUEST_THREAD_ID ? { chatId: adminGroupId, message_thread_id: DEVICE_REQUEST_THREAD_ID } : null,
+    stream?.chatId ? { chatId: stream.chatId } : null,
+  ].filter(Boolean) as Array<{ chatId: number; message_thread_id?: number }>
+  const results = await Promise.allSettled(destinations.map(({ chatId, message_thread_id }) =>
+    ctx.api.sendMessage(chatId, text, message_thread_id ? { message_thread_id, parse_mode: 'HTML' } : { parse_mode: 'HTML' })))
+  for (const result of results) if (result.status === 'rejected') console.error('Device notification failed:', result.reason)
+}
 
 async function syncAffectedRenewals(api: any, flows: Array<number | null | undefined>) {
   const campaigns = await ProPresenterRenewalCampaignModel.find({
@@ -202,10 +223,11 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
         kb.row()
       }
       kb.text('Добавить устройство', `dv:ta:${first}`).icon(ADD_DEVICE_ICON).row()
+      kb.text('Задать лимит', `dv:limit:${first}`).row()
       kb.text('‹ К команде', apCb('t', first))
       await ctx.editMessageText([
         `🖥 Устройства · ${team.name}`,
-        `Подтверждено: ${devices.length}`,
+        `Устройств: ${devices.length}/${teamDeviceLimit(team)}`,
         '',
         ...(visible.length ? visible.map(device => `• ${device.name} · поток №${device.flowNumber}`) : ['У команды пока нет устройств.']),
       ].join('\n').slice(0, 4000), { reply_markup: kb })
@@ -249,10 +271,17 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
       return true
     }
 
-    if (['admin', 'aa', 'at', 'ad', 'am', 'atf', 'amc', 'ar', 'arc', 'ta', 'tf', 'axn', 'axok'].includes(action)) {
+    if (['admin', 'aa', 'at', 'ad', 'am', 'atf', 'amc', 'ar', 'arc', 'ta', 'tf', 'axn', 'axok', 'limit'].includes(action)) {
       if (!(await hasAdminPermission(ctx.from.id, 'streams.edit')))
         throw new Error('Нет прав для управления устройствами')
-      if (action === 'ta') {
+      if (action === 'limit') {
+        const team = await TeamModel.findById(first)
+        if (!team) throw new Error('Команда не найдена')
+        ctx.session.deviceDraft = { mode: 'admin_limit', teamId: first, flowNumber: 0, adminMessageId: ctx.callbackQuery?.message?.message_id }
+        await ctx.editMessageText(`Лимит команды «${team.name}»: ${teamDeviceLimit(team)}. Напишите новое число от 1 до 20.`, {
+          reply_markup: new InlineKeyboard().text('Отмена', `dv:team_devices:${first}`),
+        })
+      } else if (action === 'ta') {
         const team = await TeamModel.findById(first)
         if (!team) throw new Error('Команда не найдена')
         const flows = [...new Set((await listTeamDevices(first)).map(d => d.flowNumber))]
@@ -279,7 +308,9 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
       } else if (action === 'axok') {
         const draft: Draft | undefined = ctx.session.deviceDraft
         if (!draft || draft.mode !== 'admin_replace' || draft.adminDeviceId !== first || !draft.name) throw new Error('Начните замену заново')
+        const oldDevice = await ProPresenterDeviceModel.findById(first)
         await adminReplaceDevice({ deviceId: first, teamId: draft.teamId, name: draft.name, adminId: ctx.from.id })
+        await notifyDeviceChange(ctx, draft.teamId, draft.flowNumber, 'replace', draft.name, oldDevice?.name)
         ctx.session.deviceDraft = undefined
         await showAdminDevice(ctx, first, true)
       } else if (action === 'admin') await showAdminFlow(ctx, Number(first), Number(second) || 0)
@@ -350,6 +381,7 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
       } else if (action === 'arc') {
         const device = await applyDeviceChange(first, 'release', undefined, ctx.from.id)
         await logDeviceEvent('team.device_released', device.teamId, ctx.from.id, 'admin', device.name, device.flowNumber)
+        await notifyDeviceChange(ctx, device.teamId, device.flowNumber, 'release', device.name)
         await syncAffectedRenewals(ctx.api, [device.flowNumber])
         if (second === 't') await handleDeviceCallback(ctx, `dv:team_devices:${device.teamId}`)
         else await showAdminFlow(ctx, device.flowNumber)
@@ -382,6 +414,7 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
       if (action === 'slotok') {
         const device = await assignReservedDevice(first, ctx.from.id, draft.flowNumber, draft.name)
         await logDeviceEvent('team.device_added', first, ctx.from.id, 'user', device.name, draft.flowNumber)
+        await notifyDeviceChange(ctx, first, draft.flowNumber, 'add', device.name)
       } else await reduceReservedSeats(first, ctx.from.id, draft.flowNumber, Number(draft.name))
       ctx.session.deviceDraft = undefined
       await showUser(ctx, first)
@@ -399,12 +432,19 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
       const { device, previousName } = await replaceTeamDevice({ teamId: first, deviceId: second, requesterId: ctx.from.id, name: draft.name })
       ctx.session.deviceDraft = undefined
       await logDeviceEvent('team.device_replaced', first, ctx.from.id, 'user', device.name, device.flowNumber, previousName)
+      await notifyDeviceChange(ctx, first, device.flowNumber, 'replace', device.name, previousName)
       await syncAffectedRenewals(ctx.api, [device.flowNumber])
       await showUser(ctx, first)
       await ctx.answerCallbackQuery({ text: 'Устройство заменено' })
       return true
     } else if (action === 'h') await showUser(ctx, first)
     else if (action === 'af') {
+      const teamDevicesCount = await ProPresenterDeviceModel.countDocuments({ teamId: first, status: 'active' })
+      if (teamDevicesCount >= teamDeviceLimit(team)) {
+        await showUser(ctx, first, 'replace_select')
+        await ctx.answerCallbackQuery({ text: `Лимит ${teamDeviceLimit(team)}: выберите устройство для замены`, show_alert: true })
+        return true
+      }
       const subscription = team.subscriptions?.get('propresenter')
       const primaryFlow = Number(subscription?.meta?.flowNumber)
       const teamDevices = await ProPresenterDeviceModel.find({ teamId: first, status: 'active' })
@@ -427,14 +467,12 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
       const draft: Draft | undefined = ctx.session.deviceDraft
       if (!draft || draft.mode !== 'user_name' || draft.teamId !== first || !draft.name)
         throw new Error('Данные заявки устарели. Начните добавление заново')
-      await submitRequest(ctx, {
-        action: 'add',
-        teamId: first,
-        requesterId: ctx.from.id,
-        deviceName: draft.name,
-        toFlow: draft.flowNumber,
-      })
+      const device = await connectTeamDevice({ teamId: first, requesterId: ctx.from.id, name: draft.name, flowNumber: draft.flowNumber })
       ctx.session.deviceDraft = undefined
+      await logDeviceEvent('team.device_added', first, ctx.from.id, 'user', device.name, device.flowNumber)
+      await notifyDeviceChange(ctx, first, device.flowNumber, 'add', device.name)
+      await syncAffectedRenewals(ctx.api, [device.flowNumber])
+      await showUser(ctx, first)
     } else if (action === 'axs') {
       const draft: Draft | undefined = ctx.session.deviceDraft
       if (!draft || draft.mode !== 'user_name' || draft.teamId !== first || !draft.name)
@@ -456,24 +494,23 @@ export async function handleDeviceCallback(ctx: any, data: string): Promise<bool
       const draft: Draft | undefined = ctx.session.deviceDraft
       if (!draft || draft.mode !== 'user_name' || draft.teamId !== first || !draft.name)
         throw new Error('Данные заявки устарели. Начните добавление заново')
-      await submitRequest(ctx, {
-        action: 'add',
-        teamId: first,
-        requesterId: ctx.from.id,
-        deviceName: draft.name,
-        toFlow: draft.flowNumber,
-        replacesDeviceId: second,
-      })
+      const { device, previousName } = await replaceTeamDevice({ teamId: first, deviceId: second, requesterId: ctx.from.id, name: draft.name })
       ctx.session.deviceDraft = undefined
+      await logDeviceEvent('team.device_replaced', first, ctx.from.id, 'user', device.name, device.flowNumber, previousName)
+      await notifyDeviceChange(ctx, first, device.flowNumber, 'replace', device.name, previousName)
+      await syncAffectedRenewals(ctx.api, [device.flowNumber])
+      await showUser(ctx, first)
     } else if (action === 'rs') await showUser(ctx, first, 'release_select')
     else if (action === 'rc') await showUser(ctx, first, 'release_confirm', { deviceId: second })
-    else if (action === 'rr')
-      await submitRequest(ctx, {
-        action: 'release',
-        teamId: first,
-        requesterId: ctx.from.id,
-        deviceId: second,
-      })
+    else if (action === 'rr') {
+      const device = await ProPresenterDeviceModel.findOne({ _id: second, teamId: first, status: 'active' })
+      if (!device) throw new Error('Устройство не найдено')
+      await applyDeviceChange(second, 'release', undefined, ctx.from.id)
+      await logDeviceEvent('team.device_released', first, ctx.from.id, 'user', device.name, device.flowNumber)
+      await notifyDeviceChange(ctx, first, device.flowNumber, 'release', device.name)
+      await syncAffectedRenewals(ctx.api, [device.flowNumber])
+      await showUser(ctx, first)
+    }
     else if (action === 'ms') await showUser(ctx, first, 'move_select')
     else if (action === 'mf') await showUser(ctx, first, 'move_flow', { deviceId: second })
     else if (action === 'mc')
@@ -516,6 +553,24 @@ export async function handleDeviceNameText(ctx: any): Promise<boolean> {
     } else await ctx.reply(text)
   }
   const name = ctx.message.text.replace(/\s+/g, ' ').trim()
+  if (draft.mode === 'admin_limit') {
+    await ctx.deleteMessage().catch(() => {})
+    if (!(await hasAdminPermission(ctx.from.id, 'streams.edit'))) { await showInputError('Нет прав'); return true }
+    const limit = Number(name)
+    if (!/^\d+$/.test(name) || !Number.isSafeInteger(limit) || limit < 1 || limit > 20) {
+      await showInputError('Укажите число от 1 до 20.')
+      return true
+    }
+    const team = await TeamModel.findById(draft.teamId)
+    if (!team) { await showInputError('Команда не найдена'); return true }
+    team.deviceLimit = limit
+    await team.save()
+    ctx.session.deviceDraft = undefined
+    await ctx.api.editMessageText(ctx.chat.id, draft.adminMessageId!, `Лимит устройств команды «${team.name}»: ${limit}`, {
+      reply_markup: new InlineKeyboard().text('‹ К устройствам команды', `dv:team_devices:${draft.teamId}`),
+    })
+    return true
+  }
   if (draft.mode === 'seats_name') {
     await ctx.deleteMessage().catch(() => {})
     if (!/^\d{1,2}$/.test(name)) { await ctx.reply('Введите количество мест цифрами.'); return true }
@@ -544,6 +599,7 @@ export async function handleDeviceNameText(ctx: any): Promise<boolean> {
         adminId: ctx.from.id,
       })
       await logDeviceEvent('team.device_added', draft.teamId, ctx.from.id, 'admin', name, draft.flowNumber)
+      await notifyDeviceChange(ctx, draft.teamId, draft.flowNumber, 'add', name)
       await syncAffectedRenewals(ctx.api, [draft.flowNumber])
       ctx.session.deviceDraft = undefined
       if (draft.adminMessageId) {
