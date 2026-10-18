@@ -3,6 +3,7 @@ import type { ScreenView } from '../core/render.js'
 import { packCb } from '../core/callback.js'
 import { TeamModel } from '../models/Team.js'
 import { ProPresenterDeviceModel } from '../models/ProPresenterDevice.js'
+import { ProPresenterWaitlistModel } from '../models/ProPresenterWaitlist.js'
 import {
   availableDeviceFlows,
   DEVICE_ICON,
@@ -26,6 +27,10 @@ export type DeviceScreenParams = {
     | 'move_select'
     | 'move_flow'
     | 'move_confirm'
+    | 'slot_name'
+    | 'slot_confirm'
+    | 'seats_name'
+    | 'seats_confirm'
   deviceId?: string
   flowNumber?: number
   name?: string
@@ -52,6 +57,7 @@ export async function devicesScreen(
     throw new Error('Действия с устройствами доступны только владельцу команды')
   const devices = await listTeamDevices(params.teamId)
   const pending = await listTeamDeviceRequests(params.teamId)
+  const reservations = await ProPresenterWaitlistModel.find({ teamId: params.teamId, status: 'assigned' }).sort({ assignedFlowNumber: 1 })
   const busy = new Set(
     pending.flatMap((request) => [request.deviceId, request.replacesDeviceId]).filter(Boolean)
   )
@@ -76,6 +82,19 @@ export async function devicesScreen(
           })
           .join('\n')
       : 'Подтверждённых устройств пока нет.'
+    for (const reservation of reservations) {
+      const flow = reservation.assignedFlowNumber!
+      const used = devices.filter((device) => device.flowNumber === flow).length
+      const remaining = Math.max(0, (reservation.deviceCount || 1) - used)
+      caption += `\n\nПоток №${flow}: ${used}/${reservation.deviceCount || 1} устройств назначено.`
+      if (remaining) caption += `\n${Array(remaining).fill('• Устройство пока не назначено').join('\n')}`
+      if (isOwner) {
+        for (let index = 0; index < remaining; index++)
+          kb.text(`Назначить устройство ${used + index + 1}`, `dv:slot:${params.teamId}:${flow}`).row()
+        if ((reservation.deviceCount || 1) > 1)
+          kb.text(`Уменьшить число мест (${reservation.deviceCount})`, `dv:seats:${params.teamId}:${flow}`).row()
+      }
+    }
     const adding = pending.filter((item) => item.action === 'add')
     if (adding.length)
       caption +=
@@ -84,7 +103,7 @@ export async function devicesScreen(
           .map((item) => `• ${item.deviceName} → поток №${item.toFlow} · ⏳ на проверке`)
           .join('\n')
     if (isOwner) {
-      kb.text('Добавить устройство', `dv:af:${params.teamId}`).icon(ADD_DEVICE_ICON).row()
+      if (!reservations.length) kb.text('Добавить устройство', `dv:af:${params.teamId}`).icon(ADD_DEVICE_ICON).row()
       kb.text(
         'Заменить устройство',
         `dv:${devices.some((device) => !busy.has(device.id)) ? 'xs' : 'xn'}:${params.teamId}`
@@ -98,6 +117,20 @@ export async function devicesScreen(
       }
     }
     kb.text('◀️ НАЗАД', packCb({ a: 'back' }))
+  } else if (step === 'slot_name') {
+    caption += `Поток №${params.flowNumber}. Напишите название устройства одним сообщением. Бот удалит сообщение.`
+    back()
+  } else if (step === 'slot_confirm') {
+    caption += `Назначить «${params.name}» в поток №${params.flowNumber}?`
+    kb.text('✅ Назначить', `dv:slotok:${params.teamId}:${params.flowNumber}`).row()
+    back()
+  } else if (step === 'seats_name') {
+    caption += `Поток №${params.flowNumber}. Напишите цифрой, сколько мест оставить. Сообщение будет удалено.`
+    back()
+  } else if (step === 'seats_confirm') {
+    caption += `Оставить ${params.name} мест в потоке №${params.flowNumber}?`
+    kb.text('✅ Подтвердить', `dv:seatsok:${params.teamId}:${params.flowNumber}`).row()
+    back()
   } else if (step === 'replace_select') {
     caption += 'Выберите одно устройство для замены:'
     for (const device of devices.filter((item) => !busy.has(item.id)))

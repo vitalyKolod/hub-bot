@@ -21,6 +21,23 @@ type ScreenRegistry = Record<
 
 let screens: ScreenRegistry = {} as ScreenRegistry
 
+/** Legacy screen captions use *bold* but media captions have no parse_mode. */
+export function formatLegacyCaption(caption: string): { caption: string; caption_entities: MessageEntity[] } {
+  const caption_entities: MessageEntity[] = []
+  let formatted = ''
+  let cursor = 0
+  for (const match of caption.matchAll(/\*([^*\n]+)\*/g)) {
+    const index = match.index ?? 0
+    formatted += caption.slice(cursor, index)
+    const offset = formatted.length
+    formatted += match[1]
+    caption_entities.push({ type: 'bold', offset, length: match[1].length })
+    cursor = index + match[0].length
+  }
+  formatted += caption.slice(cursor)
+  return { caption: formatted, caption_entities }
+}
+
 export function registerScreens(registry: ScreenRegistry) {
   screens = registry
 }
@@ -41,6 +58,11 @@ export async function renderScreen(
   }
 
   const view = await screenFactory(userId, params, ctx)
+  if (!view.caption_entities && view.caption.includes('*')) {
+    const formatted = formatLegacyCaption(view.caption)
+    view.caption = formatted.caption
+    view.caption_entities = formatted.caption_entities
+  }
   const media = view.video
     ? { type: 'video' as const, media: view.mediaIsFileId ? view.video : new InputFile(view.video), caption: view.caption, caption_entities: view.caption_entities }
     : { type: 'photo' as const, media: view.mediaIsFileId ? view.photo : new InputFile(view.photo), caption: view.caption, caption_entities: view.caption_entities }

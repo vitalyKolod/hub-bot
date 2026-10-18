@@ -42,7 +42,8 @@ export type SessionData = {
   }
   waitingForPaymentRejectReason?: boolean
   activeConversationId?: string
-  deviceDraft?: { mode: 'user_name' | 'replace_name' | 'admin_name'; teamId: string; flowNumber: number; name?: string; deviceId?: string; adminMessageId?: number }
+  deviceDraft?: { mode: 'user_name' | 'replace_name' | 'admin_name' | 'admin_replace' | 'slot_name' | 'seats_name'; teamId: string; flowNumber: number; name?: string; deviceId?: string; adminMessageId?: number }
+  propWaitlistDraft?: { teamId: string; step: 'count' | 'confirm' | 'final'; deviceCount?: number }
 }
 
 export type MyContext = Context & SessionFlavor<SessionData>

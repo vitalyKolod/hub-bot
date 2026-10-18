@@ -3,6 +3,7 @@ import { TeamModel } from '../models/Team.js'
 import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
 import { ProPresenterDeviceModel, ProPresenterDeviceRequestModel } from '../models/ProPresenterDevice.js'
 import { ProPresenterRenewalSeatModel } from '../models/ProPresenterRenewal.js'
+import { ProPresenterWaitlistModel } from '../models/ProPresenterWaitlist.js'
 
 export const DEVICE_ICON = '5431376038628171216'
 export const DEVICE_REQUEST_THREAD_ID = Number(process.env.PROP_DEVICE_REQUEST_THREAD_ID || 0)
@@ -29,6 +30,13 @@ async function requireDeviceCapacity(flowNumber: number) {
   const stream = await requireStream(flowNumber)
   const count = await ProPresenterDeviceModel.countDocuments({ flowNumber, status: 'active' })
   if (stream.capacity && count >= stream.capacity) throw new Error(`Поток №${flowNumber} заполнен: ${count}/${stream.capacity} устройств`)
+  const reserved = await ProPresenterWaitlistModel.find({ status: 'assigned', assignedFlowNumber: flowNumber })
+  if (reserved.length && stream.capacity) {
+    const reservedTeams = reserved.map((entry) => entry.teamId)
+    const extraDevices = await ProPresenterDeviceModel.countDocuments({ flowNumber, status: 'active', teamId: { $nin: reservedTeams } })
+    const occupied = reserved.reduce((total, entry) => total + (entry.deviceCount || 1), 0) + extraDevices
+    if (occupied >= stream.capacity) throw new Error(`Все места потока №${flowNumber} уже заняты или зарезервированы`)
+  }
   return stream
 }
 
@@ -49,10 +57,39 @@ export async function listFlowDevices(flowNumber: number) {
   return ProPresenterDeviceModel.find({ flowNumber, status: 'active' }).sort({ name: 1 })
 }
 
+export async function assignReservedDevice(teamId: string, userId: number, flowNumber: number, rawName: string) {
+  const team = await requireTeamOwner(teamId, userId)
+  const entry = await ProPresenterWaitlistModel.findOne({ teamId, status: 'assigned', assignedFlowNumber: flowNumber })
+  if (!entry || Number(team.subscriptions.get('propresenter')?.meta?.flowNumber) !== flowNumber)
+    throw new Error('У команды нет назначенных мест в этом потоке')
+  await requireStream(flowNumber)
+  const used = await ProPresenterDeviceModel.countDocuments({ teamId, flowNumber, status: 'active' })
+  if (used >= (entry.deviceCount || 1)) throw new Error('Все места команды уже назначены')
+  return ProPresenterDeviceModel.create({ name: normalizeName(rawName), teamId, flowNumber, createdBy: userId, status: 'active' })
+}
+
+export async function reduceReservedSeats(teamId: string, userId: number, flowNumber: number, count: number) {
+  await requireTeamOwner(teamId, userId)
+  const entry = await ProPresenterWaitlistModel.findOne({ teamId, status: 'assigned', assignedFlowNumber: flowNumber })
+  if (!entry) throw new Error('Назначенные места не найдены')
+  if (!Number.isSafeInteger(count) || count < 1 || count >= (entry.deviceCount || 1))
+    throw new Error(`Укажите число от 1 до ${(entry.deviceCount || 1) - 1}`)
+  const used = await ProPresenterDeviceModel.countDocuments({ teamId, flowNumber, status: 'active' })
+  if (used > count) throw new Error(`Сначала освободите ${used - count} устройств`)
+  entry.deviceCount = count
+  await entry.save()
+  return entry
+}
+
 export async function availableDeviceFlows(exclude?: number) {
   const streams = await ProPresenterStreamModel.find({ status: 'active', ...(exclude ? { flowNumber: { $ne: exclude } } : {}) }).sort({ flowNumber: 1 })
   const counts = await Promise.all(streams.map((stream) => ProPresenterDeviceModel.countDocuments({ flowNumber: stream.flowNumber, status: 'active' })))
-  return streams.filter((stream, index) => !stream.capacity || counts[index] < stream.capacity)
+  const reservations = await Promise.all(streams.map((stream) => ProPresenterWaitlistModel.find({ status: 'assigned', assignedFlowNumber: stream.flowNumber })))
+  const extraCounts = await Promise.all(streams.map((stream, index) => reservations[index].length
+    ? ProPresenterDeviceModel.countDocuments({ flowNumber: stream.flowNumber, status: 'active', teamId: { $nin: reservations[index].map((entry) => entry.teamId) } })
+    : Promise.resolve(0)))
+  return streams.filter((stream, index) => !stream.capacity || (counts[index] < stream.capacity &&
+    reservations[index].reduce((total, entry) => total + (entry.deviceCount || 1), 0) + extraCounts[index] < stream.capacity))
 }
 
 export async function createDeviceRequest(input: {
