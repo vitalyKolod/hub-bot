@@ -141,7 +141,7 @@ test('user card includes contact, create and delete actions in the expected orde
   const targetId = 6457509398
   const team = {
     _id: { toString: () => '507f1f77bcf86cd799439011' },
-    name: 'Спасение',
+    name: 'Спасение (2.0)',
     ownerId: targetId,
   }
   t.mock.method(UserModel as any, 'findOne', async () => ({
@@ -150,26 +150,29 @@ test('user card includes contact, create and delete actions in the expected orde
     username: null,
     city: null,
     church: null,
-    reg: 'none',
+    reg: 'in_progress',
   }))
   t.mock.method(TeamModel as any, 'find', async () => [team])
 
   const { ctx, edits } = callbackContext(111, apCb('u', targetId))
   assert.equal(await handleAdminPanelCallback(ctx, ctx.callbackQuery.data), true)
   assert.equal(edits.length, 1)
+  assert.equal(edits[0].options.parse_mode, 'MarkdownV2')
+  assert.match(edits[0].text, /in\\_progress/)
+  assert.match(edits[0].text, /Спасение \\\(2\\\.0\\\)/)
 
   const buttons = keyboardButtons(edits[0])
   const labels = buttons.map((button) => button.text)
   assert.equal(buttons.some((button) => button.text === '💬 Написать пользователю'), false)
   assert.equal(buttons.find((button) => button.text === '👤 Открыть Telegram-профиль')?.url, `tg://user?id=${targetId}`)
-  assert.ok(labels.indexOf('👥 Спасение') < labels.indexOf('➕ Создать команду'))
+  assert.ok(labels.indexOf('👥 Спасение (2.0)') < labels.indexOf('➕ Создать команду'))
   const yandexButton: any = buttons.find((button) => button.text === '➕ Добавить Яндекс 360')
   assert.equal(yandexButton?.callback_data, `y360:user:${targetId}`)
   assert.equal(yandexButton?.icon_custom_emoji_id, '5310051278464778081')
   assert.ok(labels.indexOf('➕ Создать команду') < labels.indexOf('➕ Добавить в команду'))
   assert.ok(labels.indexOf('🗑 Удалить юзера') < labels.indexOf('‹ К списку'))
   assert.equal(
-    buttons.find((button) => button.text === '👥 Спасение')?.callback_data,
+    buttons.find((button) => button.text === '👥 Спасение (2.0)')?.callback_data,
     'ap:t:507f1f77bcf86cd799439011'
   )
 })

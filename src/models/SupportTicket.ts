@@ -3,7 +3,7 @@ import mongoose from 'mongoose'
 const supportTicketSchema = new mongoose.Schema(
   {
     metadata: {
-      category: { type: String, enum: ['payment', 'subscription', 'team', 'propresenter', 'hub', 'other'] },
+      category: { type: String, enum: ['payment', 'subscription', 'team', 'propresenter', 'yandex360', 'hub', 'other'] },
       subcategory: String,
       source: { type: String, enum: ['support_menu', 'payment_rejection'] },
       paymentId: String,

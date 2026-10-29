@@ -49,6 +49,15 @@ test('support includes Yandex 360 without creating a ticket', async t => {
   assert.deepEqual(switches, [[{ userId: 10, userActive: true }, { $set: { userActive: false } }]])
 })
 
+test('Yandex 360 support context is valid for a ticket', async () => {
+  const ticket = new SupportTicketModel({
+    userId: 10,
+    threadId: 7,
+    metadata: { source: 'support_menu', category: 'yandex360', subcategory: 'access' },
+  })
+  assert.equal(ticket.validateSync(), undefined)
+})
+
 for (const [category, expected] of [['payment', 'Оплата отклонена'], ['subscription', 'Нет доступа'], ['propresenter', 'Проблема с потоком'], ['hub', 'Бот работает неправильно']]) {
   test(`${category} shows its issues and back returns to categories`, async t => {
     const { ctx, click, last, draft } = context(t)
@@ -230,8 +239,50 @@ function mockTicketStorage(t: any) {
     copyMessage: async (...args: any[]) => { copies.push(args); return { message_id: 100 } },
     closeForumTopic: async () => {},
   }
-  return { api, sent, copies, stored: () => stored }
+  return { api, sent, copies, stored: () => stored, setStored: (value: any) => { stored = value } }
 }
+
+test('failed support card does not leave an open ticket that blocks retries', async t => {
+  const { api, stored, setStored } = mockTicketStorage(t)
+  let removed = false
+  t.mock.method(SupportTicketModel as any, 'deleteOne', async () => { removed = true; setStored(null); return { deletedCount: 1 } })
+  api.sendMessage = async () => { throw new Error('Bad Request: card failed') }
+  await assert.rejects(createSupportTicketForUser(api, 10), /card failed/)
+  assert.equal(removed, true)
+  assert.equal(stored(), null)
+  api.sendMessage = async () => ({ message_id: 99 })
+  await createSupportTicketForUser(api, 10)
+  assert.ok(stored())
+})
+
+test('an old unfinished support ticket is replaced on the next attempt', async t => {
+  const { api, setStored, stored } = mockTicketStorage(t)
+  setStored({ _id: id, id, userId: 10, threadId: 5, cardMessageId: null })
+  t.mock.method(SupportTicketModel as any, 'deleteOne', async () => { setStored(null); return { deletedCount: 1 } })
+  const ticket = await createSupportTicketForUser(api, 10)
+  assert.equal(ticket.threadId, 7)
+  assert.equal(stored()?.cardMessageId, 99)
+})
+
+test('closed support topic is reopened and the user message is retried once', async t => {
+  const { api } = mockTicketStorage(t)
+  const ticket = await createSupportTicketForUser(api, 10)
+  let attempts = 0
+  let reopened = 0
+  api.copyMessage = async () => {
+    attempts++
+    if (attempts === 1) throw new Error('Bad Request: TOPIC_CLOSED')
+    return { message_id: 100 }
+  }
+  api.reopenForumTopic = async (_chatId: number, threadId: number) => {
+    assert.equal(threadId, ticket.threadId)
+    reopened++
+  }
+  const ctx: any = { api, chat: { id: 10 }, from: { id: 10 }, message: { message_id: 4, text: 'Вопрос' }, session: {} }
+  await sendUserMessageToSupport(ctx, 10)
+  assert.equal(attempts, 2)
+  assert.equal(reopened, 1)
+})
 
 for (const metadata of [
   { source: 'payment_rejection', category: 'payment', subcategory: 'payment_rejected', paymentId: id },

@@ -95,6 +95,7 @@ type RenderOptions = {
   targetMessage?: MessageTarget
   replaceOnFailure?: boolean
   forceNew?: boolean
+  parseMode?: 'Markdown' | 'MarkdownV2'
 }
 
 function getSession(ctx: Context): any {
@@ -190,7 +191,7 @@ async function render(
   const text = typeof content === 'string' ? content : content.text
 
   if (typeof content === 'string') {
-    if (markdown) opts.parse_mode = 'Markdown'
+    if (markdown) opts.parse_mode = options.parseMode || 'Markdown'
   } else {
     opts.entities = content.entities
   }
@@ -661,7 +662,7 @@ async function showUserCard(
     `Username: ${user.username ? '@' + escapeMd(user.username) : '—'}\n` +
     `Город: ${escapeMd(user.city || '—')}\n` +
     `Церковь: ${escapeMd(user.church || '—')}\n` +
-    `Регистрация: ${user.reg}\n\n` +
+    `Регистрация: ${escapeMd(user.reg)}\n\n` +
     `*Команды:*\n${teamsText}`
 
   const kb = new InlineKeyboard()
@@ -690,7 +691,7 @@ async function showUserCard(
   kb.text('🗑 Удалить юзера', apCb('u', telegramId, 'del')).row()
   kb.text('‹ К списку', apCb('ul', 0))
 
-  await render(ctx, text, kb, true, renderOptions)
+  await render(ctx, text, kb, true, { ...renderOptions, parseMode: 'MarkdownV2' })
 }
 
 /** Открывает карточку пользователя новым сообщением — используется из топика поддержки. */
