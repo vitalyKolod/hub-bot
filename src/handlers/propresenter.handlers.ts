@@ -3,7 +3,6 @@ import { FormattedString } from '@grammyjs/parse-mode'
 import { goTo } from '../state/ui.js'
 import { renderScreen } from '../core/render.js'
 import { packCb } from '../core/callback.js'
-import { escapeUnderscore } from '../utils/escape.js'
 import { getOrCreateUser } from '../services/user.service.js'
 import { getActiveProPresenterFlowNumber, getTeamById } from '../services/team.service.js'
 import {
@@ -103,31 +102,25 @@ export async function handlePropConfirmStream(ctx: MyContext, userId: number, pa
     return
   }
 
-  const adminText = `
-📡 *ЗАЯВКА НА ПРОВЕРКУ ПОТОКА*
-━━━━━━━━━━━━━━
-
-Команда заявляет, что состоит в *Потоке №${flowNumber}*.
-
-👤 *Владелец:* ${owner.fio || 'не указано'}
-😎 *Юзернейм:* ${owner.username ? '@' + escapeUnderscore(owner.username) : 'не указано'}
-🆔 *ID:* \`${userId}\`
-👥 *Команда:* ${escapeUnderscore(team.name)}
-🆔 *Team ID:* \`${teamId}\`
-
-\`FLOW_NUMBER:${flowNumber}\`
-
-━━━━━━━━━━━━━━
-Проверь, действительно ли эта команда состоит в потоке!
-`.trim()
+  const adminNotice = new FormattedString('')
+    .plain('📡 ').bold('ЗАЯВКА НА ПРОВЕРКУ ПОТОКА')
+    .plain('\n━━━━━━━━━━━━━━\n\nКоманда заявляет, что состоит в ')
+    .bold(`Потоке №${flowNumber}`)
+    .plain('.\n\n👤 ').bold('Владелец:').plain(` ${owner.fio || 'не указано'}`)
+    .plain('\n😎 ').bold('Юзернейм:').plain(` ${owner.username ? '@' + owner.username.replace(/^@/, '') : 'не указано'}`)
+    .plain('\n🆔 ').bold('ID:').plain(' ').code(String(userId))
+    .plain('\n👥 ').bold('Команда:').plain(` ${team.name}`)
+    .plain('\n🆔 ').bold('Team ID:').plain(' ').code(teamId)
+    .plain('\n\n').code(`FLOW_NUMBER:${flowNumber}`)
+    .plain('\n\n━━━━━━━━━━━━━━\nПроверь, действительно ли эта команда состоит в потоке!')
 
   const kb = new InlineKeyboard()
     .text('✅ Подтвердить', packCb({ a: 'prop_verify_accept', p: `${teamId}:${flowNumber}` }))
     .text('❌ Отклонить', packCb({ a: 'prop_verify_reject', p: teamId }))
     .row().url('👤 Открыть Telegram-профиль', `tg://user?id=${userId}`)
 
-  await ctx.api.sendMessage(ADMIN_GROUP_ID, adminText, {
-    parse_mode: 'Markdown',
+  await ctx.api.sendMessage(ADMIN_GROUP_ID, adminNotice.text, {
+    entities: adminNotice.entities,
     message_thread_id: PROP_STREAM_VERIFY_THREAD_ID,
     reply_markup: kb,
   })
