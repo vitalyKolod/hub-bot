@@ -264,13 +264,18 @@ export async function createSupportTicketForUser(
   telegramProfile?: { username?: string },
   metadata?: SupportMetadata
 ) {
-  const existing = await getOpenSupportTicket(userId)
-  if (existing) {
-    await syncSupportConversation(existing)
-    return applySupportContext(api, existing, metadata)
-  }
   const inflight = ticketCreationLocks.get(userId)
   if (inflight) return applySupportContext(api, await inflight, metadata)
+  const existing = await getOpenSupportTicket(userId)
+  if (existing) {
+    if (existing.cardMessageId) {
+      await syncSupportConversation(existing)
+      return applySupportContext(api, existing, metadata)
+    }
+    // An earlier card send may have failed after the ticket was inserted.
+    // Its forum topic was closed, so keeping this open ticket blocks every retry.
+    await SupportTicketModel.deleteOne({ _id: existing._id, status: 'open', cardMessageId: null })
+  }
 
   const creation = (async () => {
     const rechecked = await getOpenSupportTicket(userId)
@@ -289,8 +294,9 @@ export async function createSupportTicketForUser(
       SUPPORT_GROUP_ID,
       `🆘 ${(profile.fio || username).slice(0, 70)}`
     )
+    let ticket: any
     try {
-      const ticket = await SupportTicketModel.create({
+      ticket = await SupportTicketModel.create({
         userId,
         threadId: topic.message_thread_id,
         lastActivityAt: new Date(),
@@ -333,6 +339,11 @@ export async function createSupportTicketForUser(
       return ticket
     } catch (error: any) {
       await api.closeForumTopic(SUPPORT_GROUP_ID, topic.message_thread_id).catch(() => {})
+      if (ticket) {
+        await SupportTicketModel.deleteOne({ _id: ticket._id, cardMessageId: null }).catch((cleanupError) =>
+          console.error('Не удалось удалить незавершённое обращение:', cleanupError)
+        )
+      }
       if (error?.code === 11000) {
         const winner = await getOpenSupportTicket(userId)
         if (winner) return applySupportContext(api, winner, metadata)
@@ -354,7 +365,15 @@ export async function createSupportTicket(ctx: Context, userId: number) {
 
 export async function sendUserMessageToSupport(ctx: Context, userId: number) {
   const ticket = await createSupportTicket(ctx, userId)
-  const delivered = await copyConversationMessage(ctx, SUPPORT_GROUP_ID, ticket.threadId)
+  let delivered: Awaited<ReturnType<typeof copyConversationMessage>>
+  try {
+    delivered = await copyConversationMessage(ctx, SUPPORT_GROUP_ID, ticket.threadId)
+  } catch (error) {
+    const description = String((error as any)?.description || (error as any)?.message || '')
+    if (!/topic.*closed|message thread is closed/i.test(description)) throw error
+    await ctx.api.reopenForumTopic(SUPPORT_GROUP_ID, ticket.threadId)
+    delivered = await copyConversationMessage(ctx, SUPPORT_GROUP_ID, ticket.threadId)
+  }
   const payload = messagePayload(ctx)
   await saveSupportMessage({
     ticketId: ticket.id,

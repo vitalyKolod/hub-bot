@@ -3,6 +3,7 @@ import { handleTutorialAdminMessage } from './handlers/tutorialAdmin.handlers.js
 import { bindKnownUser } from './services/yandex360.service.js'
 import { handleProductJoinRequest, handleProductMemberJoined } from './services/groupJoinAccess.service.js'
 import { markSupportUiOpened, markSupportUiClosed } from './ui/supportUi.js'
+import { telegramDeliveryFallback } from './utils/telegramDeliveryFallback.js'
 import { startSupportFlow, handleSupportFlowCallback, guardSupportSelection } from './handlers/supportFlow.handlers.js'
 import { PROP_FLOWS } from './data/ProPresenterFLows.js'
 import { Bot, InlineKeyboard, session, type Context, type SessionFlavor } from 'grammy'
@@ -426,6 +427,7 @@ async function handleBroadcastCallback(ctx: MyContext, data: string) {
 }
 
 export function registerHandlers(bot: Bot<MyContext>) {
+  bot.api.config.use(telegramDeliveryFallback)
   auditLogService.setTelegramApi(bot.api)
   initScreens()
 
