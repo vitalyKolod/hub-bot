@@ -14,7 +14,7 @@ try {
     const existing = await model.collection.listIndexes().toArray().catch((error: any) => { if (error.code === 26) return []; throw error })
     for (const [key, options] of model.schema.indexes().filter(([, options]) => options.unique)) {
       const matching = existing.find(index => isDeepStrictEqual(index.key, key))
-      const valid = matching?.unique && isDeepStrictEqual(matching.partialFilterExpression || {}, options.partialFilterExpression || {})
+      const valid = existing.some(index => isDeepStrictEqual(index.key, key) && index.unique && isDeepStrictEqual(index.partialFilterExpression || {}, options.partialFilterExpression || {}))
       if (!valid) { issues++; console.log(`${model.collection.name}: ${JSON.stringify(key)} ${matching ? 'conflicting or non-unique index' : 'missing unique index'}`) }
     }
   }

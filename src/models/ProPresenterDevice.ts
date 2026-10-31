@@ -28,10 +28,12 @@ const requestSchema = new mongoose.Schema({
 }, { timestamps: true })
 
 requestSchema.index({ deviceId: 1 }, {
+  name: 'deviceId_unique_pending',
   unique: true,
   partialFilterExpression: { status: 'pending', deviceId: { $type: 'string' } },
 })
 requestSchema.index({ replacesDeviceId: 1 }, {
+  name: 'replacesDeviceId_unique_pending',
   unique: true,
   partialFilterExpression: { status: 'pending', replacesDeviceId: { $type: 'string' } },
 })

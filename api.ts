@@ -1,13 +1,13 @@
 import 'dotenv/config'
 import { connectDB } from './db.js'
 import { startApiServer } from './src/api/server.js'
+import { initializeApiIndexes } from './src/api/indexes.js'
 
 async function start() {
   const botToken = process.env.BOT_TOKEN
   if (!botToken) throw new Error('BOT_TOKEN не задан')
-  await connectDB()
-  const { default: mongoose } = await import('mongoose')
-  await Promise.all(Object.values(mongoose.models).map(model => model.init()))
+  await connectDB({ autoIndex: false, autoCreate: false })
+  await initializeApiIndexes()
   const server = startApiServer({
     botToken,
     port: Number(process.env.API_PORT || 3001),

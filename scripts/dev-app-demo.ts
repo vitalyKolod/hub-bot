@@ -11,6 +11,7 @@ const web = spawn(
     env: {
       ...process.env,
       NEXT_PUBLIC_ALLOW_DEV_AUTH: "true",
+      NEXT_PUBLIC_HUB_DEMO: "true",
       NEXT_PUBLIC_DEV_AUTH_USER_ID: "1001",
       API_PROXY_TARGET: `http://127.0.0.1:${apiPort}`,
     },

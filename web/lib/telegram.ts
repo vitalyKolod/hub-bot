@@ -39,7 +39,8 @@ export function authHeader() {
     return `tma ${initData}`
   }
   if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ALLOW_DEV_AUTH === 'true' && process.env.NEXT_PUBLIC_DEV_AUTH_USER_ID) {
-    return `dev ${sessionStorage.getItem('hub-demo-user') || process.env.NEXT_PUBLIC_DEV_AUTH_USER_ID}`
+    const demoUser = process.env.NEXT_PUBLIC_HUB_DEMO === 'true' ? sessionStorage.getItem('hub-demo-user') : null
+    return `dev ${demoUser || process.env.NEXT_PUBLIC_DEV_AUTH_USER_ID}`
   }
   const diagnostics = telegramDiagnostics()
   console.error('[HUB auth] Telegram initData is missing', diagnostics)

@@ -12,6 +12,30 @@ test('MongoDB + HTTP: Telegram/web shared state, RBAC, checkout, approvals, supp
   try {
     const { TeamModel } = await import('../src/models/Team.js')
     const { PaymentModel } = await import('../src/models/Payment.js')
+    const { SupportTicketModel } = await import('../src/models/SupportTicket.js')
+    const { ProPresenterDeviceRequestModel } = await import('../src/models/ProPresenterDevice.js')
+    // Existing develop databases retain ordinary indexes with the old default names.
+    // New partial unique indexes must coexist without dropping those old indexes.
+    for (const [model, key, name, legacyName] of [
+      [PaymentModel, { cartItemId: 1 }, 'cartItemId_unique_string', 'cartItemId_1'],
+      [SupportTicketModel, { userId: 1 }, 'userId_unique_open', 'userId_1'],
+      [ProPresenterDeviceRequestModel, { deviceId: 1 }, 'deviceId_unique_pending', 'deviceId_1'],
+      [ProPresenterDeviceRequestModel, { replacesDeviceId: 1 }, 'replacesDeviceId_unique_pending', 'replacesDeviceId_1'],
+    ] as const) {
+      await model.collection.dropIndex(name)
+      await model.collection.createIndex(key, { name: legacyName })
+      await model.createIndexes()
+      const indexes = await model.collection.listIndexes().toArray()
+      assert.ok(indexes.some(index => index.name === legacyName && !index.unique))
+      assert.ok(indexes.some(index => index.name === name && index.unique))
+    }
+    // A database previously initialized with the old unique index name also works.
+    await PaymentModel.collection.dropIndex('cartItemId_unique_string')
+    await PaymentModel.collection.dropIndex('cartItemId_1')
+    await PaymentModel.collection.createIndex({ cartItemId: 1 }, { name: 'cartItemId_1', unique: true, partialFilterExpression: { cartItemId: { $type: 'string' } } })
+    const { initializeApiIndexes } = await import('../src/api/indexes.js')
+    await initializeApiIndexes()
+    assert.ok((await PaymentModel.collection.listIndexes().toArray()).some(index => index.name === 'cartItemId_1' && index.unique))
     const { ApiNotificationModel } = await import('../src/models/ApiNotification.js')
     const { attemptNotification } = await import('../src/api/notifications.js')
     assert.equal((await request('/ready')).status, 200)

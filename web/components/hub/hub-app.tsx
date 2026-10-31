@@ -134,12 +134,12 @@ function Content() {
       {process.env.NODE_ENV === "development" &&
         process.env.NEXT_PUBLIC_ALLOW_DEV_AUTH === "true" && (
           <div className="demo-banner">
-            <span>Демо · временная база · без реальных отправок</span>
-            <button
+            <span>{process.env.NEXT_PUBLIC_HUB_DEMO === 'true' ? 'Демо · временная база · без реальных отправок' : 'Develop · данные и отправки тестового бота'}</span>
+            {process.env.NEXT_PUBLIC_HUB_DEMO === 'true' && <button
               onClick={() => hub.switchDemo(hub.isAdmin ? "1001" : "9001")}
             >
               {hub.isAdmin ? "Открыть как пользователь" : "Открыть как админ"}
-            </button>
+            </button>}
           </div>
         )}
       {hub.connectionError && !hub.error && (

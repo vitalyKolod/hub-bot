@@ -51,7 +51,7 @@ paymentSchema.index(
 )
 paymentSchema.index(
   { cartItemId: 1 },
-  { unique: true, partialFilterExpression: { cartItemId: { $type: 'string' } } }
+  { name: 'cartItemId_unique_string', unique: true, partialFilterExpression: { cartItemId: { $type: 'string' } } }
 )
 
 export const PaymentModel = mongoose.model('Payment', paymentSchema)

@@ -6,8 +6,8 @@
   "scripts": {
     "start": "tsx index.ts",
     "start:api": "tsx api.ts",
-    "dev": "nodemon --exec npx tsx index.ts",
-    "dev:api": "nodemon --exec npx tsx api.ts",
+    "dev": "nodemon --watch index.ts --watch db.ts --watch src --ext ts,json --exec npx tsx index.ts",
+    "dev:api": "nodemon --watch api.ts --watch db.ts --watch src --ext ts,json --exec npx tsx api.ts",
     "dev:stack": "node scripts/dev-stack.mjs",
     "build": "tsc --noEmit --noCheck",
     "typecheck:api": "tsc -p tsconfig.api.json",
@@ -15,7 +15,10 @@
     "dev:api:demo": "tsx scripts/dev-api-demo.ts",
     "test:api:integration": "node --import tsx --test test/api.integration.ts",
     "check:api:indexes": "tsx scripts/check-api-indexes.ts",
-    "dev:app:demo": "tsx scripts/dev-app-demo.ts"
+    "dev:app:demo": "tsx scripts/dev-app-demo.ts",
+    "dev:web": "node scripts/dev-web.mjs",
+    "setup:local": "npm ci && npm --prefix web ci",
+    "dev:web:demo": "tsx scripts/dev-app-demo.ts"
   },
   "keywords": [],
   "author": "",

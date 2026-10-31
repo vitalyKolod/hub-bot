@@ -29,7 +29,7 @@ supportTicketSchema.index({ userId: 1, status: 1 })
 supportTicketSchema.index({ status: 1, lastActivityAt: 1 })
 supportTicketSchema.index(
   { userId: 1 },
-  { unique: true, partialFilterExpression: { status: 'open' } }
+  { name: 'userId_unique_open', unique: true, partialFilterExpression: { status: 'open' } }
 )
 
 export const SupportTicketModel = mongoose.model('SupportTicket', supportTicketSchema)
