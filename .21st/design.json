@@ -1,0 +1,14 @@
+{
+  "decisions": {
+    "miniApp": {
+      "direction": "Dark mobile app with floating five-tab navigation",
+      "background": "#0A0A0D",
+      "surface": "#131318",
+      "action": "#FF6A1F",
+      "active": "#34D399",
+      "bodyFont": "Manrope",
+      "displayFont": "Unbounded",
+      "productMedia": "Preserve existing product images"
+    }
+  }
+}
