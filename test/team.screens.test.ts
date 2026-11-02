@@ -72,6 +72,35 @@ test('ProPresenter and content details keep chats and purchases in their own scr
   assert.ok(buttons(content).some((button: any) => button.text === '◀️ НАЗАД'))
 })
 
+test('ProPresenter profile reads updated stream details before devices are assigned', async (t) => {
+  const team = setup(t)
+  team.subscriptions.get('propresenter').meta = {
+    flowNumber: 2,
+    email: 'old@example.com',
+    password: 'old-password',
+    chatLink: 'https://t.me/old-chat',
+  }
+  ;(ProPresenterDeviceModel.find as any).mock.mockImplementation(() => ({ sort: async () => [] }))
+  const streamQueries: any[] = []
+  ;(ProPresenterStreamModel.find as any).mock.mockImplementation(async (query: any) => {
+    streamQueries.push(query)
+    return [{
+      flowNumber: 2,
+      email: 'new@example.com',
+      password: 'new-password',
+      chatLink: 'https://t.me/new-chat',
+      expiresAt: new Date(Date.now() + 40 * 86_400_000),
+    }]
+  })
+
+  const screen = await teamProPresenterScreen(10, teamId)
+  assert.deepEqual(streamQueries, [{ flowNumber: { $in: [2] } }])
+  assert.match(screen.caption, /Логин: new@example.com/)
+  assert.match(screen.caption, /Пароль: new-password/)
+  assert.doesNotMatch(screen.caption, /old@example.com|old-password/)
+  assert.equal(buttons(screen).find((button: any) => button.text === 'Чат потока №2')?.url, 'https://t.me/new-chat')
+})
+
 test('active subscription keeps a chat button before joining the Telegram chat', async (t) => {
   setup(t)
   const product = getProduct('procontent')!
