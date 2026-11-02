@@ -6,9 +6,12 @@
       "surface": "#131318",
       "action": "#FF6A1F",
       "active": "#34D399",
-      "bodyFont": "Manrope",
+      "bodyFont": "Onest",
       "displayFont": "Unbounded",
-      "productMedia": "Preserve existing product images"
+      "productMedia": "Square product icons",
+      "subscriptionLayout": "Expandable teams with product tiles",
+      "cart": "Team cart shared with Telegram bot",
+      "motion": "Subtle card and expand transitions with reduced-motion fallback"
     }
   }
 }

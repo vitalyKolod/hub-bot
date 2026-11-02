@@ -1,9 +1,10 @@
 import http from 'node:http'
 import { Api } from 'grammy'
-import { PRODUCTS } from '../config/products.js'
+import { getProduct, PRODUCTS } from '../config/products.js'
 import { SUPPORT_GROUP_ID } from '../config/env.js'
 import { UserModel } from '../models/User.js'
-import { getTeamById, getUserTeams } from '../services/team.service.js'
+import { getTeamById, getUserTeams, isTeamProductPurchaseLocked } from '../services/team.service.js'
+import { addToCart, getOrCreateCart, getPendingItems, removeFromCart } from '../services/cart.service.js'
 import { acceptPayment, getPayment, listPayments, rejectPayment } from '../services/payment.service.js'
 import { createSupportTicketForUser, getSupportTicketWithMessages, listAllSupportTickets, listSupportTicketsForUser, saveSupportMessage } from '../services/support.service.js'
 import {
@@ -14,7 +15,7 @@ import {
 import { requireAdminUser } from './auth/admin.js'
 import { isTeamMember } from './auth/teamAccess.js'
 import { methodNotAllowed, readJson, routePath, sendJson } from './http.js'
-import { serializePayment, serializeSupportMessage, serializeSupportTicket, serializeTeam, serializeUser } from './serializers.js'
+import { serializeCart, serializePayment, serializeSupportMessage, serializeSupportTicket, serializeTeam, serializeUser } from './serializers.js'
 import { deliverAcceptedPayment, deliverRejectedPayment } from '../adapters/telegram/paymentDelivery.js'
 
 export type ApiServerOptions = {
@@ -66,6 +67,44 @@ export function createApiServer(options: ApiServerOptions) {
       const adminSupportMatch = path.match(/^\/api\/admin\/support\/([a-f\d]{24})$/i)
       const adminSupportMessagesMatch = path.match(/^\/api\/admin\/support\/([a-f\d]{24})\/messages$/i)
       const teamMatch = path.match(/^\/api\/teams\/([a-f\d]{24})$/i)
+      const cartMatch = path.match(/^\/api\/teams\/([a-f\d]{24})\/cart$/i)
+      const cartItemsMatch = path.match(/^\/api\/teams\/([a-f\d]{24})\/cart\/items$/i)
+      const cartItemMatch = path.match(/^\/api\/teams\/([a-f\d]{24})\/cart\/items\/([a-f\d]{24})$/i)
+
+      if (cartMatch || cartItemsMatch || cartItemMatch) {
+        const teamId = (cartMatch || cartItemsMatch || cartItemMatch)![1]
+        const team = await getTeamById(teamId)
+        if (!team || !isTeamMember(team, session.user.id)) {
+          return sendJson(response, 404, { error: { code: 'NOT_FOUND', message: 'Team not found' } })
+        }
+        if (cartMatch && request.method === 'GET') {
+          return sendJson(response, 200, { data: serializeCart(await getOrCreateCart(teamId)) })
+        }
+        if (team.ownerId !== session.user.id) {
+          return sendJson(response, 403, { error: { code: 'OWNER_REQUIRED', message: 'Only the team owner can change the cart' } })
+        }
+        if (cartItemsMatch && request.method === 'POST') {
+          const body = await readJson(request)
+          const productId = typeof body.productId === 'string' ? body.productId : ''
+          if (!getProduct(productId)?.cartable) {
+            return sendJson(response, 422, { error: { code: 'INVALID_PRODUCT', message: 'Product cannot be added to the cart' } })
+          }
+          if (await isTeamProductPurchaseLocked(teamId, productId)) {
+            return sendJson(response, 409, { error: { code: 'ALREADY_PAID', message: 'Product is already paid for' } })
+          }
+          await addToCart(teamId, productId)
+          return sendJson(response, 200, { data: serializeCart(await getOrCreateCart(teamId)) })
+        }
+        if (cartItemMatch && request.method === 'DELETE') {
+          const cart = await getOrCreateCart(teamId)
+          if (!getPendingItems(cart).some((item: any) => item._id.toString() === cartItemMatch[2])) {
+            return sendJson(response, 404, { error: { code: 'NOT_FOUND', message: 'Cart item not found' } })
+          }
+          await removeFromCart(teamId, cartItemMatch[2])
+          return sendJson(response, 200, { data: serializeCart(await getOrCreateCart(teamId)) })
+        }
+        return methodNotAllowed(response, cartMatch ? ['GET'] : cartItemsMatch ? ['POST'] : ['DELETE'])
+      }
 
       if (path === '/api/support/conversations' && request.method === 'GET') {
         const tickets = await listSupportTicketsForUser(session.user.id)
