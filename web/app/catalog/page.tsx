@@ -39,8 +39,10 @@ export default function CatalogPage(){
     {ownerTeams.length>0?<label className="mb-5 block rounded-[16px] border border-white/[.09] bg-[#131318] px-3.5 py-2.5"><span className="muted block text-[10px] font-bold uppercase tracking-wider">Покупка для команды</span><select value={team?.id||''} onChange={event=>setSelectedTeamId(event.target.value)} className="mt-1 min-h-8 w-full bg-transparent text-[13px] font-bold text-white focus:outline-none">{ownerTeams.map(item=><option key={item.id} value={item.id} className="bg-[#131318]">{item.name}</option>)}</select></label>:<p className="muted mb-5 text-xs">Добавлять товары в корзину может владелец команды.</p>}
     <div className="hide-scrollbar -mx-1 mb-5 flex gap-2 overflow-x-auto px-1 pb-1">{filters.map(([id,label])=><button key={id} type="button" onClick={()=>{setFilter(id);haptic()}} aria-pressed={filter===id} className={`min-h-10 shrink-0 rounded-full border px-4 text-xs font-bold transition-colors ${filter===id?'border-white bg-white text-[#111115]':'border-[#303038] bg-[#17171c] text-[#e7e7eb]'}`}>{label}</button>)}</div>
     {products?.length?<div className="grid grid-cols-2 gap-2.5">{products.map(product=>{
-      const connected=team?team.subscriptions.some(subscription=>subscription.productId===product.id&&subscription.status==='active'):product.active
-      return <ProductCard key={product.id} product={product} connected={connected} inCart={pendingItems.some(item=>item.productId===product.id)} teamId={team?.id} adding={add.isPending&&add.variables?.productId===product.id} onAdd={()=>{if(team)add.mutate({teamId:team.id,productId:product.id})}}/>
+      const activeSubscription=team?.subscriptions.find(subscription=>subscription.productId===product.id&&subscription.status==='active')
+      const connected=Boolean(activeSubscription)||(!team&&product.active)
+      const purchaseLocked=Boolean(product.cartable&&activeSubscription?.daysLeft!==null&&activeSubscription?.daysLeft!==undefined&&activeSubscription.daysLeft>14)
+      return <ProductCard key={product.id} product={product} connected={connected} purchaseLocked={purchaseLocked} inCart={pendingItems.some(item=>item.productId===product.id)} teamId={team?.id} adding={add.isPending&&add.variables?.productId===product.id} onAdd={()=>{if(team)add.mutate({teamId:team.id,productId:product.id})}}/>
     })}</div>:<EmptyState title="Ничего не найдено" description="Попробуйте другой фильтр каталога."/>}
   </main>
 }
