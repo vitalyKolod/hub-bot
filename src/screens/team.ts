@@ -56,7 +56,11 @@ function navigation(kb: InlineKeyboard) {
 }
 async function propData(teamId: string, sub: Subscription) {
   const devices = await listTeamDevices(teamId)
-  const streams = devices.length ? await ProPresenterStreamModel.find({ flowNumber: { $in: [...new Set(devices.map(device => device.flowNumber))] } }) : []
+  const assignedFlow = Number(sub?.meta?.flowNumber)
+  const flowNumbers = devices.length
+    ? [...new Set(devices.map(device => device.flowNumber))]
+    : Number.isSafeInteger(assignedFlow) && assignedFlow > 0 ? [assignedFlow] : []
+  const streams = flowNumbers.length ? await ProPresenterStreamModel.find({ flowNumber: { $in: flowNumbers } }) : []
   const nextExpiry = streams.filter(stream => stream.expiresAt && new Date(stream.expiresAt).getTime() > Date.now()).map(stream => stream.expiresAt!).sort((a, b) => a.getTime() - b.getTime())[0]
   return { devices, streams, nextExpiry: nextExpiry || (active(sub) ? sub?.expiresAt : null) }
 }
