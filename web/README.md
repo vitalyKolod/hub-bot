@@ -1,14 +1,26 @@
 # HUB Mini App
 
-## Local development
+## Локальный запуск
 
-1. Start MongoDB and the API from the repository root: `npm run dev:api`.
-2. Copy `.env.example` to `.env.local`.
-3. For browser-only development set `ALLOW_DEV_AUTH=true` in the root API environment, then set `NEXT_PUBLIC_ALLOW_DEV_AUTH=true` and a registered Telegram ID in `web/.env.local`.
-4. Run `npm run dev` inside `web/`.
+Из основной папки проекта `hub-bot`:
 
-Development auth is rejected by the backend whenever `NODE_ENV=production`. Normal Telegram launches always use signed `Telegram.WebApp.initData`.
+```sh
+npm run setup:local
+npm run dev:web
+```
 
-## Telegram deployment
+Открыть http://localhost:3000 и оставить терминал открытым. API и веб используют существующее develop-окружение из корневого `.env`: `MONGO_URI`, `BOT_TOKEN`, чаты и темы тестового бота. Действия из веба сохраняются в этой же базе, уведомления отправляются настроенным ботом.
 
-Deploy `web/` over HTTPS and proxy `/api/*` to the HUB API. Set `MINI_APP_URL` in the bot environment to the deployed HTTPS URL. `BOT_TOKEN` must only exist in the bot/API environment and must never use a `NEXT_PUBLIC_` prefix.
+Аккаунт выбирается через `WEB_DEV_USER_ID` — числовой Telegram ID пользователя, зарегистрированного в develop-боте. Если он не задан, используется `ADMIN_ID` (либо первый `ADMIN_IDS`). Выбранный аккаунт выводится при запуске; настройки можно поменять и перезапустить веб.
+
+`npm run setup:local` требуется при первом запуске и после изменения зависимостей. Для следующих запусков достаточно `npm run dev:web`. Если порты заняты: `API_PORT=3101 WEB_PORT=3100 npm run dev:web`, затем открыть http://localhost:3100.
+
+Telegram-бот отдельно: `npm run dev` в другом терминале. Уже запущенный бот перезапускать ради веба не нужно. Остановка каждого процесса — Ctrl+C.
+
+Полностью изолированное демо с временной базой и симулятором Telegram: `npm run dev:web:demo`. Переключатель тестовых пользователей доступен только в этом режиме. `npm run dev:app:demo` остаётся его совместимым названием.
+
+## Production
+
+Публикация требует постоянно работающих процессов веба и API, HTTPS и reverse proxy. Веб собирается командой `npm --prefix web run build`, затем запускается `npm --prefix web start`. API запускается `npm run start:api`. Процессами и их перезапуском управляет PM2; development-команды для production не используются.
+
+Адрес приложения задаётся в `MINI_APP_URL` и кнопке Telegram. `BOT_TOKEN` существует только в окружении бота/API и не передаётся браузеру. Боевой вход использует подписанный Telegram initData. Полные инструкции и проверки перед выкладкой: `docs/MOBILE_APP.md` и `docs/WEB_API.md`.
