@@ -1,13 +1,11 @@
-import { isAdmin } from '../../config/admin.js'
+import { getAdminAccess } from '../../services/adminAccess.service.js'
 
 export class AdminRequiredError extends Error {
-  constructor() {
-    super('Administrator access is required')
-    this.name = 'AdminRequiredError'
-  }
+  constructor() { super('Administrator access is required'); this.name = 'AdminRequiredError' }
 }
-
-export function requireAdminUser(telegramId: number): true {
-  if (!isAdmin(telegramId)) throw new AdminRequiredError()
-  return true
+/** Same active roles as Telegram, including database-managed administrators. */
+export async function requireAdminUser(telegramId: number) {
+  const access = await getAdminAccess(telegramId)
+  if (!access) throw new AdminRequiredError()
+  return access
 }
