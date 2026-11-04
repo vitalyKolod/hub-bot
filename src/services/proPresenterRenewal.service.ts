@@ -7,7 +7,6 @@ import { ProPresenterRenewalCampaignModel, ProPresenterRenewalSeatModel } from '
 import { ProPresenterDeviceModel } from '../models/ProPresenterDevice.js'
 import { PaymentModel } from '../models/Payment.js'
 import { adminSetStreamExpiry } from './adminPanel.service.js'
-import { PROPRESENTER_BATCH_SIZE } from './proPresenterWaitlist.service.js'
 
 export const PROP_RENEWAL_STATS_THREAD_ID = Number(process.env.PROP_RENEWAL_STATS_THREAD_ID || 0)
 const ADMIN_GROUP_ID = Number(process.env.ADMIN_GROUP_ID)
@@ -59,7 +58,7 @@ export async function renewalPreview(flowNumber: number) {
   const devices = await ProPresenterDeviceModel.find({ flowNumber, status: 'active' })
   const teams = await TeamModel.find({ _id: { $in: devices.map((device) => device.teamId) } }).sort({ name: 1 })
   const product = getProduct('propresenter')
-  if (!product?.priceRub || !product?.priceUsd) throw new Error('Не настроена стоимость ProPresenter')
+  if (!product?.priceUsd) throw new Error('Не настроена стоимость ProPresenter')
   const existing = await ProPresenterRenewalCampaignModel.findOne({ flowNumber, cycleEndsAt: stream.expiresAt })
   return { stream, teams, devices, product, existing }
 }
@@ -416,8 +415,8 @@ export async function completeRenewal(api: Api, campaignId: string, adminId: num
   if (!stream) throw new Error('Поток не найден')
   await reconcileRenewalDevices(campaign)
   const stats = renewalStats(await ProPresenterRenewalSeatModel.find({ campaignId }))
-  if (stats.total < PROPRESENTER_BATCH_SIZE || stats.paid !== stats.total) {
-    throw new Error(`Нельзя продлить поток: оплачено ${stats.paid}/${stats.total}, нужно подтвердить все места (не менее ${PROPRESENTER_BATCH_SIZE})`)
+  if (stats.total < stream.capacity || stats.paid !== stats.total) {
+    throw new Error(`Нельзя продлить поток: оплачено ${stats.paid}/${stats.total}, нужно подтвердить все места (не менее ${stream.capacity})`)
   }
   if (!campaign.targetEndsAt && stream.expiresAt?.getTime() !== campaign.cycleEndsAt.getTime()) {
     throw new Error('Дата потока изменилась после запуска сбора; проверьте её в карточке потока')

@@ -4,14 +4,14 @@ import { ProPresenterWaitlistModel } from '../src/models/ProPresenterWaitlist.js
 import { ProPresenterStreamModel } from '../src/models/ProPresenterStream.js'
 import { ProPresenterDeviceModel, ProPresenterDeviceRequestModel } from '../src/models/ProPresenterDevice.js'
 import { TeamModel } from '../src/models/Team.js'
-import { addToWaitlist, countRequestedDevices } from '../src/services/proPresenterWaitlist.service.js'
+import { addToWaitlist, countRequestedDevices, requestBatchCapacity } from '../src/services/proPresenterWaitlist.service.js'
 import { assignReservedDevice, reduceReservedSeats } from '../src/services/proPresenterDevice.service.js'
 import { devicesScreen } from '../src/screens/devices.js'
 
 test('one application with two devices moves intact to the next batch when only one seat remains', async (t) => {
   const created: any[] = []
   t.mock.method(ProPresenterWaitlistModel as any, 'find', (filter: any) => {
-    const entries = filter.assignedFlowNumber === 5 ? [{ deviceCount: 19 }] : created
+    const entries = filter.assignedFlowNumber === 5 ? [{ deviceCount: 9 }] : created
     return { sort: async () => [], then: (resolve: any) => Promise.resolve(entries).then(resolve) }
   })
   t.mock.method(ProPresenterWaitlistModel as any, 'findOne', (filter: any) =>
@@ -25,6 +25,8 @@ test('one application with two devices moves intact to the next batch when only 
   assert.equal(result.entry.assignedFlowNumber, 6)
   assert.equal(result.position, 2)
   assert.equal(countRequestedDevices([{ deviceCount: 3 }, {}]), 4)
+  assert.equal(requestBatchCapacity(9), 10)
+  assert.equal(requestBatchCapacity(19), 20)
 })
 
 test('assigned seats appear as separate buttons and an owner can use and reduce them', async (t) => {

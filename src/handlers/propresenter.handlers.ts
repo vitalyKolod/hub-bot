@@ -143,7 +143,7 @@ export async function handlePropNoStreamConfirm(ctx: MyContext, userId: number, 
     await ctx.answerCallbackQuery({ text: 'Сначала укажите количество устройств', show_alert: true })
     return
   }
-  const { entry, position, created } = await addToWaitlist(teamId, userId, draft.deviceCount)
+  const { entry, position, capacity, created } = await addToWaitlist(teamId, userId, draft.deviceCount)
   ctx.session.propWaitlistDraft = undefined
 
   const team = await getTeamById(teamId)
@@ -165,7 +165,7 @@ export async function handlePropNoStreamConfirm(ctx: MyContext, userId: number, 
       .plain(`👥 Команда: ${team?.name || 'неизвестно'}\n`)
       .plain(`🆔 Team ID: ${teamId}\n`)
       .plain(`🖥 Устройств: ${deviceCount}\n\n`)
-      .bold(`Заполнено: ${position}/${PROPRESENTER_BATCH_SIZE}`)
+      .bold(`Заполнено: ${position}/${capacity}`)
     await ctx.api.sendMessage(ADMIN_GROUP_ID, notice.text, {
       entities: notice.entities,
       message_thread_id: PROP_WAITLIST_THREAD_ID,
@@ -177,7 +177,7 @@ export async function handlePropNoStreamConfirm(ctx: MyContext, userId: number, 
         .emoji('🎬', '5251272469175631339')
         .bold(` ProPresenter · будущий поток №${flowNumber}`)
         .plain('\nЗанято мест для устройств: ')
-        .bold(`${position}/${PROPRESENTER_BATCH_SIZE}`)
+        .bold(`${position}/${capacity}`)
       await ctx.api.sendMessage(communityGroupId, communityNotice.text, {
         entities: communityNotice.entities,
         message_thread_id: Number(process.env.HUB_COMMUNITY_PROPRESENTER_THREAD_ID || 2),
@@ -189,7 +189,7 @@ export async function handlePropNoStreamConfirm(ctx: MyContext, userId: number, 
     await ctx.api.sendMessage(
       ADMIN_GROUP_ID,
       `✅ *Поток ProPresenter №${flowNumber} собран!*\n\n` +
-        `Занято ${PROPRESENTER_BATCH_SIZE}/${PROPRESENTER_BATCH_SIZE} мест для устройств. Можно создавать поток.`,
+        `Занято ${capacity}/${capacity} мест для устройств. Можно создавать поток.`,
       {
         parse_mode: 'Markdown',
         message_thread_id: PROP_WAITLIST_THREAD_ID,
@@ -206,7 +206,7 @@ export async function handlePropNoStreamConfirm(ctx: MyContext, userId: number, 
       `${created ? '✅ *Заявка отправлена!*' : 'ℹ️ *Вы уже находитесь в очереди.*'}\n\n` +
       `Будущий поток: *№${flowNumber}*\n` +
       `Устройств: *${deviceCount}*\n` +
-      `Занято мест: *${position} из ${PROPRESENTER_BATCH_SIZE}*\n\n` +
+      `Занято мест: *${position} из ${capacity}*\n\n` +
       'Как только поток будет создан, мы сообщим и выдадим доступ.',
     parse_mode: 'Markdown',
     reply_markup: new InlineKeyboard().text('🏠 Главное меню', packCb({ a: 'home' })),

@@ -41,6 +41,7 @@ import {
   getPendingBatches,
   countRequestedDevices,
   PROPRESENTER_BATCH_SIZE,
+  requestBatchCapacity,
 } from '../services/proPresenterWaitlist.service.js'
 import {
   createTeamForUser,
@@ -322,7 +323,7 @@ export async function showAdminPanelMenu(ctx: Context) {
     .text('Потоки ProPresenter', apCb('streams'))
     .icon(ADMIN_MANAGEMENT_ICONS.streams)
     .text(
-      nextBatch ? `${nextBatch.title} (${nextBatch.count}/20)` : 'Заявки на поток',
+      nextBatch ? `${nextBatch.title} (${nextBatch.count}/${requestBatchCapacity(nextBatch.count)})` : 'Заявки на поток',
       apCb('wait')
     )
     .icon(ADMIN_MANAGEMENT_ICONS.requests)
@@ -476,7 +477,7 @@ async function showWaitlistBatches(ctx: Context) {
   const kb = new InlineKeyboard()
   for (const batch of batches) {
     kb.text(
-      `${batch.title} · ${batch.count}/${PROPRESENTER_BATCH_SIZE}`.slice(0, 60),
+      `${batch.title} · ${batch.count}/${requestBatchCapacity(batch.count)}`.slice(0, 60),
       apCb('wait', batch._id)
     ).row()
   }
@@ -486,6 +487,8 @@ async function showWaitlistBatches(ctx: Context) {
 
 async function showWaitlistBatch(ctx: Context, flowNumber: number) {
   const entries = await getPendingBatch(flowNumber)
+  const count = countRequestedDevices(entries)
+  const capacity = requestBatchCapacity(count)
   const title = await ap.adminGetRequestBatchTitle(flowNumber)
   const canEdit = Boolean(ctx.from && await hasAdminPermission(ctx.from.id, 'requests.edit'))
   const kb = new InlineKeyboard()
@@ -497,14 +500,14 @@ async function showWaitlistBatch(ctx: Context, flowNumber: number) {
     kb.text(label.slice(0, 60), apCb('wt', entry.teamId, flowNumber)).row()
   }
 
-  if (countRequestedDevices(entries) >= PROPRESENTER_BATCH_SIZE) {
+  if (count >= capacity) {
     kb.text(`✅ Поток №${flowNumber} создал`, apCb('wait', flowNumber, 'create')).row()
   }
   if (canEdit) kb.text('✏️ Редактировать', apCb('wait', flowNumber, 'edit')).row()
   kb.text('‹ К заявкам', apCb('wait'))
   const text =
     `📋 ${title}\n\n` +
-    `Заполнено мест: ${countRequestedDevices(entries)}/${PROPRESENTER_BATCH_SIZE}\n` +
+    `Заполнено мест: ${count}/${capacity}\n` +
     (entries.length ? 'Нажми на команду, чтобы открыть её профиль.' : 'Заявок пока нет.')
   await render(ctx, text, kb, false)
 }
@@ -525,8 +528,10 @@ async function promptWaitlistTitle(ctx: Context, flowNumber: number) {
 
 async function startWaitlistStream(ctx: Context, flowNumber: number) {
   const entries = await getPendingBatch(flowNumber)
-  if (countRequestedDevices(entries) < PROPRESENTER_BATCH_SIZE) {
-    throw new Error(`Поток ещё не собран: ${countRequestedDevices(entries)}/${PROPRESENTER_BATCH_SIZE}`)
+  const count = countRequestedDevices(entries)
+  const capacity = requestBatchCapacity(count)
+  if (count < capacity) {
+    throw new Error(`Поток ещё не собран: ${count}/${capacity}`)
   }
   getSession(ctx).adminPanelInput = {
     mode: 'waitlist_stream_new',
@@ -544,7 +549,9 @@ async function startWaitlistStream(ctx: Context, flowNumber: number) {
 
 async function showWaitlistStreamPreview(ctx: Context, flowNumber: number, draft: Record<string, any>) {
   const entries = await getPendingBatch(flowNumber)
-  if (countRequestedDevices(entries) !== PROPRESENTER_BATCH_SIZE) throw new Error('Состав потока изменился. Откройте заявки заново.')
+  const count = countRequestedDevices(entries)
+  const capacity = requestBatchCapacity(count)
+  if (count !== capacity) throw new Error('Состав потока изменился. Откройте заявки заново.')
   getSession(ctx).adminPanelInput = { mode: 'waitlist_stream_new', step: 'preview', flowNumber, draft } as ApInput
   const kb = new InlineKeyboard()
     .text('Логин', apCb('wait', flowNumber, 'field', 'email'))
@@ -553,7 +560,7 @@ async function showWaitlistStreamPreview(ctx: Context, flowNumber: number, draft
     .text('Дата', apCb('wait', flowNumber, 'field', 'expiresAt')).row()
     .text('✅ Опубликовать поток', apCb('wait', flowNumber, 'publish')).row()
     .text('‹ К заявкам', apCb('wait', flowNumber))
-  await render(ctx, `Проверьте поток №${flowNumber}:\n\nУстройств: ${countRequestedDevices(entries)}/${PROPRESENTER_BATCH_SIZE}\nКоманд: ${entries.length}\nЛогин: ${draft.email}\nПароль: ${'•'.repeat(String(draft.password).length)}\nЧат: ${draft.chatLink || 'нет'}\nДата окончания: ${formatDate(draft.expiresAt)}`, kb, false)
+  await render(ctx, `Проверьте поток №${flowNumber}:\n\nУстройств: ${count}/${capacity}\nКоманд: ${entries.length}\nЛогин: ${draft.email}\nПароль: ${'•'.repeat(String(draft.password).length)}\nЧат: ${draft.chatLink || 'нет'}\nДата окончания: ${formatDate(draft.expiresAt)}`, kb, false)
 }
 
 async function publishWaitlistStream(ctx: Context, flowNumber: number, draft: Record<string, any>) {
@@ -578,7 +585,7 @@ async function publishWaitlistStream(ctx: Context, flowNumber: number, draft: Re
     const notice = new FormattedString('')
       .emoji('🎬', '5251272469175631339')
       .bold(` ProPresenter · поток №${stream.flowNumber} открыт`)
-      .plain(`\nМеста для устройств: ${countRequestedDevices(entries)}/${PROPRESENTER_BATCH_SIZE}\n`)
+      .plain(`\nМеста для устройств: ${countRequestedDevices(entries)}/${stream.capacity}\n`)
       .plain(`Доступ до ${formatDate(stream.expiresAt)}. Участники получили данные в боте.`)
     await ctx.api.sendMessage(communityGroupId, notice.text, {
       entities: notice.entities,

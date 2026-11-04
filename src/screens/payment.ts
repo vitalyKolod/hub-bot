@@ -47,13 +47,15 @@ export async function paymentScreen(userId: number, params: any, ctx: any): Prom
 
   const kb = new InlineKeyboard()
 
-  kb.text(
-    'РУБЛИ',
-    packCb({
-      a: 'open',
-      s: 'rub_methods',
-    })
-  ).icon('5213291343232645210')
+  if (amountRub !== null) {
+    kb.text(
+      'РУБЛИ',
+      packCb({
+        a: 'open',
+        s: 'rub_methods',
+      })
+    ).icon('5213291343232645210')
+  }
 
   kb.text(
     'КРИПТА · USDT',
@@ -102,6 +104,8 @@ export async function paymentScreen(userId: number, params: any, ctx: any): Prom
       .plain(' или ')
       .bold(`${amountUsd.toLocaleString('en-US')}$`)
       .plain(' в год')
+  } else if (amountUsd !== null) {
+    order = order.bold(`от ${amountUsd.toLocaleString('en-US')}$ за устройство в год`)
   } else {
     order = order.bold('по договорённости')
   }
