@@ -1,10 +1,35 @@
 'use client'
-import Image from 'next/image'
 import Link from 'next/link'
+import { useState } from 'react'
 import { useParams } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
-import { CheckCircle2 } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, CheckCircle2, Plus, ShoppingBag } from 'lucide-react'
 import { api } from '@/lib/api'
-import type { Product } from '@/lib/types'
+import { haptic } from '@/lib/telegram'
+import type { Cart, Product, Team } from '@/lib/types'
+import { BotButton } from '@/components/bot-button'
+import { ProductIcon } from '@/components/product-icon'
+import { useToast } from '@/components/toast'
 import { ErrorState, PageSkeleton } from '@/components/ui'
-export default function ProductPage(){const {id}=useParams<{id:string}>();const query=useQuery({queryKey:['products'],queryFn:()=>api<Product[]>('/api/products')});if(query.isLoading)return <PageSkeleton/>;const product=query.data?.find(item=>item.id===id);if(query.isError||!product)return <main className="page"><ErrorState retry={()=>query.refetch()}/></main>;return <main className="page"><div className="card relative aspect-[16/10] overflow-hidden"><Image src={product.cover} alt="" fill priority className="object-cover" sizes="600px"/><div className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent"/></div><div className="mt-6 flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-widest text-[#e43d82]">Продукт HUB</p><h1 className="mt-2 text-3xl font-extrabold">{product.name}</h1></div>{product.active&&<span className="flex items-center gap-1 rounded-full bg-emerald-400/10 px-3 py-1.5 text-xs font-bold text-emerald-300"><CheckCircle2 size={14}/>Активно</span>}</div><p className="muted mt-5 text-[15px] leading-7">{product.description}</p><div className="card mt-6 p-5"><p className="muted text-xs">Стоимость подписки</p><p className="mt-1 text-2xl font-extrabold">{product.priceRub===null?'По запросу':`${product.priceRub.toLocaleString('ru-RU')} ₽`}</p><p className="muted mt-3 text-xs leading-5">Оформление и оплата пока доступны в Telegram-боте HUB.</p><Link href="/catalog" className="secondary-button mt-5 w-full">Вернуться в каталог</Link></div></main>}
+export default function ProductPage(){
+  const {id}=useParams<{id:string}>()
+  const [selectedTeamId,setSelectedTeamId]=useState('')
+  const queryClient=useQueryClient()
+  const toast=useToast()
+  const query=useQuery({queryKey:['products'],queryFn:()=>api<Product[]>('/api/products')})
+  const teamsQuery=useQuery({queryKey:['teams'],queryFn:()=>api<Team[]>('/api/teams')})
+  const teams=(teamsQuery.data||[]).filter(team=>team.viewerRole==='owner')
+  const team=teams.find(item=>item.id===selectedTeamId)||teams[0]
+  const cartQuery=useQuery({queryKey:['cart',team?.id],queryFn:()=>api<Cart>(`/api/teams/${team!.id}/cart`),enabled:Boolean(team)})
+  const add=useMutation({
+    mutationFn:({teamId,productId}:{teamId:string;productId:string})=>api<Cart>(`/api/teams/${teamId}/cart/items`,{method:'POST',body:JSON.stringify({productId})}),
+    onSuccess:(cart,variables)=>{queryClient.setQueryData(['cart',variables.teamId],cart);haptic('success');toast('Товар добавлен в корзину')},
+    onError:(error)=>toast(error instanceof Error?error.message:'Не удалось добавить товар'),
+  })
+  if(query.isLoading||teamsQuery.isLoading)return <PageSkeleton/>
+  const product=query.data?.find(item=>item.id===id)
+  if(query.isError||teamsQuery.isError||!product)return <main className="page"><ErrorState retry={()=>{void query.refetch();void teamsQuery.refetch()}}/></main>
+  const connected=team?team.subscriptions.some(subscription=>subscription.productId===id&&subscription.status==='active'):product.active
+  const inCart=Boolean(cartQuery.data?.items.some(item=>item.productId===id&&(!item.status||item.status==='pending')))
+  return <main className="page"><Link href="/catalog" className="muted mb-4 inline-flex min-h-10 items-center gap-1.5 text-xs font-bold"><ArrowLeft size={15}/>Каталог</Link><div className="card flex items-center gap-4 p-5"><ProductIcon id={product.id} name={product.name} size={76}/><div className="min-w-0"><p className="eyebrow">Продукт HUB</p><h1 className="mt-2 text-[24px] font-extrabold leading-tight">{product.name}</h1></div></div>{connected&&<span className="mt-5 inline-flex items-center gap-1 rounded-full border border-[#34d399]/25 bg-[#34d399]/10 px-2.5 py-1.5 text-[10px] font-bold text-[#34d399]"><CheckCircle2 size={13}/>Подключена</span>}<p className="muted mt-4 text-sm leading-6">{product.description}</p><div className="card mt-6 p-5"><p className="muted text-xs">Стоимость подписки</p><p className="display-font mt-1 text-xl font-bold">{product.priceRub===null?'По запросу':`${product.priceRub.toLocaleString('ru-RU')} ₽`}</p>{product.cartable&&teams.length>0&&!connected?<><label className="mt-5 block"><span className="muted text-xs">Для команды</span><select value={team?.id||''} onChange={event=>setSelectedTeamId(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-white/10 bg-[#1a1a20] px-3 text-xs font-bold text-white">{teams.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{inCart?<Link href={`/cart?team=${team!.id}`} className="secondary-button mt-4 w-full text-[#ff874c]"><ShoppingBag size={17}/>В корзине</Link>:<button type="button" disabled={add.isPending||!team} onClick={()=>{if(team)add.mutate({teamId:team.id,productId:id})}} className="accent-button mt-4 w-full"><Plus size={18}/>{add.isPending?'Добавляем…':'Добавить в корзину'}</button>}</>:<><p className="muted mt-3 text-xs leading-5">{connected?'Продление доступно в Telegram-боте HUB.':product.cartable?'Создайте команду в боте, чтобы подключить продукт.':'Оформление доступно в Telegram-боте HUB.'}</p><div className="mt-5"><BotButton label={connected?'Продлить в боте':product.priceRub===null?'Уточнить в боте':'Подключить в боте'}/></div></>}</div></main>
+}
