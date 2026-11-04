@@ -18,7 +18,7 @@ import {
   buildSubscriptionTargetId,
   type AuditActor,
 } from './auditLog.service.js'
-import { getRequestBatchTitle, renameRequestBatch } from './proPresenterWaitlist.service.js'
+import { getRequestBatchTitle, renameRequestBatch, requestBatchCapacity } from './proPresenterWaitlist.service.js'
 
 export const adminGetRequestBatchTitle = getRequestBatchTitle
 export const adminRenameRequestBatch = renameRequestBatch
@@ -784,14 +784,15 @@ export async function adminCreateStreamFromWaitlist(data: {
   }).sort({ createdAt: 1 })
   if (!entries.length) throw new Error('В этой партии нет заявок')
   const requestedSeats = entries.reduce((total, entry) => total + (entry.deviceCount || 1), 0)
-  if (requestedSeats !== 20) throw new Error(`Поток не заполнен устройствами: ${requestedSeats}/20`)
+  const capacity = requestBatchCapacity(requestedSeats)
+  if (requestedSeats !== capacity) throw new Error(`Поток не заполнен устройствами: ${requestedSeats}/${capacity}`)
 
   const stream = await ProPresenterStreamModel.create({
     flowNumber: data.flowNumber,
     email: data.email,
     password: data.password,
     chatLink: data.chatLink || '',
-    capacity: 20,
+    capacity,
     status: 'active',
     expiresAt: data.expiresAt,
   })
@@ -799,7 +800,7 @@ export async function adminCreateStreamFromWaitlist(data: {
   await auditLogService.createLog({
     type: 'propresenter.stream_created',
     ...adminAuditActor(data.adminTelegramId),
-    metadata: { flowNumber: data.flowNumber, capacity: 20, expiresAt: data.expiresAt },
+    metadata: { flowNumber: data.flowNumber, capacity, expiresAt: data.expiresAt },
   })
 
   for (const entry of entries) {

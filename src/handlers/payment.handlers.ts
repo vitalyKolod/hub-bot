@@ -283,6 +283,10 @@ export async function handlePayProduct(
 }
 
 export async function handlePayMethod(ctx: MyContext, userId: number, method: string) {
+  if (method === 'rub' && ctx.session.payment?.product === 'propresenter' && !ctx.session.payment?.renewalCampaignId) {
+    await ctx.answerCallbackQuery({ text: 'Стоимость в рублях пока не указана', show_alert: true })
+    return
+  }
   ctx.session.payment = { ...ctx.session.payment, method }
 
   if (method === 'rub') {

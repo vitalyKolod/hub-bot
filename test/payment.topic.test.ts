@@ -54,6 +54,7 @@ for (const kind of ['photo', 'document'] as const) {
   test(`${kind}: success explicitly routes receipt and stores its topic`, async (t) => {
     mockProfile(t)
     const { ctx, replies, deliveries } = context(kind)
+    ctx.session.payment.method = 'crypto'
     let topicCreated = false
     ctx.api.createForumTopic = async (_group: number, title: string) => {
       assert.equal(title, 'Продление — @owner')
