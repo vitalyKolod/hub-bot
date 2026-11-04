@@ -24,7 +24,7 @@ test('owner device screen uses the supplied image and one compact action menu', 
   assert.match(screen.caption, /MacBook — поток №2/)
   const buttons = screen.keyboard.inline_keyboard.flat()
   assert.deepEqual(buttons.map((button) => button.text), [
-    'Добавить устройство', 'Заменить устройство', 'Отказаться от устройства', '◀️ НАЗАД',
+    'Добавить устройство', 'Заменить устройство', 'Отключить устройство', '◀️ НАЗАД',
   ])
   assert.deepEqual(buttons.slice(0, 3).map((button) => button.icon_custom_emoji_id), [
     '5260251205682079529', '5303174911269818848', '5300821986451148615',
@@ -69,7 +69,7 @@ test('request confirmation button has no device icon', async (t) => {
 
   const screen = await devicesScreen(10, { teamId: '507f1f77bcf86cd799439010', step: 'release_confirm', deviceId: '507f1f77bcf86cd799439011' })
   const button = screen.keyboard.inline_keyboard[0][0]
-  assert.equal(button.text, '✅ Отправить заявку')
+  assert.equal(button.text, '✅ Да, отключить')
   assert.equal(button.icon_custom_emoji_id, undefined)
 })
 
