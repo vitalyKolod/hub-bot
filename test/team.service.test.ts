@@ -13,7 +13,28 @@ import {
   TeamNameValidationError,
   TeamOwnerNotFoundError,
   validateTeamName,
+  transferTeamOwnership,
 } from '../src/services/team.service.js'
+
+test('only the current owner can transfer to an active member', async (t) => {
+  const team: any = {
+    name: 'Команда', ownerId: 10,
+    members: [
+      { telegramId: 10, role: 'owner', status: 'active' },
+      { telegramId: 20, role: 'member', status: 'active' },
+      { telegramId: 30, role: 'member', status: 'pending' },
+    ],
+    save: async () => team,
+  }
+  t.mock.method(TeamModel as any, 'findById', async () => team)
+  t.mock.method(AuditLogModel as any, 'create', async (value: any) => value)
+  await assert.rejects(() => transferTeamOwnership('team-id', 99, 20), /только владелец/)
+  await assert.rejects(() => transferTeamOwnership('team-id', 10, 30), /действующего участника/)
+  assert.equal(team.ownerId, 10)
+  await transferTeamOwnership('team-id', 10, 20)
+  assert.equal(team.ownerId, 20)
+  assert.deepEqual(team.members.map((member: any) => member.role), ['member', 'owner', 'member'])
+})
 
 test('generateTeamNameForUser follows all fallback rules and normalizes whitespace', () => {
   assert.equal(

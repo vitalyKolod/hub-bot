@@ -40,6 +40,7 @@ export type ActionId =
   | 'payment_retry'
   | 'accept_team_invite'
   | 'decline_team_invite'
+  | 'own'
 
 export type CbData = {
   a: ActionId

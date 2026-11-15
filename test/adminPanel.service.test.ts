@@ -7,9 +7,30 @@ import { SupportTicketModel } from '../src/models/SupportTicket.js'
 import { TeamModel } from '../src/models/Team.js'
 import { TeamInviteModel } from '../src/models/TeamInvite.js'
 import { UserModel } from '../src/models/User.js'
-import { adminDeleteUser } from '../src/services/adminPanel.service.js'
+import { adminDeleteUser, adminUpdateStream } from '../src/services/adminPanel.service.js'
 import { AuditLogModel } from '../src/models/AuditLog.js'
 import { Yandex360MemberModel, Yandex360RequestModel } from '../src/models/Yandex360.js'
+import { ProPresenterStreamModel } from '../src/models/ProPresenterStream.js'
+
+test('changing stream credentials updates active and expired team copies', async (t) => {
+  let filter: any
+  let update: any
+  t.mock.method(ProPresenterStreamModel as any, 'findOneAndUpdate', async () => ({ flowNumber: 20 }))
+  t.mock.method(TeamModel as any, 'updateMany', async (f: any, u: any) => {
+    filter = f
+    update = u
+    return { modifiedCount: 2 }
+  })
+  await adminUpdateStream(20, { email: 'new@example.com', password: 'test-value' })
+  assert.deepEqual(filter, {
+    'subscriptions.propresenter.meta.flowNumber': 20,
+    'subscriptions.propresenter.status': { $in: ['active', 'expired'] },
+  })
+  assert.deepEqual(update, { $set: {
+    'subscriptions.propresenter.meta.email': 'new@example.com',
+    'subscriptions.propresenter.meta.password': 'test-value',
+  } })
+})
 
 function execQuery(result: any) {
   const promise = Promise.resolve(result)

@@ -7,7 +7,7 @@ import { TeamInviteModel } from '../src/models/TeamInvite.js'
 import { ProPresenterDeviceModel } from '../src/models/ProPresenterDevice.js'
 import { ProPresenterStreamModel } from '../src/models/ProPresenterStream.js'
 import { parseCb } from '../src/core/callback.js'
-import { teamScreen, teamProPresenterScreen, teamContentScreen, teamMembersScreen } from '../src/screens/team.js'
+import { teamScreen, teamProPresenterScreen, teamContentScreen, teamMembersScreen, teamOwnerTransferScreen, teamOwnerConfirmScreen } from '../src/screens/team.js'
 import { validateInvite } from '../src/services/teamInvite.service.js'
 import { getProduct } from '../src/config/products.js'
 
@@ -131,6 +131,22 @@ test('member details page through more than five people without a membership cap
   const last = await teamMembersScreen(10, `${teamId}:2`)
   assert.ok(last.caption.length < 1024)
   assert.ok(buttons(last).some((button: any) => button.text === '◀️ Предыдущие'))
+})
+
+test('owner transfer offers active teammates with confirmation and hides from members', async (t) => {
+  setup(t, 3)
+  const members = await teamMembersScreen(10, teamId)
+  assert.ok(buttons(members).some((button: any) => button.text === 'ПЕРЕДАТЬ ВЛАДЕНИЕ' && button.icon_custom_emoji_id))
+  const list = await teamOwnerTransferScreen(10, teamId)
+  const option = buttons(list).find((button: any) => button.text === 'Участник 11')
+  assert.equal(parseCb(option.callback_data)?.s, 'owner_ok')
+  assert.ok(Buffer.byteLength(option.callback_data) <= 64)
+  const confirm = await teamOwnerConfirmScreen(10, `${teamId}:11`)
+  assert.equal(parseCb(buttons(confirm)[0].callback_data)?.a, 'own')
+  assert.ok(Buffer.byteLength(buttons(confirm)[0].callback_data) <= 64)
+  const memberView = await teamMembersScreen(11, teamId)
+  assert.ok(!buttons(memberView).some((button: any) => button.text === 'ПЕРЕДАТЬ ВЛАДЕНИЕ'))
+  await assert.rejects(() => teamOwnerTransferScreen(11, teamId), /только владелец/)
 })
 
 test('a paid invite remains valid when the team already has five members', async (t) => {

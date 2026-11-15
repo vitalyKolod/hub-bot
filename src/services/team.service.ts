@@ -200,6 +200,28 @@ export async function isOwner(teamId: string, userId: number) {
   return team.ownerId === userId
 }
 
+export async function transferTeamOwnership(teamId: string, currentOwnerId: number, newOwnerId: number) {
+  const team = await TeamModel.findById(teamId)
+  if (!team || team.ownerId !== currentOwnerId) throw new Error('Передать владение может только владелец команды')
+  if (newOwnerId === currentOwnerId || !team.members.some(member => member.telegramId === newOwnerId && member.status === 'active')) {
+    throw new Error('Выберите действующего участника команды')
+  }
+  team.members = team.members.map(member => {
+    const value = member.toObject ? member.toObject() : member
+    if (value.telegramId === currentOwnerId) return { ...value, role: 'member' }
+    if (value.telegramId === newOwnerId) return { ...value, role: 'owner' }
+    return value
+  }) as typeof team.members
+  team.ownerId = newOwnerId
+  await team.save()
+  await auditLogService.createLog({
+    type: 'team.updated', actorType: 'user', actorTelegramId: currentOwnerId,
+    targetUserId: newOwnerId, targetTeamId: teamId,
+    metadata: { teamName: team.name, field: 'ownerId', previousOwnerTelegramId: currentOwnerId, newOwnerTelegramId: newOwnerId },
+  })
+  return team
+}
+
 /**
  * Команда пользователя
  * (если она одна)

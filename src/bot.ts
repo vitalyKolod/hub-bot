@@ -5,7 +5,7 @@ import { handleProductJoinRequest, handleProductMemberJoined } from './services/
 import { markSupportUiOpened, markSupportUiClosed } from './ui/supportUi.js'
 import { telegramDeliveryFallback } from './utils/telegramDeliveryFallback.js'
 import { startSupportFlow, handleSupportFlowCallback, guardSupportSelection } from './handlers/supportFlow.handlers.js'
-import { PROP_FLOWS } from './data/ProPresenterFLows.js'
+import { ProPresenterStreamModel } from './models/ProPresenterStream.js'
 import { Bot, InlineKeyboard, session, type Context, type SessionFlavor } from 'grammy'
 import {
   ONBOARDING_ASSET,
@@ -63,6 +63,7 @@ import {
   getTeamById,
   hasActiveTeamSubscription,
   isOwner,
+  transferTeamOwnership,
 } from './services/team.service.js'
 import { createTeamInvite } from './services/teamInvite.service.js'
 import { getPendingBatches } from './services/proPresenterWaitlist.service.js'
@@ -939,7 +940,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
       if (type === 'prop') {
         const flow = user.subscriptions?.propresenter?.flow
-        const flowData = PROP_FLOWS.find((f) => f.flow === Number(flow))
+        const flowData = await ProPresenterStreamModel.findOne({ flowNumber: Number(flow) })
 
         if (!flowData) {
           await ctx.answerCallbackQuery({ text: 'Поток не найден' })
@@ -952,7 +953,7 @@ export function registerHandlers(bot: Bot<MyContext>) {
             'subscriptions.propresenter.status': 'active',
             'subscriptions.propresenter.email': flowData.email,
             'subscriptions.propresenter.password': flowData.password,
-            'subscriptions.propresenter.chatFlow': flowData.chatFlow,
+            'subscriptions.propresenter.chatFlow': flowData.chatLink,
             'subscriptions.propresenter.expiresAt': flowData.expiresAt,
           }
         )
@@ -1100,6 +1101,19 @@ export function registerHandlers(bot: Bot<MyContext>) {
 
     if (parsed.a === 'decline_team_invite' && parsed.p) {
       await handleDeclineTeamInvite(ctx, userId)
+      return
+    }
+
+    if (parsed.a === 'own' && parsed.p) {
+      try {
+        const [teamId, targetText] = String(parsed.p).split(':')
+        await transferTeamOwnership(teamId, userId, Number(targetText))
+        goTo(userId, 'team_members', teamId)
+        await renderScreen(ctx, userId, 'team_members', teamId)
+        await ctx.answerCallbackQuery({ text: 'Владение передано' })
+      } catch (error) {
+        await ctx.answerCallbackQuery({ text: error instanceof Error ? error.message : 'Не удалось передать владение', show_alert: true })
+      }
       return
     }
 
@@ -1556,14 +1570,18 @@ export function registerHandlers(bot: Bot<MyContext>) {
       checkingSubscriptions = false
     }
   }
-  void checkSubscriptions()
-  setInterval(checkSubscriptions, 1000 * 60 * 10) // каждые 10 минут
+  if (process.env.DISABLE_BACKGROUND_JOBS !== 'true') {
+    void checkSubscriptions()
+    setInterval(checkSubscriptions, 1000 * 60 * 10) // каждые 10 минут
+  }
   const checkInactiveSupport = async () => {
     await autoCloseInactiveSupportTickets(bot.api).catch((error) =>
       console.error('Ошибка auto-close поддержки:', error)
     )
   }
-  void checkInactiveSupport()
-  setInterval(checkInactiveSupport, 1000 * 60 * 10)
+  if (process.env.DISABLE_BACKGROUND_JOBS !== 'true') {
+    void checkInactiveSupport()
+    setInterval(checkInactiveSupport, 1000 * 60 * 10)
+  }
 }
 console.log('✅ Бот запущен')

@@ -42,6 +42,7 @@ import {
   countRequestedDevices,
   PROPRESENTER_BATCH_SIZE,
   requestBatchCapacity,
+  cancelPendingBatchEntry,
 } from '../services/proPresenterWaitlist.service.js'
 import {
   createTeamForUser,
@@ -290,7 +291,7 @@ function callbackPermission(scope: string, rest: string[]) {
   if (scope === 'stream') return rest[1] ? 'streams.edit' as const : 'streams.view' as const
   if (scope === 'wait') {
     if (['create', 'publish', 'field'].includes(rest[1])) return 'streams.edit' as const
-    return ['edit', 'rename'].includes(rest[1]) ? 'requests.edit' as const : 'requests.view' as const
+    return ['edit', 'rename', 'remove', 'remove_confirm'].includes(rest[1]) ? 'requests.edit' as const : 'requests.view' as const
   }
   if (scope === 'wt') return 'requests.view' as const
   if (scope === 'admins') return rest[0] === 'add' ? 'admins.manage' as const : 'admins.view' as const
@@ -497,13 +498,13 @@ async function showWaitlistBatch(ctx: Context, flowNumber: number) {
     position += 1
     const team = await ap.adminGetTeam(entry.teamId)
     const label = team ? `👥 ${position}. ${team.name}` : `⚠️ ${position}. Команда не найдена`
-    kb.text(label.slice(0, 60), apCb('wt', entry.teamId, flowNumber)).row()
+    kb.text(label.slice(0, 60), apCb('wt', entry.teamId, flowNumber)).icon('5818715087237549366').row()
   }
 
   if (count >= capacity) {
     kb.text(`✅ Поток №${flowNumber} создал`, apCb('wait', flowNumber, 'create')).row()
   }
-  if (canEdit) kb.text('✏️ Редактировать', apCb('wait', flowNumber, 'edit')).row()
+  if (canEdit) kb.text('Редактировать', apCb('wait', flowNumber, 'edit')).icon('5956143844457189176').row()
   kb.text('‹ К заявкам', apCb('wait'))
   const text =
     `📋 ${title}\n\n` +
@@ -515,9 +516,32 @@ async function showWaitlistBatch(ctx: Context, flowNumber: number) {
 async function showWaitlistEdit(ctx: Context, flowNumber: number) {
   await requireAdminPermission(ctx.from!.id, 'requests.edit')
   const kb = new InlineKeyboard()
-    .text('✏️ Изменить название', apCb('wait', flowNumber, 'rename')).row()
+    .text('Изменить название', apCb('wait', flowNumber, 'rename')).icon('5956143844457189176').row()
+    .text('Удалить команду из заявок', apCb('wait', flowNumber, 'remove')).icon('5979070714890686650').row()
     .text('← Назад', apCb('wait', flowNumber))
   await render(ctx, '✏️ Редактирование заявок', kb, false)
+}
+
+async function showWaitlistRemove(ctx: Context, flowNumber: number, teamId?: string) {
+  await requireAdminPermission(ctx.from!.id, 'requests.edit')
+  const entries = await getPendingBatch(flowNumber)
+  const kb = new InlineKeyboard()
+  if (teamId) {
+    const entry = entries.find(item => item.teamId === teamId)
+    if (!entry) throw new Error('Заявка уже отсутствует')
+    const team = await ap.adminGetTeam(teamId)
+    kb.text('Да, удалить заявку', apCb('wait', flowNumber, 'remove_confirm', teamId)).icon('5979070714890686650').row()
+    kb.text('← Назад', apCb('wait', flowNumber, 'remove'))
+    await render(ctx, `Удалить команду «${team?.name || teamId}» из заявок на поток №${flowNumber}?`, kb, false)
+    return
+  }
+  for (const entry of entries) {
+    const team = await ap.adminGetTeam(entry.teamId)
+    kb.text((team?.name || 'Команда не найдена').slice(0, 55), apCb('wait', flowNumber, 'remove', entry.teamId))
+      .icon('5818715087237549366').row()
+  }
+  kb.text('← Назад', apCb('wait', flowNumber, 'edit'))
+  await render(ctx, entries.length ? 'Выберите команду, заявку которой нужно удалить:' : 'Заявок в этом потоке нет.', kb, false)
 }
 
 async function promptWaitlistTitle(ctx: Context, flowNumber: number) {
@@ -1539,6 +1563,11 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
         }
         else if (rest[1] === 'edit') await showWaitlistEdit(ctx, flowNumber)
         else if (rest[1] === 'rename') await promptWaitlistTitle(ctx, flowNumber)
+        else if (rest[1] === 'remove') await showWaitlistRemove(ctx, flowNumber, rest[2])
+        else if (rest[1] === 'remove_confirm') {
+          await cancelPendingBatchEntry(flowNumber, rest[2], ctx.from!.id)
+          await showWaitlistBatch(ctx, flowNumber)
+        }
         else await showWaitlistBatch(ctx, flowNumber)
         break
       }
