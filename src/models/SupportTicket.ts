@@ -10,7 +10,7 @@ const supportTicketSchema = new mongoose.Schema(
       teamId: String,
       productIds: { type: [String], default: undefined },
     },
-    userId: { type: Number, required: true, index: true },
+    userId: { type: Number, required: true },
     threadId: { type: Number, required: true, unique: true, index: true },
     cardMessageId: { type: Number, default: null },
     cardKeyboardSyncPending: { type: Boolean, default: false },
@@ -30,7 +30,7 @@ supportTicketSchema.index({ userId: 1, status: 1 })
 supportTicketSchema.index({ status: 1, lastActivityAt: 1 })
 supportTicketSchema.index(
   { userId: 1 },
-  { unique: true, partialFilterExpression: { status: 'open' } }
+  { name: 'userId_unique_open', unique: true, partialFilterExpression: { status: 'open' } }
 )
 
 export const SupportTicketModel = mongoose.model('SupportTicket', supportTicketSchema)

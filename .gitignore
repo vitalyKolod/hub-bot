@@ -4,3 +4,5 @@ data/ProPresenter.ts
 /web/node_modules
 /web/.next
 /web/.env.local
+
+/.cache/

@@ -61,7 +61,7 @@ export function legalScreen(userId: number): ScreenView {
     .emoji('⚠️', '5366402920130560049')
     .plain('Все действия вы совершаете на свой страх и риск.')
 
-  message = message.blockquote(serviceInfo, true).plain('\n\n')
+  message = message.blockquote(serviceInfo).plain('\n\n')
 
   message = message
     .bold('Оплата услуг означает ваше согласие с условиями и отказ от претензий в случае:')
@@ -84,7 +84,7 @@ export function legalScreen(userId: number): ScreenView {
       'Мы не несём ответственности за сохранность общих данных (логины, пароли, контент), но предпринимаем разумные меры для их защиты.\n\n'
     )
 
-  message = message.blockquote(risks, true).plain('\n')
+  message = message.blockquote(risks).plain('\n')
 
   message = message.bold('Используя сервис, вы подтверждаете согласие с этими условиями.')
 

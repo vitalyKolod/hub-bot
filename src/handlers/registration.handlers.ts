@@ -1,3 +1,4 @@
+import { confirmUserRegistration } from '../services/registration.service.js'
 import { InlineKeyboard } from 'grammy'
 import { UserModel } from '../models/User.js'
 import { getOrCreateUser } from '../services/user.service.js'
@@ -62,33 +63,12 @@ export async function handleConfirmRegistration(ctx: MyContext, userId: number) 
     return
   }
 
-  const result = await UserModel.updateOne(
-    { telegramId: userId, reg: { $ne: 'done' } },
-    {
-      reg: 'done',
-      regStep: 'done',
-    }
-  )
-
-  if (!result.modifiedCount) {
+  const result = await confirmUserRegistration(userId)
+  if (!result.applied) {
     await ctx.reply('✅ Вы уже зарегистрированы в ХАБе.')
     return
   }
-
-  const profile = await getOrCreateUser(userId)
-
-  await auditLogService.createLog({
-    type: 'user.registered',
-    actorType: 'user',
-    actorTelegramId: userId,
-    targetUserId: userId,
-    metadata: {
-      userName: profile.fio,
-      username: profile.username,
-      city: profile.city,
-      church: profile.church,
-    },
-  })
+  const profile = result.user
 
   try {
     await sendRegistrationAdminNotification(ctx, userId)

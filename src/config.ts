@@ -1,3 +1,4 @@
+import { RUB_PAYMENT, CRYPTO_WALLETS } from './config/payment.js'
 import 'dotenv/config'
 
 function req(name: string): string {
@@ -19,29 +20,15 @@ export const config = {
   PAYMENT_SBP: req('PAYMENT_SBP'),
   PAYMENT_RECEIVER_NAME: req('PAYMENT_RECEIVER_NAME'),
 
-  PAYMENT_USDT: 'TMFTta1wyguMMr8gHn8hxVbTYGSWoLuzma',
-  PAYMENT_USDT_ERC20: '0x4b88017585132400e1afebeb8d1a3e522ebe7d5a',
-  PAYMENT_TON: 'UQBAQvGg6hJiGPkQsysC3ZrkuqFcC2-B7vX4D4MGHAjK_vOZ',
-  PAYMENT_BYBIT: '210547658',
+  PAYMENT_USDT: CRYPTO_WALLETS.trc20,
+  PAYMENT_USDT_ERC20: CRYPTO_WALLETS.erc20,
+  PAYMENT_TON: CRYPTO_WALLETS.ton,
+  PAYMENT_BYBIT: CRYPTO_WALLETS.bybit,
 
   PRICE_CONTENT: '1000₽',
   PRICE_PROPRESENTER: '1000₽',
 
   ADMIN_GROUP_ID: Number(process.env.ADMIN_GROUP_ID || '0'),
 
-  RUB_PAYMENT: {
-    card: {
-      mastercard: '5536 9141 0822 8812',
-      mir: {
-        'Т-Банк': '2200 7021 4013 1603',
-        Озон: '2204 3201 4460 6359',
-
-        'Альфа-Банк': '2200 1537 3537 8276',
-      },
-    },
-    sbp: {
-      phone: '+7(924) 370 92-91', // номер один для всех
-      banks: ['Т-Банк', 'Озон', 'Альфа-Банк'],
-    },
-  },
+  RUB_PAYMENT,
 } as const

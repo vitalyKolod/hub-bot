@@ -7,10 +7,6 @@ export async function getOrCreateUser(telegramId: number) {
       telegramId,
       reg: 'none',
       regStep: 'fio',
-      subscriptions: {
-        propresenter: { status: 'none' },
-        content: { status: 'none' },
-      },
     })
   }
 
@@ -25,7 +21,7 @@ export async function activateOrExtendContentSubscription(userId: number) {
   const user = await getOrCreateUser(userId)
 
   const now = new Date()
-  const currentExpire = user.subscriptions?.content?.expiresAt
+  const currentExpire = (user as any).subscriptions?.content?.expiresAt
 
   // если подписки нет или истекла
   if (!currentExpire || new Date(currentExpire) < now) {

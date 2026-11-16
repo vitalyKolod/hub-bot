@@ -6,12 +6,19 @@
   "scripts": {
     "start": "tsx index.ts",
     "start:api": "tsx api.ts",
-    "dev": "nodemon --exec npx tsx index.ts",
-    "dev:api": "nodemon --exec npx tsx api.ts",
+    "dev": "nodemon --watch index.ts --watch db.ts --watch src --ext ts,json --exec npx tsx index.ts",
+    "dev:api": "nodemon --watch api.ts --watch db.ts --watch src --ext ts,json --exec npx tsx api.ts",
     "dev:stack": "node scripts/dev-stack.mjs",
     "build": "tsc --noEmit --noCheck",
     "typecheck:api": "tsc -p tsconfig.api.json",
-    "test": "node --import tsx --test test/*.test.ts"
+    "test": "node --import tsx --import ./test/env.ts --test test/*.test.ts",
+    "dev:api:demo": "tsx scripts/dev-api-demo.ts",
+    "test:api:integration": "node --import tsx --test test/api.integration.ts",
+    "check:api:indexes": "tsx scripts/check-api-indexes.ts",
+    "dev:app:demo": "tsx scripts/dev-app-demo.ts",
+    "dev:web": "node scripts/dev-web.mjs",
+    "setup:local": "npm ci && npm --prefix web ci",
+    "dev:web:demo": "tsx scripts/dev-app-demo.ts"
   },
   "keywords": [],
   "author": "",
@@ -27,8 +34,15 @@
   },
   "devDependencies": {
     "@types/node": "^25.2.2",
+    "mongodb-memory-server-core": "^11.3.0",
     "nodemon": "^3.1.11",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
+  },
+  "config": {
+    "mongodbMemoryServer": {
+      "downloadDir": ".cache/mongodb",
+      "version": "8.2.6"
+    }
   }
 }

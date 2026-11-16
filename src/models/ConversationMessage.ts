@@ -1,11 +1,20 @@
 import mongoose from 'mongoose'
 
+const attachmentSchema = new mongoose.Schema({
+  type: { type: String, required: true },
+  telegramFileId: { type: String, required: true },
+  fileName: String, mimeType: String,
+}, { _id: false })
+
 const conversationMessageSchema = new mongoose.Schema(
   {
     conversationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', required: true, index: true },
     direction: { type: String, enum: ['admin_to_user', 'user_to_admin'], required: true },
     senderId: { type: Number, required: true },
     telegramSourceMessageId: { type: Number, required: true },
+    source: { type: String, enum: ['telegram', 'web'], default: 'telegram' },
+    text: { type: String, default: null },
+    attachments: { type: [attachmentSchema], default: [] },
     telegramDestinationMessageId: { type: Number, required: true },
   },
   { timestamps: true }

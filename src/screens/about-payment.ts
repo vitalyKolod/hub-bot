@@ -54,7 +54,7 @@ export function aboutPaymentScreen(userId: number): ScreenView {
     .plain(' Криптовалютный перевод в USDT ')
     .italic('(предпочтительнее)')
 
-  message = message.blockquote(paymentMethods, true).plain('\n\n')
+  message = message.blockquote(paymentMethods).plain('\n\n')
 
   message = message.plain('Выберите удобный вариант ниже.')
 
