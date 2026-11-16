@@ -1,4 +1,5 @@
 import { getProduct } from '../config/products.js'
+import { getCartTotal, getPendingItems } from '../services/cart.service.js'
 
 export function serializeUser(user: any) {
   return {
@@ -46,6 +47,21 @@ export function serializeTeam(team: any, viewerTelegramId: number, profiles: Map
     subscriptions,
     createdAt: team.createdAt,
     updatedAt: team.updatedAt,
+  }
+}
+
+export function serializeCart(cart: any) {
+  return {
+    items: getPendingItems(cart).map((item: any) => {
+      const product = getProduct(item.product)
+      return {
+        id: item._id.toString(),
+        productId: item.product,
+        productName: product?.name || item.product,
+        priceRub: product?.priceRub ?? null,
+      }
+    }),
+    totalRub: getCartTotal(cart),
   }
 }
 
