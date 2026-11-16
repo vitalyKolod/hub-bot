@@ -498,7 +498,7 @@ async function showWaitlistBatch(ctx: Context, flowNumber: number) {
     position += 1
     const team = await ap.adminGetTeam(entry.teamId)
     const label = team ? `👥 ${position}. ${team.name}` : `⚠️ ${position}. Команда не найдена`
-    kb.text(label.slice(0, 60), apCb('wt', entry.teamId, flowNumber)).icon('5818715087237549366').row()
+    kb.text(label.slice(0, 60), apCb('wt', entry.teamId, flowNumber)).row()
   }
 
   if (count >= capacity) {
@@ -537,8 +537,7 @@ async function showWaitlistRemove(ctx: Context, flowNumber: number, teamId?: str
   }
   for (const entry of entries) {
     const team = await ap.adminGetTeam(entry.teamId)
-    kb.text((team?.name || 'Команда не найдена').slice(0, 55), apCb('wait', flowNumber, 'remove', entry.teamId))
-      .icon('5818715087237549366').row()
+    kb.text((team?.name || 'Команда не найдена').slice(0, 55), apCb('wait', flowNumber, 'remove', entry.teamId)).row()
   }
   kb.text('← Назад', apCb('wait', flowNumber, 'edit'))
   await render(ctx, entries.length ? 'Выберите команду, заявку которой нужно удалить:' : 'Заявок в этом потоке нет.', kb, false)
