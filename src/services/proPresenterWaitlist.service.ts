@@ -192,6 +192,21 @@ export async function cancelWaitlistEntry(entryId: string) {
   )
 }
 
+/** Удалить только pending-заявку выбранной команды из выбранной партии. */
+export async function cancelPendingBatchEntry(flowNumber: number, teamId: string, actorId: number) {
+  const entry = await ProPresenterWaitlistModel.findOneAndUpdate(
+    { teamId, assignedFlowNumber: flowNumber, status: 'pending' },
+    { $set: { status: 'cancelled' } },
+    { new: true }
+  )
+  if (!entry) throw new Error('Заявка уже отсутствует')
+  await auditLogService.createLog({
+    type: 'propresenter.request_removed', actorType: 'admin', actorTelegramId: actorId,
+    targetTeamId: teamId, metadata: { flowNumber, teamId },
+  })
+  return entry
+}
+
 export async function getWaitlistEntryById(entryId: string) {
   return ProPresenterWaitlistModel.findById(entryId)
 }

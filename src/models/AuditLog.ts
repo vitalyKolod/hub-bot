@@ -48,6 +48,7 @@ export const AUDIT_LOG_TYPES = [
   'admin.permission_changed',
   'admin.access_disabled',
   'propresenter.request_title_changed',
+  'propresenter.request_removed',
   'propresenter.stream_created',
   'propresenter.stream_date_changed',
   'propresenter.team_added',

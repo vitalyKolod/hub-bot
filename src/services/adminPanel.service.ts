@@ -693,7 +693,10 @@ export async function adminUpdateStream(
 
   if (Object.keys(teamUpdates).length) {
     await TeamModel.updateMany(
-      { 'subscriptions.propresenter.meta.flowNumber': flowNumber },
+      {
+        'subscriptions.propresenter.meta.flowNumber': flowNumber,
+        'subscriptions.propresenter.status': { $in: ['active', 'expired'] },
+      },
       { $set: teamUpdates }
     )
   }

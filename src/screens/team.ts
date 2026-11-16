@@ -186,6 +186,46 @@ export async function teamMembersScreen(userId: number, input: string): Promise<
   if (page < lastPage) kb.text('Следующие ▶️', packCb({ a: 'open', s: 'team_members', p: `${teamId}:${page + 1}` }))
   if (page > 0 || page < lastPage) kb.row()
   if (team.ownerId === userId && hasActiveTeamSubscription(team)) kb.text('ДОБАВИТЬ УЧАСТНИКА', packCb({ a: 'open', s: 'add_volunteer', p: teamId })).icon('5258362837411045098').row()
+  if (team.ownerId === userId && team.members.some(member => member.telegramId !== userId && member.status === 'active')) {
+    kb.text('ПЕРЕДАТЬ ВЛАДЕНИЕ', packCb({ a: 'open', s: 'owner_pick', p: teamId })).icon('6129805886383723340').row()
+  }
   navigation(kb)
   return { photo: './public/my-teams.png', caption: message.caption, caption_entities: message.caption_entities, keyboard: kb }
+}
+
+export async function teamOwnerTransferScreen(userId: number, input: string): Promise<ScreenView> {
+  const [teamId, pageText] = input.split(':')
+  const team = await getTeamById(teamId)
+  if (!team || team.ownerId !== userId) throw new Error('Передать владение может только владелец команды')
+  const members = team.members.filter(member => member.telegramId !== userId && member.status === 'active')
+  const pageSize = 5
+  const lastPage = Math.max(0, Math.ceil(members.length / pageSize) - 1)
+  const page = Math.min(Math.max(0, Number(pageText) || 0), lastPage)
+  const visible = members.slice(page * pageSize, (page + 1) * pageSize)
+  const profiles = await UserModel.find({ telegramId: { $in: visible.map(member => member.telegramId) } })
+  const byId = new Map(profiles.map(profile => [profile.telegramId, profile]))
+  const kb = new InlineKeyboard()
+  for (const member of visible) {
+    const profile = byId.get(member.telegramId)
+    kb.text((profile?.fio || String(member.telegramId)).slice(0, 50), packCb({ a: 'open', s: 'owner_ok', p: `${teamId}:${member.telegramId}` }))
+      .icon('5818715087237549366').row()
+  }
+  if (page > 0) kb.text('◀️ Предыдущие', packCb({ a: 'open', s: 'owner_pick', p: `${teamId}:${page - 1}` }))
+  if (page < lastPage) kb.text('Следующие ▶️', packCb({ a: 'open', s: 'owner_pick', p: `${teamId}:${page + 1}` }))
+  if (page > 0 || page < lastPage) kb.row()
+  kb.text('◀️ НАЗАД', packCb({ a: 'open', s: 'team_members', p: teamId }))
+  return { photo: './public/my-teams.png', caption: members.length ? 'Выберите участника, которому передать владение:' : 'Нет участников для передачи владения.', keyboard: kb }
+}
+
+export async function teamOwnerConfirmScreen(userId: number, input: string): Promise<ScreenView> {
+  const [teamId, targetText] = input.split(':')
+  const targetId = Number(targetText)
+  const team = await getTeamById(teamId)
+  if (!team || team.ownerId !== userId) throw new Error('Передать владение может только владелец команды')
+  if (!team.members.some(member => member.telegramId === targetId && member.status === 'active')) throw new Error('Участник не найден')
+  const target = await UserModel.findOne({ telegramId: targetId })
+  const kb = new InlineKeyboard()
+    .text('ПОДТВЕРДИТЬ ПЕРЕДАЧУ', packCb({ a: 'own', p: `${teamId}:${targetId}` })).icon('6129805886383723340').row()
+    .text('◀️ НАЗАД', packCb({ a: 'open', s: 'owner_pick', p: teamId }))
+  return { photo: './public/my-teams.png', caption: `Передать владение командой «${team.name}» участнику ${target?.fio || targetId}? После передачи управлять командой сможет новый владелец.`, keyboard: kb }
 }

@@ -26,7 +26,7 @@ import { teamListScreen } from './team-list.js'
 import { createTeamInfoScreen } from './create-team-info.js'
 import { teamAboutScreen } from './team-about.js'
 import { createTeamNameScreen } from './create-team-name.js'
-import { teamScreen, teamProPresenterScreen, teamContentScreen, teamMembersScreen } from './team.js'
+import { teamScreen, teamProPresenterScreen, teamContentScreen, teamMembersScreen, teamOwnerTransferScreen, teamOwnerConfirmScreen } from './team.js'
 import { devicesScreen } from './devices.js'
 import { cartScreen } from './cart.js'
 import { teamInviteScreen } from './team-invite.js'
@@ -98,6 +98,8 @@ export function initScreens() {
     team_propresenter: teamProPresenterScreen,
     team_content: teamContentScreen,
     team_members: teamMembersScreen,
+    owner_pick: teamOwnerTransferScreen,
+    owner_ok: teamOwnerConfirmScreen,
     devices: devicesScreen,
     team_list: teamListScreen,
     team_invite: teamInviteScreen,

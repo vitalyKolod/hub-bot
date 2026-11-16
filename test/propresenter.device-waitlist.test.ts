@@ -4,9 +4,21 @@ import { ProPresenterWaitlistModel } from '../src/models/ProPresenterWaitlist.js
 import { ProPresenterStreamModel } from '../src/models/ProPresenterStream.js'
 import { ProPresenterDeviceModel, ProPresenterDeviceRequestModel } from '../src/models/ProPresenterDevice.js'
 import { TeamModel } from '../src/models/Team.js'
-import { addToWaitlist, countRequestedDevices, requestBatchCapacity } from '../src/services/proPresenterWaitlist.service.js'
+import { AuditLogModel } from '../src/models/AuditLog.js'
+import { addToWaitlist, countRequestedDevices, requestBatchCapacity, cancelPendingBatchEntry } from '../src/services/proPresenterWaitlist.service.js'
 import { assignReservedDevice, reduceReservedSeats } from '../src/services/proPresenterDevice.service.js'
 import { devicesScreen } from '../src/screens/devices.js'
+
+test('admin cancellation targets only a pending request in the selected batch', async (t) => {
+  let filter: any
+  t.mock.method(ProPresenterWaitlistModel as any, 'findOneAndUpdate', async (value: any) => {
+    filter = value
+    return { teamId: 'team-a' }
+  })
+  t.mock.method(AuditLogModel as any, 'create', async (value: any) => value)
+  await cancelPendingBatchEntry(20, 'team-a', 123)
+  assert.deepEqual(filter, { teamId: 'team-a', assignedFlowNumber: 20, status: 'pending' })
+})
 
 test('one application with two devices moves intact to the next batch when only one seat remains', async (t) => {
   const created: any[] = []

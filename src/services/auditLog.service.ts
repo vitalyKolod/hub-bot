@@ -58,6 +58,7 @@ const TYPE_LABELS: Record<AuditLogType, { emoji: string; title: string }> = {
   'admin.permission_changed': { emoji: '🔐', title: 'Право администратора изменено' },
   'admin.access_disabled': { emoji: '⛔️', title: 'Доступ администратора отключён' },
   'propresenter.request_title_changed': { emoji: '✏️', title: 'Название заявок изменено' },
+  'propresenter.request_removed': { emoji: '🗑', title: 'Заявка на поток удалена' },
   'propresenter.stream_created': { emoji: '🎬', title: 'Поток ProPresenter создан' },
   'propresenter.stream_date_changed': { emoji: '📅', title: 'Дата потока изменена' },
   'propresenter.team_added': { emoji: '📡', title: 'Команда добавлена в поток' },

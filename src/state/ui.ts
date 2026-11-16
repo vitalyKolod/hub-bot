@@ -9,6 +9,8 @@ export type ScreenId =
   | 'team_propresenter'
   | 'team_content'
   | 'team_members'
+  | 'owner_pick'
+  | 'owner_ok'
   | 'devices'
   | 'create_team_info'
   | 'team_about'
