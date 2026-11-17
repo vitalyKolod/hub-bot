@@ -49,6 +49,23 @@ export async function listTeamDevices(teamId: string) {
   return ProPresenterDeviceModel.find({ teamId, status: 'active' }).sort({ flowNumber: 1, name: 1 })
 }
 
+export function teamDeviceLimit(team: { deviceLimit?: number | null } | null | undefined, reservedCount = 0) {
+  return team?.deviceLimit || Math.max(1, reservedCount)
+}
+
+export async function connectTeamDevice(input: { teamId: string; requesterId: number; flowNumber: number; name: string }) {
+  const team = await requireTeamOwner(input.teamId, input.requesterId)
+  const subscription = team.subscriptions.get('propresenter')
+  if (!subscription || !['active', 'expired'].includes(subscription.status)) throw new Error('У команды нет подписки ProPresenter')
+  const count = await ProPresenterDeviceModel.countDocuments({ teamId: input.teamId, status: 'active' })
+  const reservations = await ProPresenterWaitlistModel.find({ teamId: input.teamId, status: 'assigned' })
+  const limit = teamDeviceLimit(team, reservations.reduce((total, entry) => total + (entry.deviceCount || 1), 0))
+  if (count >= limit) throw new Error(`Достигнут лимит устройств команды: ${limit}. Выберите устройство для замены`)
+  await requireDeviceCapacity(input.flowNumber)
+  return ProPresenterDeviceModel.create({ name: normalizeName(input.name), teamId: input.teamId, flowNumber: input.flowNumber,
+    createdBy: input.requesterId, history: [{ action: 'added', toFlow: input.flowNumber, at: new Date(), actorId: input.requesterId }] })
+}
+
 export async function listTeamDeviceRequests(teamId: string) {
   return ProPresenterDeviceRequestModel.find({ teamId, status: 'pending' }).sort({ createdAt: -1 })
 }
@@ -64,6 +81,10 @@ export async function assignReservedDevice(teamId: string, userId: number, flowN
     throw new Error('У команды нет назначенных мест в этом потоке')
   await requireStream(flowNumber)
   const used = await ProPresenterDeviceModel.countDocuments({ teamId, flowNumber, status: 'active' })
+  const total = await ProPresenterDeviceModel.countDocuments({ teamId, status: 'active' })
+  const reservations = await ProPresenterWaitlistModel.find({ teamId, status: 'assigned' })
+  const limit = teamDeviceLimit(team, reservations.reduce((sum, item) => sum + (item.deviceCount || 1), 0))
+  if (total >= limit) throw new Error(`Достигнут лимит устройств команды: ${limit}`)
   if (used >= (entry.deviceCount || 1)) throw new Error('Все места команды уже назначены')
   return ProPresenterDeviceModel.create({ name: normalizeName(rawName), teamId, flowNumber, createdBy: userId, status: 'active' })
 }
@@ -193,7 +214,11 @@ export async function createApprovedDevice(input: { name: string; teamId: string
     if (existing) return existing
   }
   if (input.replacingDeviceId) await requireStream(input.flowNumber)
-  else await requireDeviceCapacity(input.flowNumber)
+  else {
+    const count = await ProPresenterDeviceModel.countDocuments({ teamId: input.teamId, status: 'active' })
+    if (count >= teamDeviceLimit(team)) throw new Error(`Достигнут лимит устройств команды: ${teamDeviceLimit(team)}`)
+    await requireDeviceCapacity(input.flowNumber)
+  }
   return ProPresenterDeviceModel.create({
     name: normalizeName(input.name), teamId: input.teamId, flowNumber: input.flowNumber,
     createdBy: input.adminId,
