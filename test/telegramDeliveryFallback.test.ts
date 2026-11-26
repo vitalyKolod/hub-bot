@@ -2,12 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { telegramDeliveryFallback } from '../src/utils/telegramDeliveryFallback.js'
 
-test('privacy-restricted profile button is removed while other buttons stay', async () => {
+for (const error of ['BUTTON_USER_PRIVACY_RESTRICTED', 'BUTTON_USER_INVALID']) test(`${error} profile button is removed while other buttons stay`, async () => {
   const calls: any[] = []
   const prev: any = async (_method: string, payload: any) => {
     calls.push(payload)
     return calls.length === 1
-      ? { ok: false, error_code: 400, description: 'Bad Request: BUTTON_USER_PRIVACY_RESTRICTED' }
+      ? { ok: false, error_code: 400, description: `Bad Request: ${error}` }
       : { ok: true, result: { message_id: 1 } }
   }
   const payload: any = {
