@@ -53,7 +53,13 @@ export async function teamListScreen(userId: number): Promise<ScreenView> {
     .plain(' ')
     .plain('\n\n')
 
-  message = message.plain(`👤 ${user?.fio || 'Имя не указано'}\n🏙 Город: ${user?.city || 'Не указано'}\n⛪ Церковь: ${user?.church || 'Не указано'}\n\n`)
+  message = message
+    .emoji('👤', '6032693626394382504')
+    .plain(` ${user?.fio || 'Имя не указано'}\n`)
+    .emoji('🏙', '5821128296217185461')
+    .plain(` Город: ${user?.city || 'Не указано'}\n`)
+    .emoji('⛪', '5370857213533379300')
+    .plain(` Церковь: ${user?.church || 'Не указано'}\n\n`)
 
   if (teams.length === 0) {
     message = message

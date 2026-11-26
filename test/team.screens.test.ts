@@ -8,6 +8,7 @@ import { ProPresenterDeviceModel } from '../src/models/ProPresenterDevice.js'
 import { ProPresenterStreamModel } from '../src/models/ProPresenterStream.js'
 import { parseCb } from '../src/core/callback.js'
 import { teamScreen, teamProPresenterScreen, teamContentScreen, teamMembersScreen, teamOwnerTransferScreen, teamOwnerConfirmScreen } from '../src/screens/team.js'
+import { teamListScreen } from '../src/screens/team-list.js'
 import { validateInvite } from '../src/services/teamInvite.service.js'
 import { getProduct } from '../src/config/products.js'
 
@@ -30,6 +31,18 @@ function setup(t: any, members = 1) {
   return team
 }
 function buttons(screen: any) { return screen.keyboard.inline_keyboard.flat() }
+
+test('team list shows the requested profile icons', async (t) => {
+  t.mock.method(TeamModel as any, 'find', async () => [])
+  t.mock.method(UserModel as any, 'findOne', async () => ({ fio: 'Виталий', city: 'Ханская', church: 'Спасение' }))
+  const screen = await teamListScreen(10)
+  assert.match(screen.caption, /Виталий\n🏙 Город: Ханская\n⛪ Церковь: Спасение/)
+  assert.deepEqual(
+    screen.caption_entities?.filter((entity: any) => entity.type === 'custom_emoji').slice(1, 4)
+      .map((entity: any) => entity.custom_emoji_id),
+    ['6032693626394382504', '5821128296217185461', '5370857213533379300']
+  )
+})
 
 test('team overview is compact and routes to three detailed screens', async (t) => {
   setup(t)
