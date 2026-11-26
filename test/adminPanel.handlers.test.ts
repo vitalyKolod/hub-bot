@@ -7,6 +7,7 @@ import { apCb } from '../src/constants/admin-panel.js'
 import { AuditLogModel } from '../src/models/AuditLog.js'
 import { ProPresenterWaitlistModel } from '../src/models/ProPresenterWaitlist.js'
 import { ProPresenterRequestBatchModel } from '../src/models/ProPresenterRequestBatch.js'
+import { ProPresenterStreamModel } from '../src/models/ProPresenterStream.js'
 import { ProductPriceModel } from '../src/models/ProductPrice.js'
 import { PRODUCTS } from '../src/config/products.js'
 
@@ -45,6 +46,7 @@ test('management menu uses only the configured custom icons on section buttons',
   const subscriptionsButton: any = buttons.find((item) => item.text === '📦 Подписки')
   assert.equal(subscriptionsButton?.callback_data, apCb('subs'))
   assert.equal(subscriptionsButton?.icon_custom_emoji_id, undefined)
+  assert.equal(buttons.find((item) => item.text === 'Потоки ProPresenter')?.callback_data, apCb('streams_home'))
   assert.deepEqual(
     edits[0].options.reply_markup.inline_keyboard.map((row: Array<{ text: string }>) => row.map((button) => button.text)),
     [
@@ -56,6 +58,32 @@ test('management menu uses only the configured custom icons on section buttons',
       ['‹ Назад'],
     ]
   )
+})
+
+test('ProPresenter streams menu opens the list with custom status icons', async (t) => {
+  const { ctx: home, edits: homeEdits } = callbackContext(111, apCb('streams_home'))
+  await handleAdminPanelCallback(home, home.callbackQuery.data)
+  assert.deepEqual(keyboardButtons(homeEdits[0]).map((button) => button.text), [
+    'Потоки', '➕ Новый поток', '‹ Меню',
+  ])
+
+  t.mock.method(ProPresenterStreamModel as any, 'find', () => ({
+    sort: async () => [
+      { flowNumber: 9, status: 'active' },
+      { flowNumber: 10, status: 'closed' },
+    ],
+  }))
+  t.mock.method(TeamModel as any, 'countDocuments', async () => 0)
+  t.mock.method(TeamModel as any, 'find', async () => [])
+  const { ctx: list, edits: listEdits } = callbackContext(111, apCb('streams'))
+  await handleAdminPanelCallback(list, list.callbackQuery.data)
+  const buttons = keyboardButtons(listEdits[0])
+  assert.equal(buttons[0].icon_custom_emoji_id, '5433776994066111727')
+  assert.equal(buttons[1].icon_custom_emoji_id, '5433942135558643707')
+  assert.equal(buttons[0].callback_data, apCb('stream', 9))
+  assert.equal(buttons[1].callback_data, apCb('stream', 10))
+  assert.equal(buttons[2].callback_data, apCb('streams_home'))
+  assert.ok(!buttons.some((button) => button.text.includes('Новый поток')))
 })
 
 type RecordedEdit = {
