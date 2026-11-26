@@ -293,6 +293,7 @@ function callbackPermission(scope: string, rest: string[]) {
   if (scope === 'tl' || scope === 'search_t') return 'teams.view' as const
   if (scope === 't') return rest[1] ? 'teams.edit' as const : 'teams.view' as const
   if (scope === 'streams') return 'streams.view' as const
+  if (scope === 'streams_home') return 'streams.view' as const
   if (scope === 'stream_new') return 'streams.edit' as const
   if (scope === 'stream') return rest[1] ? 'streams.edit' as const : 'streams.view' as const
   if (scope === 'wait') {
@@ -328,7 +329,7 @@ export async function showAdminPanelMenu(ctx: Context) {
     .text('Команды', apCb('tl', 0))
     .icon(ADMIN_MANAGEMENT_ICONS.teams)
     .row()
-    .text('Потоки ProPresenter', apCb('streams'))
+    .text('Потоки ProPresenter', apCb('streams_home'))
     .icon(ADMIN_MANAGEMENT_ICONS.streams)
     .text(
       nextBatch ? `${nextBatch.title} (${nextBatch.count}/${requestBatchCapacity(nextBatch.count)})` : 'Заявки на поток',
@@ -1291,6 +1292,14 @@ function parseFlowNumberInput(text: string): number {
 
 // ==================== ПОТОКИ PROPRESENTER (справочник, не привязан к юзеру) ====================
 
+async function showStreamsMenu(ctx: Context) {
+  const kb = new InlineKeyboard()
+    .text('Потоки', apCb('streams')).row()
+    .text('➕ Новый поток', apCb('stream_new')).row()
+    .text('‹ Меню', apCb('menu'))
+  await render(ctx, 'Потоки ProPresenter', kb, false)
+}
+
 async function getStreamCounts(flowNumber: number) {
   const [teamCount, userIds] = await Promise.all([
     ap.adminGetStreamOccupancy(flowNumber),
@@ -1307,15 +1316,14 @@ async function showStreamsList(ctx: Context) {
   )
   const kb = new InlineKeyboard()
   for (const [index, s] of streams.entries()) {
-    const mark = s.status === 'active' ? '🟢' : '🔴'
+    const statusIcon = s.status === 'active' ? '5433776994066111727' : '5433942135558643707'
     const { teamCount, userCount } = streamCounts[index]
     kb.text(
-      `${mark} Поток #${s.flowNumber} · команд: ${teamCount} · пользователей: ${userCount}`,
+      `Поток #${s.flowNumber} · команд: ${teamCount} · пользователей: ${userCount}`,
       apCb('stream', s.flowNumber)
-    ).row()
+    ).icon(statusIcon).row()
   }
-  kb.text('➕ Новый поток', apCb('stream_new')).row()
-  kb.text('‹ Меню', apCb('menu'))
+  kb.text('‹ Назад', apCb('streams_home'))
 
   const text = streams.length ? 'Потоки ProPresenter (из БД):' : 'Потоков пока нет.'
   await render(ctx, text, kb, false)
@@ -1433,7 +1441,7 @@ async function promptAddTeamToStream(ctx: Context, flowNumber: number) {
 
 async function startNewStream(ctx: Context) {
   getSession(ctx).adminPanelInput = { mode: 'stream_new', step: 'email', draft: {} } as ApInput
-  const kb = new InlineKeyboard().text('‹ Отмена', apCb('streams'))
+  const kb = new InlineKeyboard().text('‹ Отмена', apCb('streams_home'))
   await render(ctx, 'Новый поток. Введи email:', kb, false)
 }
 
@@ -1618,6 +1626,9 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
       }
 
       // ---- потоки ----
+      case 'streams_home':
+        await showStreamsMenu(ctx)
+        break
       case 'streams':
         await showStreamsList(ctx)
         break
