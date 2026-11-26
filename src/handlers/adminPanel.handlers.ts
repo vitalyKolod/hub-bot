@@ -339,8 +339,7 @@ export async function showAdminPanelMenu(ctx: Context) {
   if (ctx.from && await hasAdminPermission(ctx.from.id, 'tutorials.view')) {
     kb.text('Туториалы', apCb('tuts')).icon('5375309569905938163')
   }
-  kb.text('Подписки', apCb('subs'))
-    .icon(PRODUCT_CUSTOM_EMOJI_IDS.procontent)
+  kb.text('📦 Подписки', apCb('subs'))
     .row()
     .text('Потоки Яндекс 360', 'y360:admin')
     .icon('5310051278464778081')
