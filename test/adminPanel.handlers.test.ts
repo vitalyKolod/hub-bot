@@ -7,6 +7,8 @@ import { apCb } from '../src/constants/admin-panel.js'
 import { AuditLogModel } from '../src/models/AuditLog.js'
 import { ProPresenterWaitlistModel } from '../src/models/ProPresenterWaitlist.js'
 import { ProPresenterRequestBatchModel } from '../src/models/ProPresenterRequestBatch.js'
+import { ProductPriceModel } from '../src/models/ProductPrice.js'
+import { PRODUCTS } from '../src/config/products.js'
 
 process.env.ADMIN_IDS = '111,222'
 process.env.ADMIN_GROUP_ID ||= '-100000000001'
@@ -40,6 +42,20 @@ test('management menu uses only the configured custom icons on section buttons',
     assert.equal(button?.icon_custom_emoji_id, icon)
     assert.doesNotMatch(label, /^[👥🏘📡📋👮]/u)
   }
+  const subscriptionsButton: any = buttons.find((item) => item.text === '📦 Подписки')
+  assert.equal(subscriptionsButton?.callback_data, apCb('subs'))
+  assert.equal(subscriptionsButton?.icon_custom_emoji_id, undefined)
+  assert.deepEqual(
+    edits[0].options.reply_markup.inline_keyboard.map((row: Array<{ text: string }>) => row.map((button) => button.text)),
+    [
+      ['Юзеры', 'Команды'],
+      ['Потоки ProPresenter', 'Заявки на поток №21 (2/10)'],
+      ['Туториалы', '📦 Подписки'],
+      ['Потоки Яндекс 360'],
+      ['Администраторы'],
+      ['‹ Назад'],
+    ]
+  )
 })
 
 type RecordedEdit = {
@@ -377,6 +393,57 @@ test('private admin search edits its prompt and deletes the query without sendin
   assert.equal(edits.at(-1)?.messageId, 50)
   assert.equal(edits.at(-1)?.text, 'Найдено: 1')
   assert.equal(keyboardButtons(edits.at(-1)!)[0].callback_data, apCb('t', 'team-1'))
+})
+
+test('subscription price input is deleted and applied only after confirmation', async (t) => {
+  const originalRub = PRODUCTS.procontent.priceRub
+  const originalUsd = PRODUCTS.procontent.priceUsd
+  let savedRub: number | undefined
+  t.mock.method(ProductPriceModel as any, 'findOneAndUpdate', async (_filter: any, update: any) => { savedRub = update.$set.priceRub })
+  try {
+    const { ctx: prompt, edits } = callbackContext(111, apCb('sub', 'procontent', 'price'))
+    prompt.chat.type = 'private'
+    await handleAdminPanelCallback(prompt, prompt.callbackQuery.data)
+    assert.equal(prompt.session.adminPanelInput.mode, 'edit_product_price')
+
+    const { ctx: input } = textContext(111, '850 рублей', prompt.session, edits)
+    input.chat.type = 'private'
+    let deleted = false
+    input.deleteMessage = async () => { deleted = true }
+    await handleAdminPanelText(input)
+    assert.equal(deleted, true)
+    assert.equal(savedRub, undefined)
+    assert.match(edits.at(-1)!.text, /850 ₽ — 8,5 \$/)
+    assert.ok(keyboardButtons(edits.at(-1)!).some((button) => button.callback_data === apCb('sub', 'procontent', 'save', 850)))
+
+    const { ctx: confirm } = callbackContext(111, apCb('sub', 'procontent', 'save', 850))
+    await handleAdminPanelCallback(confirm, confirm.callbackQuery.data)
+    assert.equal(savedRub, 850)
+    assert.equal(PRODUCTS.procontent.priceUsd, 8.5)
+  } finally {
+    PRODUCTS.procontent.priceRub = originalRub
+    PRODUCTS.procontent.priceUsd = originalUsd
+  }
+})
+
+test('subscriptions show content products and list only active teams', async (t) => {
+  const { ctx: menu, edits: menuEdits } = callbackContext(111, apCb('subs'))
+  await handleAdminPanelCallback(menu, menu.callbackQuery.data)
+  const labels = keyboardButtons(menuEdits[0]).map((button) => button.text)
+  assert.ok(labels.includes('ProContent'))
+  assert.ok(labels.includes('Sunday Screens'))
+  assert.ok(!labels.includes('Pro Presenter'))
+
+  t.mock.method(TeamModel as any, 'find', (filter: any) => {
+    assert.equal(filter['subscriptions.procontent.status'], 'active')
+    assert.ok(filter['subscriptions.procontent.expiresAt'].$gt instanceof Date)
+    return { sort: () => ({ skip: () => ({ limit: async () => [{ _id: 'team-1', name: 'Команда' }] }) }) }
+  })
+  t.mock.method(TeamModel as any, 'countDocuments', async () => 1)
+  const { ctx: teams, edits } = callbackContext(111, apCb('subteams', 'procontent', 0))
+  await handleAdminPanelCallback(teams, teams.callbackQuery.data)
+  assert.match(edits[0].text, /активные команды: 1/)
+  assert.ok(keyboardButtons(edits[0]).some((button) => button.callback_data === apCb('subteam', 'procontent', 0, 'team-1')))
 })
 
 test('private admin validation errors edit the prompt and preserve retry state', async () => {

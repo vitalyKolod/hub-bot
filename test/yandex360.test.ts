@@ -243,7 +243,7 @@ test('Yandex 360 removes text entered into its forms even when validation fails'
 test('main menu uses Yandex 360 media navigation with the requested custom icon', async () => {
   const { mainScreen } = await import('../src/screens/main.js')
   const buttons = mainScreen(1).keyboard.inline_keyboard.flat()
-  const button = buttons.find(button => button.text === 'Яндекс 360')
+  const button = buttons.find(button => button.text === 'ЯНДЕКС 360')
   assert.equal(button?.callback_data, 'a=open&s=yandex360')
   assert.equal(button?.icon_custom_emoji_id, '5310051278464778081')
 })

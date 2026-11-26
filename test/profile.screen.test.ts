@@ -143,12 +143,9 @@ test('only an owned team name contains the crown marker', () => {
   assert.doesNotMatch(memberProfile.text, /👑/)
 })
 
-test('main menu profile button has a custom icon without a unicode emoji in its text', () => {
-  const button = mainScreen(100).keyboard.inline_keyboard.flat().find((item) => 'text' in item && item.text === 'Мой профиль')
-
-  assert.ok(button && 'callback_data' in button)
-  assert.equal(button.icon_custom_emoji_id, PROFILE_ICONS.profile)
-  assert.equal(button.callback_data, 'a=open&s=profile')
+test('main menu keeps the requested section order without the profile button', () => {
+  const buttons = mainScreen(100).keyboard.inline_keyboard.flat().filter((item) => 'text' in item)
+  assert.deepEqual(buttons.map((item) => item.text), ['МОИ КОМАНДЫ', 'ХАБ КОМЬЮНИТИ', 'ЯНДЕКС 360', 'ПОМОЩЬ'])
 })
 
 test('profile back button returns through the existing home action', () => {

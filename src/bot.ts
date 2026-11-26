@@ -1423,6 +1423,9 @@ export function registerHandlers(bot: Bot<MyContext>) {
     // должен обрабатываться раньше, чем обычный ответ пользователю.
     if (await relayAdminMessage(ctx)) return
 
+    // Поля профиля и личные сценарии нельзя заполнять сообщениями из групп.
+    if (ctx.chat.type !== 'private') return
+
     const profile = await getOrCreateUser(userId)
 
     if (ctx.session.editingField) {

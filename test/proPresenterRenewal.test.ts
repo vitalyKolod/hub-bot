@@ -245,3 +245,32 @@ test('expired ProPresenter stream does not remove members from its chat during r
   assert.equal(tasks, 0)
   assert.equal(bans, 0)
 })
+
+test('active renewal suppresses generic private expiry reminders', async (t) => {
+  const expiry = new Date(Date.now() + 7 * 86_400_000)
+  const team: any = {
+    _id: 'team-1', name: 'Команда', ownerId: 10,
+    members: [{ telegramId: 10, status: 'active' }], reminders: [],
+    subscriptions: new Map([['propresenter', { status: 'active', expiresAt: expiry, meta: { flowNumber: 9 } }]]),
+    async save() {},
+  }
+  const unpaidTeam: any = {
+    _id: 'team-2', name: 'Другая команда', ownerId: 20,
+    members: [{ telegramId: 20, status: 'active' }], reminders: [],
+    subscriptions: new Map([['propresenter', { status: 'active', expiresAt: expiry, meta: { flowNumber: 9 } }]]),
+    async save() {},
+  }
+  const sentTo: number[] = []
+  t.mock.method(TeamModel as any, 'find', async () => [team, unpaidTeam])
+  t.mock.method(ProPresenterStreamModel as any, 'find', async () => [{ flowNumber: 9, expiresAt: expiry, adminReminders: [], async save() {} }])
+  t.mock.method(ProPresenterRenewalCampaignModel as any, 'find', async () => [{ _id: campaignId, flowNumber: 9, cycleEndsAt: expiry }])
+  t.mock.method(ProPresenterRenewalSeatModel as any, 'findOne', async (filter: any) => filter.teamId === 'team-1' ? { paymentStatus: 'pending', devices: [] } : { paymentStatus: 'none', devices: [] })
+  t.mock.method(GroupAccessRevocationModel as any, 'find', async () => [])
+  t.mock.method(AuditLogModel as any, 'create', async () => ({}))
+  const bot: any = { api: { async sendMessage(chatId: number) { sentTo.push(chatId) } } }
+
+  await runReminders(bot)
+
+  assert.ok(!sentTo.includes(team.ownerId))
+  assert.ok(sentTo.includes(unpaidTeam.ownerId))
+})

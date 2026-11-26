@@ -16,6 +16,7 @@ import {
   getAdminRoleDisplay, type AdminPermissionCategory, type AdminPermissionKey, type AdminRole,
 } from '../constants/admin-access.js'
 import { getProduct } from '../config/products.js'
+import { formatPricePair, setProductPrice, validatePriceRub } from '../services/productPrice.service.js'
 import {
   apCb,
   parseAdminPanelCallback,
@@ -59,6 +60,7 @@ const AUDIT_LOG_THREAD_ID = Number(process.env.AUDIT_LOG_THREAD_ID || 390)
 type ApInputMode =
   | 'search_user'
   | 'search_team'
+  | 'edit_product_price'
   | 'edit_user_field'
   | 'add_user_to_team'
   | 'create_team_name'
@@ -282,6 +284,10 @@ function paginationRow(kb: InlineKeyboard, page: number, totalPages: number, bas
 }
 
 function callbackPermission(scope: string, rest: string[]) {
+  if (scope === 'subs') return 'subscriptions.view' as const
+  if (scope === 'sub') return ['edit', 'price', 'save'].includes(rest[1]) ? 'subscriptions.edit' as const : 'subscriptions.view' as const
+  if (scope === 'subteams') return 'subscriptions.view' as const
+  if (scope === 'subteam') return 'teams.view' as const
   if (scope === 'ul' || scope === 'search_u') return 'users.view' as const
   if (scope === 'u') return rest[1] ? 'users.edit' as const : 'users.view' as const
   if (scope === 'tl' || scope === 'search_t') return 'teams.view' as const
@@ -300,6 +306,7 @@ function callbackPermission(scope: string, rest: string[]) {
 }
 
 function inputPermission(mode: ApInputMode) {
+  if (mode === 'edit_product_price') return 'subscriptions.edit' as const
   if (mode === 'search_user') return 'users.view' as const
   if (['edit_user_field', 'add_user_to_team', 'create_team_name'].includes(mode)) return 'users.edit' as const
   if (mode === 'search_team') return 'teams.view' as const
@@ -329,18 +336,72 @@ export async function showAdminPanelMenu(ctx: Context) {
     )
     .icon(ADMIN_MANAGEMENT_ICONS.requests)
     .row()
+  if (ctx.from && await hasAdminPermission(ctx.from.id, 'tutorials.view')) {
+    kb.text('Туториалы', apCb('tuts')).icon('5375309569905938163')
+  }
+  kb.text('📦 Подписки', apCb('subs'))
+    .row()
     .text('Потоки Яндекс 360', 'y360:admin')
     .icon('5310051278464778081')
     .row()
   if (ctx.from && await hasAdminPermission(ctx.from.id, 'admins.view')) {
     kb.text('Администраторы', apCb('admins')).icon(ADMIN_MANAGEMENT_ICONS.admins).row()
   }
-  if (ctx.from && await hasAdminPermission(ctx.from.id, 'tutorials.view')) {
-    kb.text('Туториалы', apCb('tuts')).icon('5375309569905938163').row()
-  }
   kb.text('‹ Назад', 'admin:root')
 
   await render(ctx, '🛠 *Панель управления*\n\nВыбери раздел.', kb)
+}
+
+function subscriptionProduct(id: string) {
+  if (id === 'propresenter' || !(TEAM_PRODUCT_IDS as readonly string[]).includes(id)) throw new Error('Подписка не найдена')
+  return getProduct(id)!
+}
+
+async function showSubscriptions(ctx: Context) {
+  const kb = new InlineKeyboard()
+  for (const id of TEAM_PRODUCT_IDS.filter((productId) => productId !== 'propresenter')) {
+    const product = subscriptionProduct(id)
+    kb.text(product.name, apCb('sub', id)).icon(PRODUCT_CUSTOM_EMOJI_IDS[id]).row()
+  }
+  kb.text('‹ Меню', apCb('menu'))
+  await render(ctx, '📦 Подписки\n\nВыбери подписку.', kb, false)
+}
+
+async function showSubscription(ctx: Context, id: string) {
+  const product = subscriptionProduct(id)
+  const kb = new InlineKeyboard()
+  if (product.cartable) kb.text('✏️ Редактировать', apCb('sub', id, 'edit')).row()
+  kb.text('👥 Команды', apCb('subteams', id, 0)).row()
+  kb.text('‹ Подписки', apCb('subs'))
+  const price = product.priceRub === null ? 'отдельная цена потока' : formatPricePair(product.priceRub)
+  await render(ctx, `${product.name}\n\nЦена: ${price}`, kb, false)
+}
+
+async function showSubscriptionEdit(ctx: Context, id: string) {
+  const product = subscriptionProduct(id)
+  if (!product.cartable || product.priceRub === null) throw new Error('Редактирование этой подписки недоступно')
+  const kb = new InlineKeyboard()
+    .text('💰 Цена', apCb('sub', id, 'price')).row()
+    .text('‹ К подписке', apCb('sub', id))
+  await render(ctx, `✏️ ${product.name}\n\nЦена: ${formatPricePair(product.priceRub)}`, kb, false)
+}
+
+async function promptSubscriptionPrice(ctx: Context, id: string) {
+  const product = subscriptionProduct(id)
+  if (!product.cartable) throw new Error('Цена этой подписки недоступна для редактирования')
+  getSession(ctx).adminPanelInput = { mode: 'edit_product_price', product: id } as ApInput
+  await render(ctx, 'Введите новую цену в рублях:', new InlineKeyboard().text('‹ Назад', apCb('sub', id, 'edit')), false)
+}
+
+async function showSubscriptionTeams(ctx: Context, id: string, page: number) {
+  const product = subscriptionProduct(id)
+  const safePage = Number.isSafeInteger(page) && page >= 0 ? page : 0
+  const { teams, total, totalPages } = await ap.adminListActiveSubscriptionTeams(id, safePage)
+  const kb = new InlineKeyboard()
+  for (const team of teams) kb.text(team.name.slice(0, 60), apCb('subteam', id, safePage, team._id.toString())).row()
+  paginationRow(kb, safePage, totalPages, `subteams:${id}`)
+  kb.text('‹ К подписке', apCb('sub', id))
+  await render(ctx, `${product.name} · активные команды: ${total}${teams.length ? '' : '\n\nКоманд пока нет.'}`, kb, false)
 }
 
 async function showAdmins(ctx: Context) {
@@ -1408,6 +1469,25 @@ export async function handleAdminPanelCallback(ctx: Context, data: string): Prom
       case 'menu':
         await showAdminPanelMenu(ctx)
         break
+      case 'subs':
+        await showSubscriptions(ctx)
+        break
+      case 'sub': {
+        const id = rest[0]
+        if (rest[1] === 'edit') await showSubscriptionEdit(ctx, id)
+        else if (rest[1] === 'price') await promptSubscriptionPrice(ctx, id)
+        else if (rest[1] === 'save') {
+          await setProductPrice(id, validatePriceRub(rest[2] || ''))
+          await showSubscriptionEdit(ctx, id)
+        } else await showSubscription(ctx, id)
+        break
+      }
+      case 'subteams':
+        await showSubscriptionTeams(ctx, rest[0], Number(rest[1] || 0))
+        break
+      case 'subteam':
+        await showTeamCard(ctx, rest[2], { label: '‹ К командам подписки', callback: apCb('subteams', rest[0], rest[1]) })
+        break
       case 'admins':
         if (rest[0] === 'add' && rest[1]) await promptAdminId(ctx, rest[1] as AdminRole)
         else if (rest[0] === 'add') await promptAddAdmin(ctx)
@@ -1649,10 +1729,19 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
 
   session.adminPanelInput = undefined
   ctx = adminInputContext(ctx, input)
-  if ((ctx as any).adminInputTarget || input.mode === 'waitlist_stream_new') await ctx.deleteMessage().catch(() => {})
+  if ((ctx as any).adminInputTarget || input.mode === 'waitlist_stream_new' || input.mode === 'edit_product_price') await ctx.deleteMessage().catch(() => {})
 
   try {
     switch (input.mode) {
+      case 'edit_product_price': {
+        const rub = validatePriceRub(text)
+        const kb = new InlineKeyboard()
+          .text('✅ Всё верно', apCb('sub', input.product!, 'save', rub)).row()
+          .text('✏️ Изменить', apCb('sub', input.product!, 'price')).row()
+          .text('‹ Отмена', apCb('sub', input.product!, 'edit'))
+        await render(ctx, `${productName(input.product!)}\n\nНовая цена: ${formatPricePair(rub)}\n\nВсё верно?`, kb, false)
+        break
+      }
       case 'search_user':
         await runUserSearch(ctx, text)
         break
@@ -1841,7 +1930,7 @@ export async function handleAdminPanelText(ctx: Context): Promise<boolean> {
         return false
     }
   } catch (err: any) {
-    if (input.mode === 'waitlist_stream_new') session.adminPanelInput = input
+    if (input.mode === 'waitlist_stream_new' || input.mode === 'edit_product_price') session.adminPanelInput = input
     await ctx.reply('❌ ' + (err.message || 'Ошибка'))
   }
 

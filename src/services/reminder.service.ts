@@ -2,6 +2,7 @@ import { Bot, InlineKeyboard } from 'grammy'
 import { getProduct } from '../config/products.js'
 import { packCb } from '../core/callback.js'
 import { ProPresenterStreamModel } from '../models/ProPresenterStream.js'
+import { ProPresenterRenewalCampaignModel, ProPresenterRenewalSeatModel } from '../models/ProPresenterRenewal.js'
 import { TeamModel } from '../models/Team.js'
 import { GroupAccessRevocationModel } from '../models/GroupAccessRevocation.js'
 import { auditLogService, buildSubscriptionTargetId, recordOperationalEvent } from './auditLog.service.js'
@@ -307,6 +308,7 @@ async function reconcileGroupAccess(bot: Bot<any>, teams: any[], streams: Map<nu
 export async function runReminders(bot: Bot<any>) {
   const now = new Date()
   const streams = await ProPresenterStreamModel.find({ expiresAt: { $ne: null } })
+  let renewalCycles: Map<string, any> | undefined
   const streamsByNumber = new Map(streams.map((stream) => [stream.flowNumber, stream]))
   const streamExpires = new Map(streams.map((stream) => [stream.flowNumber, stream.expiresAt!]))
   const teams = await TeamModel.find({})
@@ -322,6 +324,17 @@ export async function runReminders(bot: Bot<any>) {
           : subscription.expiresAt
       if (!expiryValue) continue
       const expiresAt = new Date(expiryValue)
+      if (productId === 'propresenter' && !renewalCycles) {
+        const campaigns = await ProPresenterRenewalCampaignModel.find({ status: 'active' })
+        renewalCycles = new Map(campaigns.map((campaign) => [`${campaign.flowNumber}:${campaign.cycleEndsAt.toISOString()}`, campaign]))
+      }
+      const activeRenewal = productId === 'propresenter' ? renewalCycles?.get(`${flowNumber}:${expiresAt.toISOString()}`) : undefined
+      const alreadyContributed = async () => {
+        if (!activeRenewal) return false
+        const seat = await ProPresenterRenewalSeatModel.findOne({ campaignId: activeRenewal._id, teamId: String(team._id) })
+        return seat?.paymentStatus === 'paid' || seat?.paymentStatus === 'pending' ||
+          seat?.devices?.some((device: any) => device.active !== false && ['paid', 'pending'].includes(device.paymentStatus)) || false
+      }
 
       // Поток является источником правды для всех команд в нём.
       if (
@@ -351,7 +364,7 @@ export async function runReminders(bot: Bot<any>) {
             expiresAt,
           },
         })
-        await notifyMembers(
+        if (!(await alreadyContributed())) await notifyMembers(
           bot,
           team,
           `❌ Подписка «${getProduct(productId)?.name || productId}» команды «${team.name}» закончилась.\n\nДанные и ссылки на чаты больше недоступны. Чтобы вернуть доступ, продлите подписку.`,
@@ -383,7 +396,9 @@ export async function runReminders(bot: Bot<any>) {
           ? `🎬 Вы находитесь в потоке ProPresenter №${flowNumber}. До окончания подписки осталось ${remaining} дн.\n\nОбсудите продление в чате своего потока, чтобы не потерять доступ.`
           : `⏳ До окончания подписки «${productName}» команды «${team.name}» осталось ${remaining} дн.\n\nДля продления нажмите кнопку ниже.`
 
-      await notifyMembers(bot, team, text, productId)
+      // Если чек по команде уже отправлен, о неоплаченных устройствах владельцу
+      // напомнит отдельный сценарий сбора продления.
+      if (!(await alreadyContributed())) await notifyMembers(bot, team, text, productId)
       team.reminders.push(reminderKey)
 
       if (productId === 'propresenter') {

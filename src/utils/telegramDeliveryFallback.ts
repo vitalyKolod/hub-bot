@@ -9,7 +9,7 @@ export const telegramDeliveryFallback: Transformer = async (prev, method, payloa
 
   for (let attempt = 0; attempt < 2 && !response.ok; attempt++) {
     const description = String(response.description || '')
-    if (!removedProfileButton && description.includes('BUTTON_USER_PRIVACY_RESTRICTED')) {
+    if (!removedProfileButton && /BUTTON_USER_(?:PRIVACY_RESTRICTED|INVALID)/.test(description)) {
       const markup = currentPayload.reply_markup
       const rows = markup?.inline_keyboard
       if (!Array.isArray(rows)) break
