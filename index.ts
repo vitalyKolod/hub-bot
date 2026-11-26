@@ -3,6 +3,7 @@ import { API_CONSTANTS, Bot } from 'grammy'
 import { config } from './src/config.js'
 import { registerHandlers } from './src/bot.js'
 import { connectDB } from './db.js'
+import { refreshProductPrices } from './src/services/productPrice.service.js'
 import { runReminders } from './src/services/reminder.service.js'
 
 export async function start() {
@@ -11,6 +12,7 @@ export async function start() {
 
     // 1. Подключаем БД
     await connectDB()
+    await refreshProductPrices()
 
     // 2. Создаём бота
     const bot = new Bot(config.BOT_TOKEN)

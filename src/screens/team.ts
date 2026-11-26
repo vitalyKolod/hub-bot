@@ -76,7 +76,7 @@ export async function teamScreen(userId: number, input: string | { teamId: strin
   const activeContentCount = PRODUCTS.filter(product => active(team.subscriptions.get(product.id))).length
   let contentQuote = new FormattedString('').emoji('🖥', '5373330964372004748').plain(' Контент для экранов\n\n').bold(`Подписок ${activeContentCount}/${PRODUCTS.length}\n`)
   for (const product of PRODUCTS) contentQuote = contentQuote.plain('\n').concat(productLine(product.name, product.icon, team.subscriptions.get(product.id), byProduct.get(product.id))).plain('\n')
-  const message = header(team.name).bold('⛪ ПОДПИСКИ\n\n').expandableBlockquote(propQuote).plain('\n\n━━━━━━━━━━━━━━\n').expandableBlockquote(contentQuote).plain('\n━━━━━━━━━━━━━━\n').bold('👑 Владелец\n').plain(`${owner?.fio || 'Не найден'}\n━━━━━━━━━━━━━━\n`).bold('Состав команды:\n').bold(`👥 Участников: ${team.members.length}`)
+  const message = header(team.name).bold('⛪ ПОДПИСКИ\n\n').expandableBlockquote(propQuote).plain('\n\n━━━━━━━━━━━━━━\n').expandableBlockquote(contentQuote).plain('\n━━━━━━━━━━━━━━\n').bold('👑 Владелец\n').plain(`${owner?.fio || 'Не найден'}${team.ownerId === userId ? ' (ВЫ)' : ''}\n━━━━━━━━━━━━━━\n`).bold('Состав команды:\n').bold(`👥 Участников: ${team.members.length}`)
   const kb = new InlineKeyboard()
   kb.text('ProPresenter', packCb({ a: 'open', s: 'team_propresenter', p: teamId })).icon('5251272469175631339').row()
   kb.text('КОНТЕНТ ДЛЯ ЭКРАНОВ', packCb({ a: 'open', s: 'team_content', p: teamId })).icon('5373330964372004748').row()
@@ -180,7 +180,7 @@ export async function teamMembersScreen(userId: number, input: string): Promise<
       .plain(`\n┗ Username: ${profile?.username ? `@${profile.username}` : 'Не указан'}`)
       .plain(`\n┗ ID: ${member.telegramId}\n`)
   }
-  const message = header(team.name).bold('👑 Владелец\n').plain(`${owner?.fio || 'Не найден'}\n━━━━━━━━━━━━━━\n`).expandableBlockquote(quote)
+  const message = header(team.name).bold('👑 Владелец\n').plain(`${owner?.fio || 'Не найден'}${team.ownerId === userId ? ' (ВЫ)' : ''}\n━━━━━━━━━━━━━━\n`).expandableBlockquote(quote)
   const kb = new InlineKeyboard()
   if (page > 0) kb.text('◀️ Предыдущие', packCb({ a: 'open', s: 'team_members', p: `${teamId}:${page - 1}` }))
   if (page < lastPage) kb.text('Следующие ▶️', packCb({ a: 'open', s: 'team_members', p: `${teamId}:${page + 1}` }))

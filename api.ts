@@ -1,11 +1,13 @@
 import 'dotenv/config'
 import { connectDB } from './db.js'
 import { startApiServer } from './src/api/server.js'
+import { refreshProductPrices } from './src/services/productPrice.service.js'
 
 async function start() {
   const botToken = process.env.BOT_TOKEN
   if (!botToken) throw new Error('BOT_TOKEN не задан')
   await connectDB()
+  await refreshProductPrices()
   startApiServer({
     botToken,
     port: Number(process.env.API_PORT || 3001),

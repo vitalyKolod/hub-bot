@@ -3,10 +3,11 @@ import { FormattedString } from '@grammyjs/parse-mode'
 
 import { packCb } from '../core/callback.js'
 import { getUserTeams } from '../services/team.service.js'
+import { UserModel } from '../models/User.js'
 import type { ScreenView } from '../core/render.js'
 
 export async function teamListScreen(userId: number): Promise<ScreenView> {
-  const teams = await getUserTeams(userId)
+  const [teams, user] = await Promise.all([getUserTeams(userId), UserModel.findOne({ telegramId: userId })])
 
   const kb = new InlineKeyboard()
 
@@ -51,6 +52,8 @@ export async function teamListScreen(userId: number): Promise<ScreenView> {
     .emoji('▫️', '5296533616224906961')
     .plain(' ')
     .plain('\n\n')
+
+  message = message.plain(`👤 ${user?.fio || 'Имя не указано'}\n🏙 Город: ${user?.city || 'Не указано'}\n⛪ Церковь: ${user?.church || 'Не указано'}\n\n`)
 
   if (teams.length === 0) {
     message = message

@@ -9,6 +9,8 @@ export function supportScreen(_userId: number): ScreenView {
     photo: HELP_PHOTO,
     caption: '🆘 ПОМОЩЬ\n\nЕсли появились вопросы по работе ХАБ КОМЬЮНИТИ, сложности с ботом или вы обнаружили ошибку — напишите нам.\n\nВыбирите раздел 👇',
     keyboard: new InlineKeyboard()
+      .text('ТУТОРИАЛЫ', packCb({ a: 'open', s: 'tutorials' }))
+      .icon('5944753741512052670').row()
       .text('Написать в поддержку', 'support:start')
       .icon('5307746710682869587').row()
       .url('Написать разработчику', 'https://t.me/vitaly_kolodchenko')

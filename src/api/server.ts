@@ -1,6 +1,7 @@
 import http from 'node:http'
 import { Api } from 'grammy'
 import { PRODUCTS } from '../config/products.js'
+import { refreshProductPrices } from '../services/productPrice.service.js'
 import { SUPPORT_GROUP_ID } from '../config/env.js'
 import { UserModel } from '../models/User.js'
 import { getTeamById, getUserTeams } from '../services/team.service.js'
@@ -164,6 +165,7 @@ export function createApiServer(options: ApiServerOptions) {
         return sendJson(response, 200, { data: serializeTeam(team, session.user.id, profiles) })
       }
       if (path === '/api/products') {
+        await refreshProductPrices()
         const teams = await getUserTeams(session.user.id)
         const statuses = new Map<string, any>()
         for (const team of teams) {

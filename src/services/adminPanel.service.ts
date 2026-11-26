@@ -23,6 +23,18 @@ import { getRequestBatchTitle, renameRequestBatch, requestBatchCapacity } from '
 export const adminGetRequestBatchTitle = getRequestBatchTitle
 export const adminRenameRequestBatch = renameRequestBatch
 
+export async function adminListActiveSubscriptionTeams(productId: string, page: number) {
+  const filter = {
+    [`subscriptions.${productId}.status`]: 'active',
+    [`subscriptions.${productId}.expiresAt`]: { $gt: new Date() },
+  }
+  const [teams, total] = await Promise.all([
+    TeamModel.find(filter).sort({ name: 1 }).skip(page * PAGE_SIZE).limit(PAGE_SIZE),
+    TeamModel.countDocuments(filter),
+  ])
+  return { teams, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) }
+}
+
 function adminAuditActor(adminTelegramId?: number): AuditActor {
   return adminTelegramId
     ? { actorType: 'admin', actorTelegramId: adminTelegramId }
