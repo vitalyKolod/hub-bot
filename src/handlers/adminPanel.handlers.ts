@@ -330,22 +330,23 @@ export async function showAdminPanelMenu(ctx: Context) {
     .row()
     .text('Потоки ProPresenter', apCb('streams'))
     .icon(ADMIN_MANAGEMENT_ICONS.streams)
-    .text('Подписки', apCb('subs'))
-    .icon(PRODUCT_CUSTOM_EMOJI_IDS.procontent)
     .text(
       nextBatch ? `${nextBatch.title} (${nextBatch.count}/${requestBatchCapacity(nextBatch.count)})` : 'Заявки на поток',
       apCb('wait')
     )
     .icon(ADMIN_MANAGEMENT_ICONS.requests)
     .row()
+  if (ctx.from && await hasAdminPermission(ctx.from.id, 'tutorials.view')) {
+    kb.text('Туториалы', apCb('tuts')).icon('5375309569905938163')
+  }
+  kb.text('Подписки', apCb('subs'))
+    .icon(PRODUCT_CUSTOM_EMOJI_IDS.procontent)
+    .row()
     .text('Потоки Яндекс 360', 'y360:admin')
     .icon('5310051278464778081')
     .row()
   if (ctx.from && await hasAdminPermission(ctx.from.id, 'admins.view')) {
     kb.text('Администраторы', apCb('admins')).icon(ADMIN_MANAGEMENT_ICONS.admins).row()
-  }
-  if (ctx.from && await hasAdminPermission(ctx.from.id, 'tutorials.view')) {
-    kb.text('Туториалы', apCb('tuts')).icon('5375309569905938163').row()
   }
   kb.text('‹ Назад', 'admin:root')
 

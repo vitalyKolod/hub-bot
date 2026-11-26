@@ -42,6 +42,17 @@ test('management menu uses only the configured custom icons on section buttons',
     assert.equal(button?.icon_custom_emoji_id, icon)
     assert.doesNotMatch(label, /^[👥🏘📡📋👮]/u)
   }
+  assert.deepEqual(
+    edits[0].options.reply_markup.inline_keyboard.map((row: Array<{ text: string }>) => row.map((button) => button.text)),
+    [
+      ['Юзеры', 'Команды'],
+      ['Потоки ProPresenter', 'Заявки на поток №21 (2/10)'],
+      ['Туториалы', 'Подписки'],
+      ['Потоки Яндекс 360'],
+      ['Администраторы'],
+      ['‹ Назад'],
+    ]
+  )
 })
 
 type RecordedEdit = {
