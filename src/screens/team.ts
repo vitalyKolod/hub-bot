@@ -125,7 +125,7 @@ export async function teamProPresenterScreen(userId: number, teamId: string): Pr
   return { photo: './public/team-propresenter.png', caption: message.caption, caption_entities: message.caption_entities, keyboard: kb }
 }
 
-export async function teamContentScreen(userId: number, teamId: string, ctx?: { api: { getChatMember: (chatId: number, userId: number) => Promise<any>; getChat: (chatId: number) => Promise<any> } }): Promise<ScreenView> {
+export async function teamContentScreen(userId: number, teamId: string): Promise<ScreenView> {
   const { team, byProduct } = await data(teamId)
   const belongs = team.ownerId === userId || team.members.some(member => member.telegramId === userId && member.status === 'active')
   const activeContentCount = PRODUCTS.filter(product => active(team.subscriptions.get(product.id))).length
@@ -133,25 +133,13 @@ export async function teamContentScreen(userId: number, teamId: string, ctx?: { 
   for (const product of PRODUCTS) quote = quote.plain('\n').concat(productLine(product.name, product.icon, team.subscriptions.get(product.id), byProduct.get(product.id), true)).plain('\n')
   const message = header(team.name).expandableBlockquote(quote)
   const kb = new InlineKeyboard()
-  const chatLinks = await Promise.all(PRODUCTS.map(async product => {
-    if (!belongs || !active(team.subscriptions.get(product.id))) return null
-    const entry = { product, url: null as string | null }
-    if (!ctx) return entry
+  for (const product of PRODUCTS) if (belongs && active(team.subscriptions.get(product.id))) {
     const chatId = Number(getProduct(product.id)?.groupId)
-    if (!Number.isSafeInteger(chatId) || chatId >= 0) return entry
-    try {
-      const member = await ctx.api.getChatMember(chatId, userId)
-      if (!['creator', 'administrator', 'member'].includes(member.status) && !(member.status === 'restricted' && member.is_member)) return entry
-      const chat = await ctx.api.getChat(chatId).catch(() => null)
-      const url = chat?.username ? `https://t.me/${chat.username}` : chat?.invite_link || (String(chatId).startsWith('-100') ? `https://t.me/c/${String(chatId).slice(4)}/1` : null)
-      return { product, url }
-    } catch { return entry }
-  }))
-  for (const entry of chatLinks) if (entry) {
-    const label = `Чат — ${entry.product.name}`
-    if (entry.url) kb.url(label, entry.url)
-    else kb.text(label, packCb({ a: 'content_chat', p: teamId, m: entry.product.id }))
-    kb.icon(entry.product.icon).row()
+    // A private chat URL opens immediately for existing members; newcomers still need an approved invite.
+    if (Number.isSafeInteger(chatId) && String(chatId).startsWith('-100')) {
+      kb.url(`Чат — ${product.name}`, `https://t.me/c/${String(chatId).slice(4)}/1`).icon(product.icon).row()
+    }
+    kb.text(`Получить доступ — ${product.name}`, packCb({ a: 'content_chat', p: teamId, m: product.id })).icon(product.icon).row()
   }
   if (team.ownerId === userId) {
     for (const product of PRODUCTS) if (shouldShowRenewal(team.subscriptions.get(product.id))) {
