@@ -135,11 +135,10 @@ export async function teamContentScreen(userId: number, teamId: string): Promise
   const kb = new InlineKeyboard()
   for (const product of PRODUCTS) if (belongs && active(team.subscriptions.get(product.id))) {
     const chatId = Number(getProduct(product.id)?.groupId)
-    // A private chat URL opens immediately for existing members; newcomers still need an approved invite.
+    // A private chat URL opens for existing members and cannot grant access to another account.
     if (Number.isSafeInteger(chatId) && String(chatId).startsWith('-100')) {
       kb.url(`Чат — ${product.name}`, `https://t.me/c/${String(chatId).slice(4)}/1`).icon(product.icon).row()
     }
-    kb.text(`Получить доступ — ${product.name}`, packCb({ a: 'content_chat', p: teamId, m: product.id })).icon(product.icon).row()
   }
   if (team.ownerId === userId) {
     for (const product of PRODUCTS) if (shouldShowRenewal(team.subscriptions.get(product.id))) {

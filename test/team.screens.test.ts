@@ -77,7 +77,7 @@ test('ProPresenter and content details keep chats and purchases in their own scr
   assert.ok(prop.caption_entities?.some((entity: any) => entity.type === 'spoiler'))
   assert.ok(buttons(content).some((button: any) => button.text === 'ДОБАВИТЬ ПОДПИСКУ'))
   assert.equal(buttons(content).find((button: any) => button.text === 'Чат — ProContent')?.url, 'https://t.me/c/1234567890/1')
-  assert.equal(parseCb(buttons(content).find((button: any) => button.text === 'Получить доступ — ProContent')?.callback_data)?.a, 'content_chat')
+  assert.ok(!buttons(content).some((button: any) => button.text.startsWith('Получить доступ —')))
   assert.match(content.caption, /❌ Нет/)
   assert.ok(buttons(prop).some((button: any) => button.text === '◀️ НАЗАД'))
   assert.ok(buttons(content).some((button: any) => button.text === '◀️ НАЗАД'))
@@ -112,7 +112,7 @@ test('ProPresenter profile reads updated stream details before devices are assig
   assert.equal(buttons(screen).find((button: any) => button.text === 'Чат потока №2')?.url, 'https://t.me/new-chat')
 })
 
-test('active subscription offers a direct chat link and an invite for newcomers without Telegram lookups', async (t) => {
+test('active subscription offers only a direct private chat link', async (t) => {
   setup(t)
   const product = getProduct('procontent')!
   const oldGroupId = product.groupId
@@ -120,9 +120,7 @@ test('active subscription offers a direct chat link and an invite for newcomers 
   t.after(() => { product.groupId = oldGroupId })
   const screen = await teamContentScreen(10, teamId)
   assert.equal(buttons(screen).find((button: any) => button.text === 'Чат — ProContent')?.url, 'https://t.me/c/1234567890/1')
-  const button = buttons(screen).find((button: any) => button.text === 'Получить доступ — ProContent')
-  assert.deepEqual(parseCb(button.callback_data), { a: 'content_chat', p: teamId, m: 'procontent', s: undefined })
-  assert.ok(Buffer.byteLength(button.callback_data) <= 64)
+  assert.ok(!buttons(screen).some((button: any) => button.text.startsWith('Получить доступ —')))
 })
 
 test('ProPresenter credentials are restricted to team members', async (t) => {
@@ -166,7 +164,7 @@ test('a paid invite remains valid when the team already has five members', async
   assert.equal(check.team, team)
 })
 
-test('Story Loop opens directly and still offers a protected invite', async (t) => {
+test('Story Loop opens directly without a second access button', async (t) => {
   const team = setup(t)
   team.subscriptions.set('storyloops', { status: 'active', expiresAt: new Date(Date.now() + 86_400_000) })
   const product = getProduct('storyloops')!
@@ -175,7 +173,7 @@ test('Story Loop opens directly and still offers a protected invite', async (t) 
   t.after(() => { product.groupId = oldGroupId })
   const screen = await teamContentScreen(10, teamId)
   assert.equal(buttons(screen).find((button: any) => button.text === 'Чат — Story Loop')?.url, 'https://t.me/c/9876543210/1')
-  assert.equal(parseCb(buttons(screen).find((button: any) => button.text === 'Получить доступ — Story Loop')?.callback_data)?.m, 'storyloops')
+  assert.ok(!buttons(screen).some((button: any) => button.text.startsWith('Получить доступ —')))
 })
 
 test('chat buttons depend on current subscription and active team membership', async (t) => {
@@ -192,12 +190,18 @@ test('chat buttons depend on current subscription and active team membership', a
   assert.ok(!buttons(await teamContentScreen(10, teamId)).some((button: any) => button.text.startsWith('Чат —')))
 })
 
-test('all content products have callbacks within the Telegram limit before joining', async (t) => {
+test('all active content products show only direct chat links', async (t) => {
   const team = setup(t)
-  for (const id of ['procontent', 'cmg', 'sunday_screens', 'cgs', 'storyloops']) {
+  const ids = ['procontent', 'cmg', 'sunday_screens', 'cgs', 'storyloops']
+  const oldGroupIds = ids.map(id => getProduct(id)!.groupId)
+  t.after(() => ids.forEach((id, index) => { getProduct(id)!.groupId = oldGroupIds[index] }))
+  for (const [index, id] of ids.entries()) {
     team.subscriptions.set(id, { status: 'active', expiresAt: new Date(Date.now() + 86_400_000) })
+    getProduct(id)!.groupId = -1001234567890 - index
   }
-  const chats = buttons(await teamContentScreen(10, teamId)).filter((button: any) => button.text.startsWith('Получить доступ —'))
+  const screen = await teamContentScreen(10, teamId)
+  const chats = buttons(screen).filter((button: any) => button.text.startsWith('Чат —'))
   assert.equal(chats.length, 5)
-  for (const button of chats) assert.ok(Buffer.byteLength(button.callback_data) <= 64)
+  for (const button of chats) assert.match(button.url, /^https:\/\/t\.me\/c\/\d+\/1$/)
+  assert.ok(!buttons(screen).some((button: any) => button.text.startsWith('Получить доступ —')))
 })
