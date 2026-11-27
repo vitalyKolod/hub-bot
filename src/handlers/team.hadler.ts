@@ -1,4 +1,6 @@
 import { InlineKeyboard } from 'grammy'
+import { packCb } from '../core/callback.js'
+import { getCartableProducts } from '../config/products.js'
 import { setInputMode, clearInputMode, getOrCreateUser } from '../services/user.service.js'
 import { INPUT_MODES } from '../constants/input-modes.js'
 import { goTo, goHome } from '../state/ui.js'
@@ -89,6 +91,24 @@ export async function handleAcceptTeamInvite(ctx: MyContext, userId: number, cod
 
   goHome(userId)
   await renderScreen(ctx, userId, 'main', undefined, { forceNew: true })
+
+  const chatKeyboard = new InlineKeyboard()
+  for (const product of getCartableProducts()) {
+    const subscription = check.team.subscriptions.get(product.id)
+    const chatId = Number(product.groupId)
+    if (subscription?.status !== 'active' || !subscription.expiresAt ||
+      new Date(subscription.expiresAt).getTime() <= Date.now() || !Number.isSafeInteger(chatId) || chatId >= 0) continue
+    chatKeyboard.text(`Вступить — ${product.name}`, packCb({ a: 'content_chat', p: check.team._id.toString(), m: product.id })).row()
+  }
+  if (chatKeyboard.inline_keyboard.length) {
+    try {
+      await ctx.reply('Чаты вашей команды. Нажмите нужную кнопку, чтобы получить приглашение с проверкой подписки:', {
+        reply_markup: chatKeyboard,
+      })
+    } catch (error) {
+      console.error('Не удалось отправить новому участнику кнопки контент-чатов:', error)
+    }
+  }
 }
 
 export async function handleDeclineTeamInvite(ctx: MyContext, userId: number) {
